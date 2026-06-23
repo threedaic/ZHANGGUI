@@ -23,7 +23,6 @@ const menus = [
   { key: 'wine', label: '存酒盘点', desc: '库存、盘点、酒水台账', path: '/management/wine-inventory' },
   { key: 'rating', label: '评分管理', desc: '桌面评分码、评分统计', path: '/management/rating' },
   { key: 'contracts', label: '合同管理', desc: '员工合同、到期提醒', path: '/management/contracts' },
-  { key: 'printer', label: '打印机配置', desc: '打印机绑定、纸条模板', path: '/management/printer-config' },
 ]
 </script>
 

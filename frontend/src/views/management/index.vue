@@ -155,13 +155,6 @@ const opsCards: FuncCard[] = [
     </svg>`,
   },
   {
-    label: '打印机配置',
-    path: '/management/printer-config',
-    icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
-      <path d="M7 5h14v8H7z"/><path d="M7 17h14v6H7z"/><rect x="10" y="19" width="8" height="2"/><path d="M10 8h8"/>
-    </svg>`,
-  },
-  {
     label: '处罚通知',
     path: '/management/penalties',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">

@@ -193,11 +193,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/management/WineRoster.vue'),
       },
       {
-        path: 'printer-config',
-        name: 'PrinterConfig',
-        component: () => import('@/views/management/PrinterConfig.vue'),
-      },
-      {
         path: 'wine-stocktake',
         name: 'WineStocktake',
         component: () => import('@/views/wine/StocktakeList.vue'),
