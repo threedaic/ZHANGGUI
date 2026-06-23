@@ -179,7 +179,11 @@
             <option value="feie">飞鹅</option>
             <option value="xpyun">芯烨</option>
             <option value="gainscha">佳博</option>
-            <option value="jolimark">映美</option>
+            <option value="jolimark">映美云</option>
+            <option value="zhongwu">中午云</option>
+            <option value="ushengyun">优声云</option>
+            <option value="kuaidi100">快递100</option>
+            <option value="printcenter">365智能云打印</option>
           </select>
         </div>
         <div class="form-group">
