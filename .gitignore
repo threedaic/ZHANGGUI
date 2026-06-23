@@ -73,7 +73,6 @@ backend/app.bak/
 # 自动生成文件
 frontend/auto-imports.d.ts
 frontend/components.d.ts
-frontend/tsconfig.node.json
 
 # 设计稿临时目录
 stitch-designs/

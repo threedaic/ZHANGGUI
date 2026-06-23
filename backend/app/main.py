@@ -94,11 +94,12 @@ async def seed_default_data(conn):
         return
 
     # Store (shared_stores) — 先插门店，拿到 store_id
+    # 注意：raw SQL INSERT 不会触发 ORM 的 Python 端 default，必须显式提供所有 NOT NULL 字段
     store_result = await conn.execute(
         text(
-            "INSERT INTO shared_stores (store_code, store_name, address, region, status, daily_booking_limit) "
+            "INSERT INTO shared_stores (store_code, store_name, address, region, status, daily_booking_limit, brand_fee_rate) "
             "VALUES ('BJ-SLT-001', '北京三里屯店', "
-            "'北京市朝阳区工人体育场北路4号80号楼一层113室', '北京', 'active', 30) "
+            "'北京市朝阳区工人体育场北路4号80号楼一层113室', '北京', 'active', 30, 0.05) "
             "RETURNING store_id"
         )
     )
