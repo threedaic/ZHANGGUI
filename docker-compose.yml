@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: crush-zhanggui-db
+    environment:
+      POSTGRES_USER: crush
+      POSTGRES_PASSWORD: crush_dev_pwd
+      POSTGRES_DB: crush_zhanggui
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crush -d crush_zhanggui"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: crush-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: crush-zhanggui-api
+    network_mode: host
+    env_file:
+      - .env
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+# Crush 2.0 其他端（收银/厨师/全国/客人/桌灯）按 SPEC §6.1 开发节奏
+# 在对应阶段开始时再添加容器配置，当前阶段仅员工端（frontend/）
+
+volumes:
+  pgdata:

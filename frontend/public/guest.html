@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Crush酒吧 - 我的存酒</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Source Han Sans SC', 'Poppins', -apple-system, sans-serif; background: #000000; color: #FFFFFF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    .header { width: 100%; padding: 48px 16px 32px; text-align: center; }
+    .logo { font-size: 28px; font-weight: 900; color: #FB0079; font-family: 'Poppins', sans-serif; letter-spacing: 4px; }
+    .subtitle { font-size: 11px; color: #C8C8C8; margin-top: 4px; letter-spacing: 8px; }
+
+    /* Phone input */
+    .phone-section { width: calc(100% - 32px); max-width: 360px; margin-bottom: 20px; }
+    .phone-input { width: 100%; height: 52px; padding: 0 16px; background: #111111; border: 1px solid #333333; border-radius: 8px; color: #FFFFFF; font-size: 18px; text-align: center; outline: none; letter-spacing: 1px; }
+    .phone-input:focus { border-color: #FB0079; }
+    .phone-input::placeholder { color: #7A7C80; }
+    .phone-hint { font-size: 11px; color: #7A7C80; text-align: center; margin-top: 8px; }
+
+    /* Wine list */
+    .wine-list { width: calc(100% - 32px); max-width: 360px; display: flex; flex-direction: column; gap: 8px; }
+    .wine-card { background: #111111; border: 1px solid #333333; border-radius: 12px; padding: 16px; }
+    .wine-card.retrieved { opacity: 0.4; }
+    .wine-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .wine-row:last-child { margin-bottom: 0; }
+    .wine-name { font-size: 15px; font-weight: 600; color: #FFFFFF; }
+    .wine-badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+    .wine-badge.stored { background: #333333; color: #C8C8C8; }
+    .wine-badge.retrieved { background: #FB0079; color: #FFFFFF; }
+    .wine-info { font-size: 12px; color: #7A7C80; }
+    .wine-ml { font-family: 'Poppins', sans-serif; color: #FF68A2; font-size: 13px; }
+    .wine-retrieve { display: inline-block; margin-top: 10px; padding: 6px 16px; background: #FB0079; color: #FFFFFF; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .wine-retrieve.retrieved-link { background: #333333; color: #7A7C80; cursor: default; }
+
+    /* Empty / Error */
+    .msg { width: calc(100% - 32px); max-width: 360px; text-align: center; padding: 40px 0; }
+    .msg-text { font-size: 14px; color: #7A7C80; }
+    .msg-sub { font-size: 12px; color: #7A7C80; margin-top: 4px; }
+
+    /* Spinner */
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 2px solid #333333; border-top-color: #FB0079; border-radius: 50%; animation: spin 0.6s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .footer { margin-top: 40px; padding: 16px; }
+    .footer-text { font-size: 11px; color: #7A7C80; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">CRUSH</div>
+    <div class="subtitle">我的存酒</div>
+  </div>
+
+  <div class="phone-section">
+    <input
+      id="phone-input"
+      class="phone-input"
+      type="tel"
+      maxlength="11"
+      placeholder="输入手机号查看存酒"
+      autofocus
+      onkeyup="onPhoneKey(event)"
+    />
+    <p class="phone-hint">输入存酒时登记的手机号</p>
+  </div>
+
+  <div id="loading" class="msg" style="display:none">
+    <div class="spinner"></div>
+    <p class="msg-text">查询中...</p>
+  </div>
+
+  <div id="wine-list" class="wine-list" style="display:none"></div>
+
+  <div id="empty" class="msg" style="display:none">
+    <p class="msg-text">暂无存酒记录</p>
+    <p class="msg-sub">请确认手机号是否正确</p>
+  </div>
+
+  <div id="error" class="msg" style="display:none">
+    <p class="msg-text">查询失败，请重试</p>
+  </div>
+
+  <div class="footer"><p class="footer-text">Crush酒吧</p></div>
+
+  <script>
+    var API = '/api/v1';
+    var timer = null;
+
+    function onPhoneKey(e) {
+      if (timer) clearTimeout(timer);
+      var phone = e.target.value.replace(/\s/g, '');
+      if (phone.length < 11) { show(''); return; }
+      if (phone.length > 11) { e.target.value = phone.slice(0, 11); return; }
+      timer = setTimeout(function() { fetchWines(phone); }, 500);
+    }
+
+    async function fetchWines(phone) {
+      show('loading');
+      try {
+        var r = await fetch(API + '/wines/guest?phone=' + encodeURIComponent(phone));
+        var j = await r.json();
+        if (j.code || !j.data) throw new Error(j.message);
+
+        var wines = j.data;
+        if (!wines.length) { show('empty'); return; }
+
+        var html = '';
+        for (var i = 0; i < wines.length; i++) {
+          var w = wines[i];
+          var stored = w.status === 'stored';
+          html +=
+            '<div class="wine-card' + (stored ? '' : ' retrieved') + '">' +
+            '<div class="wine-row">' +
+            '<span class="wine-name">' + esc(w.wine_name) + '</span>' +
+            '<span class="wine-badge ' + (stored ? 'stored' : 'retrieved') + '">' +
+            (stored ? '在存' : '已取') + '</span>' +
+            '</div>' +
+            '<div class="wine-row">' +
+            '<span class="wine-info">' + esc(w.date_stored) + '</span>' +
+            '<span class="wine-ml">剩余 ' + (w.remaining_ml || 0) + 'ml/' + (w.initial_ml || 0) + 'ml</span>' +
+            '</div>' +
+            (stored
+              ? '<a class="wine-retrieve" href="/wine-h5.html?code=' + esc(w.bottle_label) + '">取酒</a>'
+              : '<span class="wine-retrieve retrieved-link">已取完</span>') +
+            '</div>';
+        }
+        document.getElementById('wine-list').innerHTML = html;
+        show('list');
+      } catch (e) { show('error'); }
+    }
+
+    function show(state) {
+      document.getElementById('loading').style.display = state === 'loading' ? '' : 'none';
+      document.getElementById('wine-list').style.display = state === 'list' ? '' : 'none';
+      document.getElementById('empty').style.display = state === 'empty' ? '' : 'none';
+      document.getElementById('error').style.display = state === 'error' ? '' : 'none';
+    }
+
+    function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+  </script>
+</body>
+</html>

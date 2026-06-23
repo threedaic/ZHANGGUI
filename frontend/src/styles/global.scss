@@ -1,0 +1,183 @@
+/* 全局基础样式 — Crush 掌柜品牌 */
+/* variables 已由 vite.config.ts 的 additionalData 全局注入，无需在此 @use */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: $font-family;
+  background-color: $color-black;
+  color: $brand-white;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+  background-color: $color-black;
+}
+
+a {
+  color: $brand-primary;
+  text-decoration: none;
+}
+
+/* 数字使用 Poppins */
+.num {
+  font-family: $font-family-number;
+}
+
+/* 通用卡片 */
+.card {
+  background-color: $brand-card-bg;
+  border-radius: $radius-md;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+}
+
+/* 主色按钮 */
+.btn-primary {
+  background-color: $brand-primary;
+  color: $brand-white;
+  border: none;
+  border-radius: $radius-sm;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* 次级按钮 */
+.btn-ghost {
+  background-color: transparent;
+  color: $brand-white;
+  border: 1px solid $brand-divider;
+  border-radius: $radius-sm;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 分隔线 */
+.divider {
+  height: 1px;
+  background-color: $brand-divider;
+  margin: $spacing-md 0;
+}
+
+/* 文本工具 */
+.text-primary {
+  color: $brand-primary;
+}
+.text-muted {
+  color: $brand-text-light;
+}
+.text-large {
+  font-size: 18px;
+  font-weight: 600;
+}
+.text-xlarge {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: $font-family-number;
+}
+
+/* 页面容器 */
+.page {
+  min-height: 100vh;
+  padding: $spacing-lg;
+  padding-bottom: 88px; /* 给底部导航留空间 */
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-lg;
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: $brand-white;
+  }
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: $brand-text-light;
+  font-size: 14px;
+}
+
+/* Element Plus 暗色适配 */
+.el-message {
+  min-width: auto;
+}
+
+/* ==================== 毛玻璃 & 辉光工具类 ==================== */
+
+/* 毛玻璃卡片 */
+.glass {
+  background: rgba(17, 17, 17, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: $radius-lg;
+}
+
+/* 主色辉光 */
+.glow-primary {
+  box-shadow: 0 0 16px rgba(251, 0, 121, 0.25);
+}
+
+.glow-primary-strong {
+  box-shadow: 0 0 24px rgba(251, 0, 121, 0.4);
+}
+
+/* 文字辉光 */
+.text-glow {
+  text-shadow: 0 0 8px rgba(251, 0, 121, 0.5);
+}
+
+/* 按钮辉光 */
+.btn-glow {
+  box-shadow: 0 4px 16px rgba(251, 0, 121, 0.35);
+  transition: box-shadow 0.2s, transform 0.1s;
+
+  &:active {
+    transform: scale(0.97);
+    box-shadow: 0 2px 8px rgba(251, 0, 121, 0.25);
+  }
+}
+
+/* 渐变主色背景 */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, rgba(251, 0, 121, 0.15) 0%, rgba(251, 0, 121, 0.05) 100%);
+}
+
+/* ==================== 路由过渡动画 ==================== */
+.page-fade-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.page-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}

@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Frontend build output (I-005)
+frontend/dist/
+
+# Environment files (keep .env.example only)
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# SQLite
+*.sqlite3
+*.db
+
+# Alembic
+alembic/versions/*.pyc
+
+# ===== 安全敏感文件（绝对不入库）=====
+# SSH 密钥
+.ssh/
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts
+
+# 数据库备份与临时 SQL
+*.sql
+!backend/alembic/versions/*.sql
+backend/crush_backup.sql
+check_admin.sql
+reset_admin.sql
+
+# 上传目录（运行时生成）
+backend/uploads/
+frontend/public/uploads/
+uploads/
+
+# 备份目录
+*.bak/
+app.bak/
+backend/app.bak/
+
+# Trae/IDE 临时文件
+.trae/
+*.trae
+
+# 自动生成文件
+frontend/auto-imports.d.ts
+frontend/components.d.ts
+frontend/tsconfig.node.json
+
+# 设计稿临时目录
+stitch-designs/
+

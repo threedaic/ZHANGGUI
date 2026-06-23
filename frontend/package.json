@@ -1,0 +1,38 @@
+{
+  "name": "crush-zhanggui-frontend",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.8",
+    "dayjs": "^1.11.10",
+    "echarts": "^5.5.0",
+    "element-plus": "^2.6.2",
+    "pinia": "^2.1.7",
+    "vant": "^4.8.7",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@vant/auto-import-resolver": "^1.2.1",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/test-utils": "^2.4.11",
+    "@vue/tsconfig": "^0.5.1",
+    "jsdom": "^29.1.1",
+    "sass": "^1.101.0",
+    "sass-embedded": "^1.100.0",
+    "typescript": "^5.4.3",
+    "unplugin-vue-components": "^0.26.0",
+    "vite": "^5.2.6",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^2.0.7"
+  }
+}

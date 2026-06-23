@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Crush酒吧 - 取酒</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Source Han Sans SC', 'Poppins', -apple-system, sans-serif; background: #000000; color: #FFFFFF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    .header { width: 100%; padding: 48px 16px 32px; text-align: center; }
+    .logo { font-size: 28px; font-weight: 900; color: #FB0079; font-family: 'Poppins', sans-serif; letter-spacing: 4px; }
+    .subtitle { font-size: 11px; color: #C8C8C8; margin-top: 4px; letter-spacing: 8px; }
+    .card { width: calc(100% - 32px); max-width: 360px; background: #111111; border: 1px solid #333333; border-radius: 12px; padding: 24px 20px; text-align: center; }
+    .icon-wrap { margin-bottom: 16px; }
+    .spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid #333333; border-top-color: #FB0079; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card-title { font-size: 18px; font-weight: 600; color: #FFFFFF; margin-bottom: 4px; }
+    .card-desc { font-size: 12px; color: #7A7C80; margin-bottom: 16px; }
+    .info-list { text-align: left; margin-bottom: 20px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222222; }
+    .info-row:last-child { border: none; }
+    .info-label { font-size: 12px; color: #7A7C80; }
+    .info-value { font-size: 14px; color: #C8C8C8; }
+    .info-value.hl { color: #FF68A2; font-family: 'Poppins', sans-serif; }
+    .info-value.name { color: #FFFFFF; font-weight: 600; }
+    .section-title { font-size: 13px; color: #C8C8C8; text-align: left; margin-bottom: 8px; }
+    .ml-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .ml-btn { height: 44px; background: #111111; border: 1px solid #333333; border-radius: 8px; color: #C8C8C8; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; }
+    .ml-btn.active { background: #FB0079; border-color: #FB0079; color: #FFFFFF; }
+    .form-input { width: 100%; height: 44px; padding: 0 12px; background: #111111; border: 1px solid #333333; border-radius: 8px; color: #FFFFFF; font-size: 14px; outline: none; margin-bottom: 16px; }
+    .form-input:focus { border-color: #FB0079; }
+    .form-input::placeholder { color: #7A7C80; }
+    .btn { display: block; width: 100%; height: 48px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Source Han Sans SC', sans-serif; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #FB0079; color: #FFFFFF; }
+    .btn-outline { background: transparent; color: #C8C8C8; border: 1px solid #333333; margin-top: 8px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; display: inline-block; }
+    .badge-stored { background: #333333; color: #C8C8C8; }
+    .badge-retrieved { background: #FB0079; color: #FFFFFF; }
+    .footer { margin-top: 40px; padding: 16px; }
+    .footer-text { font-size: 11px; color: #7A7C80; }
+    .error-code { font-family: 'Poppins', monospace; font-size: 13px; color: #FB0079; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">CRUSH</div>
+    <div class="subtitle">存酒取酒</div>
+  </div>
+
+  <!-- Loading -->
+  <div class="card" id="loading-card">
+    <div class="icon-wrap"><div class="spinner"></div></div>
+    <p class="card-title">查询存酒信息...</p>
+  </div>
+
+  <!-- Info + Retrieve -->
+  <div class="card" id="info-card" style="display:none">
+    <div class="icon-wrap">
+      <svg width="48" height="48" viewBox="0 0 56 56" fill="none">
+        <rect x="18" y="8" width="20" height="36" rx="4" stroke="#FB0079" stroke-width="2" fill="none"/>
+        <line x1="22" y1="14" x2="34" y2="14" stroke="#C8C8C8" stroke-width="1.5"/>
+        <line x1="22" y1="20" x2="34" y2="20" stroke="#C8C8C8" stroke-width="1.5"/>
+        <line x1="22" y1="26" x2="30" y2="26" stroke="#C8C8C8" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <p class="card-title" id="wine-name"></p>
+    <div id="status-badge" style="margin-bottom:16px"></div>
+    <div class="info-list" id="wine-details"></div>
+    <div id="retrieve-section" style="display:none">
+      <p class="section-title">取出量</p>
+      <div class="ml-grid" id="ml-options"></div>
+      <input class="form-input" id="table-input" placeholder="桌号（选填）" />
+      <button class="btn btn-primary" id="confirm-btn" onclick="doRetrieve()">我要取酒</button>
+    </div>
+    <div id="empty-section" style="display:none">
+      <p class="card-desc">该酒已全部取完</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="card" id="error-card" style="display:none">
+    <div class="icon-wrap">
+      <svg width="48" height="48" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="20" stroke="#FB0079" stroke-width="2" fill="none"/>
+        <line x1="22" y1="22" x2="34" y2="34" stroke="#FB0079" stroke-width="2"/>
+        <line x1="34" y1="22" x2="22" y2="34" stroke="#FB0079" stroke-width="2"/>
+      </svg>
+    </div>
+    <p class="card-title">查询失败</p>
+    <p class="card-desc" id="error-msg">未找到该存酒记录</p>
+    <p class="error-code" id="error-code"></p>
+  </div>
+
+  <!-- Success -->
+  <div class="card" id="success-card" style="display:none">
+    <div class="icon-wrap">
+      <svg width="48" height="48" viewBox="0 0 56 56" fill="none">
+        <circle cx="28" cy="28" r="20" stroke="#FB0079" stroke-width="2" fill="none"/>
+        <polyline points="18,28 25,35 38,21" stroke="#FB0079" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <p class="card-title">已通知服务员</p>
+    <p class="card-desc">请稍候，服务员马上送酒到您的桌台</p>
+    <p class="card-desc" id="success-detail"></p>
+    <button class="btn btn-outline" onclick="window.close()">关闭</button>
+  </div>
+
+  <div class="footer"><p class="footer-text">Crush酒吧</p></div>
+
+  <script>
+    var API = '/api/v1';
+    var gWine = null;
+    var gMl = 0;
+
+    function showCard(id) {
+      ['loading-card','info-card','error-card','success-card'].forEach(function(c) {
+        document.getElementById(c).style.display = c === id ? '' : 'none';
+      });
+    }
+
+    function escapeHtml(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+    function getParam(name) {
+      var m = location.search.match(new RegExp('[?&]' + name + '=([^&]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    async function load() {
+      var code = getParam('code');
+      if (!code) {
+        showCard('error-card');
+        document.getElementById('error-msg').textContent = '缺少存酒码';
+        return;
+      }
+
+      try {
+        var r = await fetch(API + '/wines/h5/' + encodeURIComponent(code));
+        var j = await r.json();
+        if (j.code || !j.data) throw new Error(j.message || '未找到');
+        gWine = j.data;
+
+        document.getElementById('wine-name').textContent = gWine.wine_name;
+        document.getElementById('status-badge').innerHTML =
+          '<span class="badge badge-' + (gWine.status === 'retrieved' ? 'retrieved' : 'stored') + '">' +
+          (gWine.status === 'retrieved' ? '已取完' : '在存') + '</span>';
+
+        document.getElementById('wine-details').innerHTML =
+          '<div class="info-row"><span class="info-label">存酒日期</span><span class="info-value">' + escapeHtml(gWine.date_stored) + '</span></div>' +
+          '<div class="info-row"><span class="info-label">原始容量</span><span class="info-value">' + (gWine.initial_ml || 0) + 'ml</span></div>' +
+          '<div class="info-row"><span class="info-label">剩余</span><span class="info-value hl">' + (gWine.remaining_ml || 0) + 'ml</span></div>';
+
+        if (gWine.status === 'retrieved' || !gWine.remaining_ml || gWine.remaining_ml <= 0) {
+          document.getElementById('empty-section').style.display = '';
+          document.getElementById('retrieve-section').style.display = 'none';
+        } else {
+          document.getElementById('retrieve-section').style.display = '';
+          document.getElementById('empty-section').style.display = 'none';
+          buildMlOptions(gWine.remaining_ml);
+        }
+
+        showCard('info-card');
+      } catch (e) {
+        showCard('error-card');
+        document.getElementById('error-msg').textContent = e.message || '查询失败';
+        document.getElementById('error-code').textContent = 'code: ' + code;
+      }
+    }
+
+    function buildMlOptions(remaining) {
+      var all = [100, 200, 300, 500, remaining];
+      var html = '';
+      for (var i = 0; i < all.length; i++) {
+        var v = all[i];
+        if (v > remaining) continue;
+        var label = i === all.length - 1 ? ('全部(' + v + 'ml)') : (v + 'ml');
+        var active = i === 0 ? ' active' : '';
+        html += '<button class="ml-btn' + active + '" onclick="selMl(' + v + ', this)">' + label + '</button>';
+      }
+      document.getElementById('ml-options').innerHTML = html;
+      gMl = all[0];
+    }
+
+    function selMl(v, el) {
+      gMl = v;
+      var btns = document.querySelectorAll('.ml-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      el.classList.add('active');
+    }
+
+    async function doRetrieve() {
+      if (!gWine || gMl <= 0) return;
+      var btn = document.getElementById('confirm-btn');
+      btn.disabled = true;
+      btn.textContent = '提交中...';
+
+      var tableNo = document.getElementById('table-input').value.trim() || null;
+
+      try {
+        var r = await fetch(API + '/wines/h5/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bottle_label: gWine.bottle_label, retrieve_ml: gMl, table_no: tableNo }),
+        });
+        var j = await r.json();
+        if (j.code) throw new Error(j.message);
+
+        document.getElementById('success-detail').textContent =
+          gWine.wine_name + ' 取出 ' + gMl + 'ml' + (tableNo ? ' 桌号 ' + tableNo : '');
+        showCard('success-card');
+      } catch (e) {
+        alert(e.message || '提交失败');
+        btn.disabled = false;
+        btn.textContent = '我要取酒';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+# 本地开发环境：PostgreSQL 16 + Redis
+# 使用：docker compose -f docker-compose.dev.yml up -d
+# 停止：docker compose -f docker-compose.dev.yml down
+# 清空数据：docker compose -f docker-compose.dev.yml down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crush-dev-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crush
+      POSTGRES_PASSWORD: crush_dev_pwd
+      POSTGRES_DB: crush_zhanggui
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - crush-dev-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crush -d crush_zhanggui"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: crush-dev-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - crush-dev-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  crush-dev-pg-data:
+  crush-dev-redis-data:
