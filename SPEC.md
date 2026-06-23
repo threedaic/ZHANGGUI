@@ -778,12 +778,51 @@ CREATE TABLE sys_printers (
     printer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     name VARCHAR(50) NOT NULL,
+    printer_type VARCHAR(20) DEFAULT 'order',  -- label=标签机, receipt=小票机, order=出单机
     brand VARCHAR(50),
     device_sn VARCHAR(100),
     api_url TEXT,
     api_key TEXT,
+    api_user VARCHAR(100),
+    api_secret TEXT,
+    paper_width INTEGER DEFAULT 80,
+    online_status BOOLEAN DEFAULT FALSE,
+    last_heartbeat TIMESTAMPTZ,
+    extra_config JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 打印路由规则表
+CREATE TABLE sys_print_routes (
+    route_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    trigger_event VARCHAR(50) DEFAULT 'order_created',  -- order_created/payment_completed/manual
+    document_type VARCHAR(50) DEFAULT 'order',  -- order/receipt/label
+    filter_type VARCHAR(50) DEFAULT 'category',  -- category/product/order_type/all
+    filter_value JSONB,  -- 匹配值：分类ID列表/商品ID列表
+    printer_id UUID NOT NULL,
+    priority INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 打印任务队列表（故障转移+离线重试）
+CREATE TABLE print_queue (
+    queue_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL,
+    route_id UUID,
+    printer_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',  -- pending/printing/completed/failed
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    printed_at TIMESTAMPTZ
 );
 ```
 
@@ -794,8 +833,8 @@ CREATE TABLE sys_printers (
 | shared_* | 9 | 门店/加盟商/员工/会员/等级/分类/商品/桌台/设备/配置 |
 | pos_* | 10 | 订单/明细/支付/支付方式/会话/退单/审批/流水/日志/对账/纸条 |
 | game_* | 4 | 模板/会话/参与者/奖品 |
-| sys_* | 3 | 配置/审计/打印机 |
-| **合计** | **26** | 不含掌柜已有的wage_*/att_*/sig_*/app_* |
+| sys_* | 5 | 配置/审计/打印机/路由规则/打印队列 |
+| **合计** | **28** | 不含掌柜已有的wage_*/att_*/sig_*/app_* |
 
 ---
 
@@ -826,6 +865,16 @@ CREATE TABLE sys_printers (
 | 游戏 | GET/POST/PUT /api/v1/games | 游戏发起（日常Tab） |
 | 存酒 | GET/POST /api/v1/wine-storage | 存酒管理 |
 | 订桌 | GET/POST /api/v1/reservations | 订桌管理 |
+| **打印机** | GET /api/v1/printers | 打印机列表 |
+| | POST /api/v1/printers | 添加打印机 |
+| | PUT /api/v1/printers/{id} | 更新打印机 |
+| | DELETE /api/v1/printers/{id} | 删除打印机 |
+| | POST /api/v1/printers/{id}/test | 测试打印 |
+| | **POST /api/v1/printers/print** | **统一打印接口（自动路由）** |
+| | POST /api/v1/printers/print/direct | 直接打印到指定打印机 |
+| | GET/POST /api/v1/printers/routes | 路由规则管理 |
+| | GET /api/v1/printers/categories | 分类打印机绑定 |
+| | PUT /api/v1/printers/categories/{id}/printer | 更新分类绑定 |
 
 ### 4.3 收银端API
 
@@ -857,7 +906,127 @@ CREATE TABLE sys_printers (
 | 霸屏 | POST /api/v1/overlay/broadcast | 霸屏推送 |
 | 纸条 | GET/POST /api/v1/desk-notes | 纸条社交 |
 
-### 4.4 WebSocket通道
+### 4.4 打印机路由引擎（统一打印服务）
+
+> **设计理念**：一次配置，全局调用。所有涉及打印的模块（收银台、存酒、取酒、厨房出单等）都通过统一接口调用，无需单独配置。
+
+#### 路由优先级
+
+```
+1. 自定义路由规则（高级模式）→ 匹配则使用
+   ↓ 未匹配
+2. 分类绑定打印机（简单模式）→ 查找分类绑定的打印机
+   ↓ 未绑定
+3. 按打印机类型自动路由 → 找同类型第一台打印机
+   ↓ 未找到
+4. 提示"没有可用打印机"
+```
+
+#### 打印机类型
+
+| 类型 | 代码 | 用途 | 典型场景 |
+|------|------|------|----------|
+| 出单机 | `order` | 厨房/吧台出单 | 订单创建时，餐食→厨房，酒水→吧台 |
+| 小票机 | `receipt` | 客户收据 | 支付完成时打印小票 |
+| 标签机 | `label` | 标签打印 | 存酒标签、商品标签 |
+
+#### 调用方式
+
+**方式一：根据分类自动路由（推荐）**
+
+```typescript
+// 任何模块都可以这样调用
+await printersAPI.printByCategory({
+  category_id: 'xxx',           // 商品分类ID
+  content: '打印内容',
+  document_type: 'order',       // order=出单 / receipt=收据 / label=标签
+  trigger: 'order_created'      // order_created / payment_completed / manual
+})
+```
+
+**方式二：直接打印到指定打印机**
+
+```typescript
+await printersAPI.printDirect({
+  printer_id: 'xxx',
+  content: '打印内容'
+})
+```
+
+#### 故障转移机制
+
+- 打印机离线 → 自动使用备用打印机
+- 打印失败 → 自动加入队列，每30秒重试
+- 重试3次仍失败 → 记录日志，可手动重打
+
+#### 配置入口
+
+**设置端 → 打印机管理**
+
+- 打印机列表：添加/编辑/删除打印机
+- 路由规则：高级自定义路由（按订单类型、时间段等）
+- 分类绑定：简单模式，为每个分类指定打印机
+
+#### 涉及打印的模块清单
+
+> **开发者注意**：以下模块在开发时必须集成打印功能，调用统一打印接口。
+
+| 模块 | 打印场景 | 文档类型 | 触发时机 | 说明 |
+|------|----------|----------|----------|------|
+| **收银台** | 订单小票 | `receipt` | `payment_completed` | 支付完成后打印客户收据 |
+| **收银台** | 厨房/吧台出单 | `order` | `order_created` | 根据商品分类自动路由到对应打印机 |
+| **存酒** | 存酒标签 | `label` | `order_created` | 存酒时打印标签贴在酒瓶上 |
+| **取酒** | 取酒凭证 | `receipt` | `manual` | 取酒时打印取酒凭证 |
+| **库存管理** | 盘点单 | `receipt` | `manual` | 盘点完成后打印盘点单 |
+| **员工管理** | 签收单 | `receipt` | `manual` | 工资条/处罚通知等签收打印 |
+| **订桌** | 预订确认 | `receipt` | `manual` | 预订成功后打印确认单 |
+
+#### AI开发检查清单
+
+> **AI开发者必读**：开发新模块时，必须检查是否涉及打印场景。
+
+```markdown
+## 打印功能检查清单
+
+开发新模块时，请逐项检查：
+
+- [ ] 该模块是否有需要打印的场景？
+- [ ] 打印时机是什么？（订单创建/支付完成/手动）
+- [ ] 文档类型是什么？（出单/收据/标签）
+- [ ] 是否需要根据商品分类路由到不同打印机？
+- [ ] 是否调用了统一打印接口 `printersAPI.printByCategory`？
+- [ ] 是否处理了打印失败的情况？
+
+## 调用模板
+
+// 订单类打印（出单）
+await printersAPI.printByCategory({
+  category_id: item.category_id,
+  content: generateOrderContent(item),
+  document_type: 'order',
+  trigger: 'order_created'
+})
+
+// 收据类打印（小票）
+await printersAPI.printByCategory({
+  category_id: order.items[0].category_id,
+  content: generateReceipt(order),
+  document_type: 'receipt',
+  trigger: 'payment_completed'
+})
+
+// 标签类打印
+await printersAPI.printByCategory({
+  category_id: item.category_id,
+  content: generateLabel(item),
+  document_type: 'label',
+  trigger: 'order_created'
+})
+```
+
+---
+
+### 4.5 WebSocket通道
 
 | 通道 | 说明 |
 |------|------|

@@ -66,6 +66,8 @@ from app.models.game import (
 from app.models.sys import (
     SysConfig,
     Printer,
+    PrintRoute,
+    PrintQueue,
 )
 
 __all__ = [
@@ -141,4 +143,6 @@ __all__ = [
     "GamePrize",
     "SysConfig",
     "Printer",
+    "PrintRoute",
+    "PrintQueue",
 ]

@@ -82,6 +82,9 @@ class Category(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    # 打印机绑定（简单模式）
+    printer_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))  # 出单打印机
+    backup_printer_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))  # 备用打印机
 
 
 class Product(Base, TimestampMixin):

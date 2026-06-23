@@ -63,6 +63,16 @@ async def init_scheduler():
     # 启动时从数据库读取所有班次配置，注册检查任务
     await _register_all_shift_checks()
 
+    # 注册打印队列处理任务（每30秒执行一次）
+    from app.tasks.print_queue_job import process_print_queue_job
+    scheduler.add_job(
+        process_print_queue_job,
+        'interval',
+        seconds=30,
+        id='process_print_queue_job',
+        replace_existing=True,
+    )
+
     scheduler.start()
 
     jobs = scheduler.get_jobs()

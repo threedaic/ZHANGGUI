@@ -358,7 +358,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'printer',
         name: 'PrinterSetting',
-        component: () => import('@/views/settings/PrinterSetting.vue'),
+        component: () => import('@/views/settings/PrinterManagement.vue'),
       },
     ],
   },
