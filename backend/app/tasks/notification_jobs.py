@@ -88,12 +88,14 @@ async def shift_check_job(shift_code: str) -> None:
         except Exception as e:
             logger.error(f"班次检查-同步打卡总失败: {e}")
 
-    # Phase 2: 推送到岗通知（全新 session）
+    # Phase 2: 推送到岗通知（全新 session，遍历所有门店）
     from app.services.attendance_push import push_shift_status
 
     async with AsyncSessionLocal() as session:
         try:
-            await push_shift_status(session, 1, today, shift_code)
+            store_ids = await get_active_store_ids(session)
+            for sid in store_ids:
+                await push_shift_status(session, sid, today, shift_code)
             await session.commit()
             logger.info(f"班次到岗通知已推送: {shift_code}")
         except Exception as e:
@@ -136,6 +138,10 @@ async def monthly_attendance_confirm_job() -> None:
             )
             boss_emp_id = boss_result.scalar_one_or_none()
 
+            if not boss_emp_id:
+                logger.warning("考勤确认任务: 无 boss 角色，跳过")
+                return
+
             created = 0
 
             for emp in employees:
@@ -149,7 +155,7 @@ async def monthly_attendance_confirm_job() -> None:
                         title=title,
                         ref_type="attendance_summary",
                         ref_id=emp.id,  # 用 employee_id 作为 ref
-                        issued_by=boss_emp_id or 1,
+                        issued_by=boss_emp_id,
                         extra={"period": period},
                     )
                     created += 1

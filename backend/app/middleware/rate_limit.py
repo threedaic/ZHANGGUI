@@ -20,12 +20,24 @@ RATE_LIMITS: dict[str, tuple[int, int]] = {
 }
 DEFAULT_LIMIT = (60, 60)  # 60次/分钟
 
+# 白名单路径前缀 — 不做限流（公开 OAuth 接口、健康检查等）
+RATE_LIMIT_WHITELIST: list[str] = [
+    "/api/v1/auth/wework/config",
+    "/api/v1/auth/wework/login",
+    "/health",
+]
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Only rate-limit API routes
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
+
+        # 白名单路径跳过限流
+        for prefix in RATE_LIMIT_WHITELIST:
+            if request.url.path.startswith(prefix):
+                return await call_next(request)
 
         max_requests, window = _get_limit(request.url.path)
         client_ip = request.client.host if request.client else "unknown"

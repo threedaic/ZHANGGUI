@@ -22,7 +22,9 @@ class ContractRepository:
 
     async def list_salary_matrix(self) -> list[SalaryMatrix]:
         result = await self.session.execute(
-            select(SalaryMatrix).order_by(
+            select(SalaryMatrix).where(
+                SalaryMatrix.store_id == self.store_id
+            ).order_by(
                 SalaryMatrix.position, SalaryMatrix.grade
             )
         )

@@ -28,3 +28,13 @@ export function login(body: LoginRequest) {
 export function getCurrentUser() {
   return client.get<ApiResponse<UserInfo>>('/auth/me')
 }
+
+export interface WeworkOAuthConfig {
+  corp_id: string
+  agent_id: string
+}
+
+/** 获取门店的企微 corp_id / agent_id，供前端构造 OAuth 跳转 URL。 */
+export function getWeworkOAuthConfig() {
+  return client.get<ApiResponse<WeworkOAuthConfig | null>>('/auth/wework/config')
+}

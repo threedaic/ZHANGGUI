@@ -7,9 +7,23 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const menus = [
+  // 排班与人
+  { key: 'schedule', label: '排班考勤', desc: '排班表、到岗统计、换班审批', path: '/management/schedule-attendance' },
+  { key: 'kpi', label: 'KPI考核', desc: '模板、评分、申诉', path: '/management/kpi' },
+  { key: 'rankings', label: '员工排行', desc: '业绩/KPI/考勤/评分排名', path: '/management/rankings' },
+  // 工资与账期
   { key: 'payroll', label: '工资管理', desc: '月度工资汇总、确认、发放', path: '/management/payroll' },
   { key: 'period', label: '账期管理', desc: '锁定/关账/重新开放', path: '/management/period' },
-  { key: 'rankings', label: '员工排行', desc: '业绩/KPI/考勤/评分排名', path: '/management/rankings' },
+  // 数据与风控
+  { key: 'dashboard', label: '数据看板', desc: '营收、考勤、预订总览', path: '/management/dashboard' },
+  { key: 'antifraud', label: '防飞单', desc: '飞单检测与处理', path: '/management/antifraud' },
+  { key: 'audit', label: '操作日志', desc: '系统操作审计', path: '/management/audit' },
+  // 店铺运营
+  { key: 'tables', label: '桌位管理', desc: '桌台状态、开台/关台', path: '/management/tables' },
+  { key: 'wine', label: '存酒盘点', desc: '库存、盘点、酒水台账', path: '/management/wine-inventory' },
+  { key: 'rating', label: '评分管理', desc: '桌面评分码、评分统计', path: '/management/rating' },
+  { key: 'contracts', label: '合同管理', desc: '员工合同、到期提醒', path: '/management/contracts' },
+  { key: 'printer', label: '打印机配置', desc: '打印机绑定、纸条模板', path: '/management/printer-config' },
 ]
 </script>
 

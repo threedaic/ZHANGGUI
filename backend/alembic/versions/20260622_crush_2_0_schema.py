@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "crush_2_0_schema"
-down_revision = "20260615"
+down_revision = None  # 20260615 迁移引用的旧表名已不存在，断开链接
 branch_labels = None
 depends_on = None
 

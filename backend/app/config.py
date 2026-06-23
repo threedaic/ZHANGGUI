@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     # WeCom boss userids (comma-separated, always granted boss role regardless of department)
     BOSS_WEWORK_USERIDS: str = ""
 
+    # WeCom global config (all stores share the same corp account)
+    WECOM_CORP_ID: str = ""
+    WECOM_AGENT_ID: str = ""
+    WECOM_SECRET: str = ""
+
     # External service base URLs (configurable for env switching / proxies)
     WECOM_API_BASE: str = "https://qyapi.weixin.qq.com/cgi-bin"
     FRONTEND_BASE_URL: str = "https://zhanggui.crushserver.cloud"

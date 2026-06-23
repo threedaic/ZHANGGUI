@@ -164,25 +164,38 @@ async def get_me(request: Request):
 
 # ==================== 企微 OAuth 免登录 ====================
 
+@router.get("/wework/config")
+async def wework_config(request: Request):
+    """返回企微 corp_id 和 agent_id，供前端构造 OAuth 跳转 URL。全局配置，无需门店。"""
+    from app.config import get_settings
+    settings = get_settings()
+    if not settings.WECOM_CORP_ID:
+        return make_response(data=None, request=request)
+    return make_response(data={
+        "corp_id": settings.WECOM_CORP_ID,
+        "agent_id": settings.WECOM_AGENT_ID,
+    }, request=request)
+
+
 @router.get("/wework/login")
 async def wework_login(request: Request, db: AsyncSession = Depends(get_db)):
     """企微 OAuth 回调。从 code 获取用户身份，自动登录。"""
     from fastapi.responses import RedirectResponse
+    from app.config import get_settings
 
     code = request.query_params.get("code")
     if not code:
         return RedirectResponse(url="/login")
 
-    # 从 shared_stores 表获取企微配置
-    result = await db.execute(select(Store).order_by(Store.id.asc()).limit(1))
-    store = result.scalar_one_or_none()
-    if not store or not store.wework_corp_id:
+    # 企微配置从环境变量读取（全局）
+    settings = get_settings()
+    if not settings.WECOM_CORP_ID:
         return RedirectResponse(url="/login?error=config")
 
-    # 用 code 换取企微 userid
+    # 用 code 换取企微 userid（store_id 传空，_get_store_config 会走环境变量）
     from app.services.wework import get_userid_by_code
     try:
-        wework_userid = await get_userid_by_code(db, str(store.id), code)
+        wework_userid = await get_userid_by_code(db, None, code)
     except Exception as e:
         logger.warning(f"企微 OAuth 获取 userid 失败: {e}")
         return RedirectResponse(url="/login?error=oauth_fail")

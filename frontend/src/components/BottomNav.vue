@@ -71,7 +71,8 @@ function go(path: string) {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  min-height: 64px;
+  box-sizing: border-box;
   /* 毛玻璃效果 */
   background: rgba(17, 17, 17, 0.85);
   backdrop-filter: blur(20px);
@@ -79,8 +80,9 @@ function go(path: string) {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
+  justify-content: space-around;
   z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
 }
 
 .nav-item {

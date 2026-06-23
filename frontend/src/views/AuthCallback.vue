@@ -8,7 +8,7 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-onMounted(() => {
+onMounted(async () => {
   const accessToken = route.query.access_token as string | undefined
   const refreshToken = route.query.refresh_token as string | undefined
   const role = route.query.role as string | undefined
@@ -28,19 +28,26 @@ onMounted(() => {
   }
 
   // OAuth 成功回调
-  if (!accessToken || !refreshToken) {
+  if (!accessToken) {
     ElMessage.error('回调参数缺失')
     router.replace('/login')
     return
   }
 
+  // 先存 token，再拉取完整用户信息
   auth.setAuth(accessToken, {
-    user_id: '',
-    employee_id: '',
-    store_id: '',
+    user_id: null,
+    employee_id: null,
+    store_id: null,
     role: (role as 'boss' | 'store_manager' | 'staff') || 'staff',
     username: '',
   })
+
+  try {
+    await auth.fetchUser()
+  } catch {
+    // fetchUser 失败不影响登录，用 token 中的信息继续
+  }
 
   ElMessage.success('企微登录成功')
   router.replace('/')

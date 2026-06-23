@@ -57,7 +57,7 @@ async def seed_salary_matrix(repo: ContractRepository):
 
     from app.models.contract import SalaryMatrix
     for item in SALARY_MATRIX_SEED:
-        entry = SalaryMatrix(**item)
+        entry = SalaryMatrix(store_id=repo.store_id, **item)
         repo.session.add(entry)
     await repo.session.flush()
     logger.info("薪资矩阵种子数据已写入")

@@ -15,6 +15,7 @@ from app.utils.audit_logger import set_audit_context
 RLS_WHITELIST = {
     "/api/v1/auth/login",
     "/api/v1/auth/wework/login",    # WeCom OAuth callback (M-009 fix)
+    "/api/v1/auth/wework/config",   # WeCom OAuth config for frontend redirect
     "/api/v1/auth/refresh",         # 使用 body 中的 refresh_token，不依赖 Authorization header
     "/api/v1/ratings",             # Guest QR code rating (POST submit, no auth)
     "/api/v1/wine-storage/h5/",    # Guest wine status + retrieve via H5 (prefix match)

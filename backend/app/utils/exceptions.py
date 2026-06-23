@@ -91,11 +91,23 @@ async def _push_critical_alert(request: Request, exc: Exception, request_id: str
     try:
         from app.services.notification_service import NotificationService
         from app.database import AsyncSessionLocal
+        import uuid
 
-        store_id = getattr(request.state, "store_id", None) or 1
-        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-500:]
+        store_id = getattr(request.state, "store_id", None)
 
         async with AsyncSessionLocal() as session:
+            # store_id 为空或非 UUID 时，查数据库获取第一个有效门店
+            if not store_id or not isinstance(store_id, uuid.UUID):
+                from sqlalchemy import select
+                from app.models.store import Store
+                result = await session.execute(select(Store.id).limit(1))
+                row = result.scalar_one_or_none()
+                if not row:
+                    logger.warning("无法推送告警：无可用门店")
+                    return
+                store_id = row
+
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-500:]
             notif = NotificationService(session, store_id)
             content = (
                 f"> 路径: {request.url.path}\n"

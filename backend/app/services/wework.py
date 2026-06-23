@@ -24,8 +24,21 @@ TOKEN_KEY = "wework:access_token:{corp_id}"
 TOKEN_TTL = 7000  # 7200 - 200 安全余量
 
 
-async def _get_store_config(db: AsyncSession, store_id: int) -> dict | None:
-    """从 stores 表读取企微配置，secret 已 AES 加密。"""
+async def _get_store_config(db: AsyncSession, store_id: int | None = None) -> dict | None:
+    """读取企微配置：优先环境变量（全局），其次门店表（兼容旧数据）。"""
+    settings = get_settings()
+
+    # 优先使用环境变量中的全局企微配置
+    if settings.WECOM_CORP_ID and settings.WECOM_SECRET:
+        return {
+            "corp_id": settings.WECOM_CORP_ID,
+            "agent_id": settings.WECOM_AGENT_ID,
+            "secret": settings.WECOM_SECRET,
+        }
+
+    # 回退到门店表（兼容旧数据）
+    if store_id is None:
+        return None
     stmt = select(Store).where(Store.id == store_id)
     result = await db.execute(stmt)
     store = result.scalar_one_or_none()
@@ -38,11 +51,11 @@ async def _get_store_config(db: AsyncSession, store_id: int) -> dict | None:
     }
 
 
-async def get_access_token(db: AsyncSession, store_id: int) -> str:
+async def get_access_token(db: AsyncSession, store_id: int | None = None) -> str:
     """获取/刷新企微 access_token，自动 Redis 缓存。"""
     cfg = await _get_store_config(db, store_id)
     if not cfg:
-        raise NotFoundError(f"门店 {store_id} 未配置企微")
+        raise NotFoundError("企微未配置，请在 .env 中设置 WECOM_CORP_ID / WECOM_AGENT_ID / WECOM_SECRET")
 
     redis = await get_redis()
     cache_key = TOKEN_KEY.format(corp_id=cfg["corp_id"])
@@ -589,7 +602,7 @@ async def fetch_checkin_data(
 
 # ==================== OAuth 登录辅助 ====================
 
-async def get_userid_by_code(db: AsyncSession, store_id: int, code: str) -> str | None:
+async def get_userid_by_code(db: AsyncSession, store_id: int | None, code: str) -> str | None:
     """用 OAuth code 换取企微成员 userid。
 
     调用企微 user/getuserinfo 接口，返回企业成员的 UserId；
