@@ -15,6 +15,11 @@ CREATE POLICY sys_printers_store_isolation ON sys_printers
     USING (store_id = current_setting('app.current_store_id')::UUID)
     WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
 
+-- sys_printers 的 RLS 策略：管理员豁免
+CREATE POLICY sys_printers_admin_all_access ON sys_printers
+    FOR ALL
+    USING (current_setting('app.current_user_role', true) = 'admin');
+
 -- 2. sys_print_routes 表启用 RLS
 ALTER TABLE sys_print_routes ENABLE ROW LEVEL SECURITY;
 
@@ -24,6 +29,11 @@ CREATE POLICY sys_print_routes_store_isolation ON sys_print_routes
     USING (store_id = current_setting('app.current_store_id')::UUID)
     WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
 
+-- sys_print_routes 的 RLS 策略：管理员豁免
+CREATE POLICY sys_print_routes_admin_all_access ON sys_print_routes
+    FOR ALL
+    USING (current_setting('app.current_user_role', true) = 'admin');
+
 -- 3. sys_print_queue 表启用 RLS
 ALTER TABLE sys_print_queue ENABLE ROW LEVEL SECURITY;
 
@@ -32,6 +42,11 @@ CREATE POLICY sys_print_queue_store_isolation ON sys_print_queue
     FOR ALL
     USING (store_id = current_setting('app.current_store_id')::UUID)
     WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
+
+-- sys_print_queue 的 RLS 策略：管理员豁免
+CREATE POLICY sys_print_queue_admin_all_access ON sys_print_queue
+    FOR ALL
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 修复视图中的表名
 CREATE OR REPLACE VIEW v_printer_status AS

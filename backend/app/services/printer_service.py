@@ -10,11 +10,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 from loguru import logger
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sys import Printer, PrintRoute, PrintQueue
@@ -533,5 +533,256 @@ class PrinterService:
         if not printer:
             return {"status": "failed", "message": "打印机不存在"}
 
-        test_content = f"测试打印 - {printer.name}\n时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作"
+        test_content = f"测试打印 - {printer.name}\n时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作"
         return await self._send_print(store_id, printer, test_content)
+
+    # ==================== CRUD 操作（供API层调用） ====================
+
+    async def list_printers(self, store_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """获取打印机列表"""
+        return await self.get_printer_status(store_id)
+
+    async def create_printer(self, store_id: uuid.UUID, data: Dict[str, Any]) -> Dict[str, Any]:
+        """创建打印机"""
+        printer = Printer(
+            store_id=store_id,
+            name=data["name"],
+            printer_type=data.get("printer_type", "order"),
+            brand=data.get("brand"),
+            device_sn=data.get("device_sn"),
+            api_url=data.get("api_url"),
+            api_key=data.get("api_key"),
+            api_user=data.get("api_user"),
+            api_secret=data.get("api_secret"),
+            paper_width=data.get("paper_width", 80),
+            extra_config=data.get("extra_config", {}),
+            is_active=True,
+        )
+        self.db.add(printer)
+        await self.db.commit()
+        await self.db.refresh(printer)
+        return {"printer_id": str(printer.printer_id)}
+
+    async def update_printer(self, store_id: uuid.UUID, printer_id: uuid.UUID, data: Dict[str, Any]) -> bool:
+        """更新打印机"""
+        printer = await self._get_printer(store_id, printer_id)
+        if not printer:
+            return False
+
+        for key, value in data.items():
+            if value is not None and hasattr(printer, key):
+                setattr(printer, key, value)
+
+        await self.db.commit()
+        return True
+
+    async def delete_printer(self, store_id: uuid.UUID, printer_id: uuid.UUID) -> bool:
+        """删除打印机（软删除）"""
+        printer = await self._get_printer(store_id, printer_id)
+        if not printer:
+            return False
+
+        printer.is_active = False
+        await self.db.commit()
+        return True
+
+    async def get_printer_status_list(self, store_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """获取打印机状态列表"""
+        result = await self.db.execute(
+            select(Printer).where(
+                Printer.store_id == store_id,
+                Printer.is_active == True,
+            ).order_by(Printer.name)
+        )
+        printers = result.scalars().all()
+
+        data = []
+        for p in printers:
+            status = "offline"
+            if p.online_status:
+                status = "online"
+            elif p.last_heartbeat and p.last_heartbeat > datetime.utcnow() - timedelta(minutes=5):
+                status = "online"
+
+            data.append({
+                "printer_id": str(p.printer_id),
+                "name": p.name,
+                "printer_type": p.printer_type,
+                "brand": p.brand,
+                "device_sn": p.device_sn,
+                "online_status": p.online_status,
+                "last_heartbeat": p.last_heartbeat.isoformat() if p.last_heartbeat else None,
+                "computed_status": status,
+                "is_active": p.is_active,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            })
+
+        return data
+
+    # ==================== 路由规则 CRUD ====================
+
+    async def list_routes(self, store_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """获取路由规则列表（批量查询，避免N+1）"""
+        result = await self.db.execute(
+            select(PrintRoute).where(
+                PrintRoute.store_id == store_id,
+                PrintRoute.is_active == True,
+            ).order_by(PrintRoute.trigger_event, PrintRoute.priority)
+        )
+        routes = result.scalars().all()
+
+        if not routes:
+            return []
+
+        # 批量查询所有相关打印机
+        printer_ids = {r.printer_id for r in routes}
+        printers_result = await self.db.execute(
+            select(Printer).where(
+                Printer.printer_id.in_(printer_ids),
+                Printer.store_id == store_id,
+            )
+        )
+        printer_map = {p.printer_id: p.name for p in printers_result.scalars().all()}
+
+        return [
+            {
+                "route_id": str(r.route_id),
+                "name": r.name,
+                "trigger_event": r.trigger_event,
+                "document_type": r.document_type,
+                "filter_type": r.filter_type,
+                "filter_value": r.filter_value,
+                "printer_id": str(r.printer_id),
+                "printer_name": printer_map.get(r.printer_id, "未知打印机"),
+                "priority": r.priority,
+                "is_active": r.is_active,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in routes
+        ]
+
+    async def create_route(self, store_id: uuid.UUID, data: Dict[str, Any]) -> Dict[str, Any]:
+        """创建路由规则"""
+        route = PrintRoute(
+            store_id=store_id,
+            name=data["name"],
+            trigger_event=data.get("trigger_event", "order_created"),
+            document_type=data.get("document_type", "order"),
+            filter_type=data.get("filter_type", "category"),
+            filter_value=data.get("filter_value"),
+            printer_id=uuid.UUID(data["printer_id"]),
+            priority=data.get("priority", 1),
+            is_active=True,
+        )
+        self.db.add(route)
+        await self.db.commit()
+        await self.db.refresh(route)
+        return {"route_id": str(route.route_id)}
+
+    async def update_route(self, store_id: uuid.UUID, route_id: uuid.UUID, data: Dict[str, Any]) -> bool:
+        """更新路由规则"""
+        result = await self.db.execute(
+            select(PrintRoute).where(
+                PrintRoute.route_id == route_id,
+                PrintRoute.store_id == store_id,
+            )
+        )
+        route = result.scalar_one_or_none()
+        if not route:
+            return False
+
+        for key, value in data.items():
+            if value is not None and hasattr(route, key):
+                if key == "printer_id":
+                    setattr(route, key, uuid.UUID(value))
+                else:
+                    setattr(route, key, value)
+
+        await self.db.commit()
+        return True
+
+    async def delete_route(self, store_id: uuid.UUID, route_id: uuid.UUID) -> bool:
+        """删除路由规则"""
+        result = await self.db.execute(
+            select(PrintRoute).where(
+                PrintRoute.route_id == route_id,
+                PrintRoute.store_id == store_id,
+            )
+        )
+        route = result.scalar_one_or_none()
+        if not route:
+            return False
+
+        await self.db.delete(route)
+        await self.db.commit()
+        return True
+
+    # ==================== 分类打印机绑定 CRUD ====================
+
+    async def list_categories_with_printer(self, store_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """获取分类列表（含打印机绑定信息，批量查询避免N+1）"""
+        result = await self.db.execute(
+            select(Category).where(
+                Category.store_id == store_id,
+                Category.is_active == True,
+            ).order_by(Category.sort_order)
+        )
+        categories = result.scalars().all()
+
+        if not categories:
+            return []
+
+        # 收集所有打印机ID，批量查询
+        printer_ids = set()
+        for c in categories:
+            if c.printer_id:
+                printer_ids.add(c.printer_id)
+            if c.backup_printer_id:
+                printer_ids.add(c.backup_printer_id)
+
+        printer_map = {}
+        if printer_ids:
+            printers_result = await self.db.execute(
+                select(Printer).where(
+                    Printer.printer_id.in_(printer_ids),
+                    Printer.store_id == store_id,
+                )
+            )
+            printer_map = {p.printer_id: p.name for p in printers_result.scalars().all()}
+
+        return [
+            {
+                "category_id": str(c.category_id),
+                "name": c.name,
+                "sort_order": c.sort_order,
+                "printer_id": str(c.printer_id) if c.printer_id else None,
+                "printer_name": printer_map.get(c.printer_id) if c.printer_id else None,
+                "backup_printer_id": str(c.backup_printer_id) if c.backup_printer_id else None,
+                "backup_printer_name": printer_map.get(c.backup_printer_id) if c.backup_printer_id else None,
+            }
+            for c in categories
+        ]
+
+    async def update_category_printer(
+        self,
+        store_id: uuid.UUID,
+        category_id: uuid.UUID,
+        printer_id: Optional[str],
+        backup_printer_id: Optional[str],
+    ) -> bool:
+        """更新分类绑定的打印机"""
+        result = await self.db.execute(
+            select(Category).where(
+                Category.category_id == category_id,
+                Category.store_id == store_id,
+                Category.is_active == True,
+            )
+        )
+        category = result.scalar_one_or_none()
+        if not category:
+            return False
+
+        category.printer_id = uuid.UUID(printer_id) if printer_id else None
+        category.backup_printer_id = uuid.UUID(backup_printer_id) if backup_printer_id else None
+        await self.db.commit()
+        return True
