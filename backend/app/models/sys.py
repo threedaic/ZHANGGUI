@@ -101,11 +101,11 @@ class PrintRoute(Base):
 
 
 class PrintQueue(Base):
-    """打印任务队列表（print_queue）
+    """打印任务队列表（sys_print_queue）
 
     用于故障转移和离线重试
     """
-    __tablename__ = "print_queue"
+    __tablename__ = "sys_print_queue"
 
     queue_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)

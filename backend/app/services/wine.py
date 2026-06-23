@@ -6,13 +6,14 @@
 - 客人自助取酒 + 云打印机出小票
 """
 import secrets
+import uuid
 from datetime import date, timedelta, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 from app.models.wine_storage import WineStorage
 from app.repositories.wine import WineRepository
 from app.utils.exceptions import NotFoundError, ConflictError, ValidationError
-from app.services.cloud_printer import print_label, print_retrieve_receipt
+from app.services.printer_service import PrinterService
 from app.services.sms import send_stored_sms as _sms_stored, send_retrieved_sms as _sms_retrieved
 
 
@@ -90,7 +91,23 @@ async def store_wine(
 async def _safe_print_label(bottle_label: str, customer_name: str, wine_name: str,
                             remaining_ml: int, date_stored: str, cabinet_no: str, store_id: int):
     try:
-        await print_label(bottle_label, customer_name, wine_name, remaining_ml, date_stored, cabinet_no, store_id)
+        from app.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            service = PrinterService(session)
+            # 构建标签内容
+            capacity_map = {750: "满瓶", 562: "3/4瓶", 375: "1/2瓶", 187: "1/4瓶"}
+            capacity = capacity_map.get(remaining_ml, "满瓶")
+            content = f"存酒标签\n客户: {customer_name}\n酒名: {wine_name}\n容量: {capacity}\n瓶码: {bottle_label}\n柜号: {cabinet_no}\n日期: {date_stored}"
+
+            # 使用标签打印机
+            store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+            await service.print_by_category(
+                store_id=store_uuid,
+                category_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),  # 存酒分类ID
+                content=content,
+                trigger="order_created",
+                document_type="label",
+            )
     except Exception as e:
         logger.error(f"打印标签失败（不影响存酒）: {e}")
 
@@ -141,7 +158,33 @@ async def staff_retrieve(
 async def _safe_print_receipt(bottle_label: str, customer_name: str, wine_name: str,
                               retrieve_ml: int, table_no: str, store_id: int):
     try:
-        await print_retrieve_receipt(bottle_label, customer_name, wine_name, retrieve_ml, table_no, store_id)
+        from app.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            service = PrinterService(session)
+            # 构建取酒小票内容
+            content = (
+                f"┌──────────────────────────┐\n"
+                f"│      CRUSH 酒吧 取酒单     │\n"
+                f"├──────────────────────────┤\n"
+                f"│  客人: {customer_name:<16}│\n"
+                f"│  酒名: {wine_name:<16}│\n"
+                f"│  取出: {retrieve_ml}ml{' ' * (14 - len(str(retrieve_ml)))}│\n"
+                f"│  桌号: {table_no:<16}│\n"
+                f"│  瓶码: {bottle_label:<16}│\n"
+                f"├──────────────────────────┤\n"
+                f"│    >> 请送酒至对应桌台     │\n"
+                f"└──────────────────────────┘"
+            )
+
+            # 使用小票打印机
+            store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+            await service.print_by_category(
+                store_id=store_uuid,
+                category_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),  # 存酒分类ID
+                content=content,
+                trigger="manual",
+                document_type="receipt",
+            )
     except Exception as e:
         logger.error(f"打印取酒小票失败（不影响取酒）: {e}")
 
@@ -185,7 +228,7 @@ async def self_retrieve(
 
     # 云打印机出取酒小票
     from asyncio import create_task
-    create_task(print_retrieve_receipt(
+    create_task(_safe_print_receipt(
         bottle_label, wine.customer_name, wine.wine_name, retrieve_ml, table_no or "-", wine.store_id
     ))
 

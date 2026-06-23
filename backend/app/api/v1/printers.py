@@ -20,15 +20,17 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional, List
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.database import get_db
 from app.models.sys import Printer, PrintRoute
-from app.models.shared import Category
+from app.repositories.printer_repository import PrinterRepository
+from app.schemas.printer import (
+    PrinterCreate, PrinterUpdate, PrintRouteCreate, PrintRouteUpdate,
+    PrintByCategoryRequest, PrintDirectRequest, CategoryPrinterUpdate,
+)
 from app.utils.deps import get_store_id, require_role, make_response
 from app.utils.exceptions import NotFoundError, ValidationError
 from app.services.printer_service import PrinterService
@@ -45,14 +47,29 @@ async def list_printers(
 ):
     """获取打印机列表"""
     store_id = get_store_id(request)
-    service = PrinterService(db)
-    printers = await service.get_printer_status(store_id)
-    return make_response(data=printers, request=request)
+    repo = PrinterRepository(db)
+    printers = await repo.get_printers_by_store(store_id)
+
+    data = []
+    for p in printers:
+        data.append({
+            "printer_id": str(p.printer_id),
+            "name": p.name,
+            "printer_type": p.printer_type,
+            "brand": p.brand,
+            "device_sn": p.device_sn,
+            "online_status": p.online_status,
+            "last_heartbeat": p.last_heartbeat.isoformat() if p.last_heartbeat else None,
+            "is_active": p.is_active,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        })
+
+    return make_response(data=data, request=request)
 
 
 @router.post("")
 async def create_printer(
-    body: dict,
+    body: PrinterCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -60,32 +77,23 @@ async def create_printer(
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
 
-    # 验证必填字段
-    name = body.get("name")
-    if not name:
-        raise ValidationError("打印机名称不能为空")
-
-    printer_type = body.get("printer_type", "order")
-    if printer_type not in ("label", "receipt", "order"):
-        raise ValidationError("打印机类型无效")
-
     printer = Printer(
         store_id=store_id,
-        name=name,
-        printer_type=printer_type,
-        brand=body.get("brand"),
-        device_sn=body.get("device_sn"),
-        api_url=body.get("api_url"),
-        api_key=body.get("api_key"),
-        api_user=body.get("api_user"),
-        api_secret=body.get("api_secret"),
-        paper_width=body.get("paper_width", 80),
-        extra_config=body.get("extra_config", {}),
+        name=body.name,
+        printer_type=body.printer_type,
+        brand=body.brand,
+        device_sn=body.device_sn,
+        api_url=body.api_url,
+        api_key=body.api_key,
+        api_user=body.api_user,
+        api_secret=body.api_secret,
+        paper_width=body.paper_width,
+        extra_config=body.extra_config or {},
         is_active=True,
     )
-    db.add(printer)
-    await db.commit()
-    await db.refresh(printer)
+
+    repo = PrinterRepository(db)
+    await repo.create_printer(printer)
 
     return make_response(
         message="打印机添加成功",
@@ -97,7 +105,7 @@ async def create_printer(
 @router.put("/{printer_id}")
 async def update_printer(
     printer_id: uuid.UUID,
-    body: dict,
+    body: PrinterUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -105,41 +113,36 @@ async def update_printer(
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(Printer).where(
-            Printer.printer_id == printer_id,
-            Printer.store_id == store_id,
-        )
-    )
-    printer = result.scalar_one_or_none()
+    repo = PrinterRepository(db)
+    printer = await repo.get_printer_by_id(printer_id, store_id)
     if not printer:
         raise NotFoundError("打印机不存在")
 
     # 更新字段
-    if "name" in body:
-        printer.name = body["name"]
-    if "printer_type" in body:
-        printer.printer_type = body["printer_type"]
-    if "brand" in body:
-        printer.brand = body["brand"]
-    if "device_sn" in body:
-        printer.device_sn = body["device_sn"]
-    if "api_url" in body:
-        printer.api_url = body["api_url"]
-    if "api_key" in body:
-        printer.api_key = body["api_key"]
-    if "api_user" in body:
-        printer.api_user = body["api_user"]
-    if "api_secret" in body:
-        printer.api_secret = body["api_secret"]
-    if "paper_width" in body:
-        printer.paper_width = body["paper_width"]
-    if "extra_config" in body:
-        printer.extra_config = body["extra_config"]
-    if "is_active" in body:
-        printer.is_active = body["is_active"]
+    if body.name is not None:
+        printer.name = body.name
+    if body.printer_type is not None:
+        printer.printer_type = body.printer_type
+    if body.brand is not None:
+        printer.brand = body.brand
+    if body.device_sn is not None:
+        printer.device_sn = body.device_sn
+    if body.api_url is not None:
+        printer.api_url = body.api_url
+    if body.api_key is not None:
+        printer.api_key = body.api_key
+    if body.api_user is not None:
+        printer.api_user = body.api_user
+    if body.api_secret is not None:
+        printer.api_secret = body.api_secret
+    if body.paper_width is not None:
+        printer.paper_width = body.paper_width
+    if body.extra_config is not None:
+        printer.extra_config = body.extra_config
+    if body.is_active is not None:
+        printer.is_active = body.is_active
 
-    await db.commit()
+    await repo.update_printer(printer)
     return make_response(message="打印机更新成功", request=request)
 
 
@@ -153,19 +156,12 @@ async def delete_printer(
     require_role(request, ["boss"])
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(Printer).where(
-            Printer.printer_id == printer_id,
-            Printer.store_id == store_id,
-        )
-    )
-    printer = result.scalar_one_or_none()
+    repo = PrinterRepository(db)
+    printer = await repo.get_printer_by_id(printer_id, store_id)
     if not printer:
         raise NotFoundError("打印机不存在")
 
-    printer.is_active = False
-    await db.commit()
-
+    await repo.soft_delete_printer(printer)
     return make_response(message="打印机已删除", request=request)
 
 
@@ -200,16 +196,36 @@ async def get_printer_status(
 ):
     """获取所有打印机状态"""
     store_id = get_store_id(request)
-    service = PrinterService(db)
-    status = await service.get_printer_status(store_id)
-    return make_response(data=status, request=request)
+    repo = PrinterRepository(db)
+    printers = await repo.get_printers_by_store(store_id)
+
+    data = []
+    for p in printers:
+        status = "offline"
+        if p.online_status:
+            status = "online"
+        elif p.last_heartbeat:
+            from datetime import datetime, timedelta
+            if p.last_heartbeat > datetime.utcnow() - timedelta(minutes=5):
+                status = "online"
+
+        data.append({
+            "printer_id": str(p.printer_id),
+            "name": p.name,
+            "printer_type": p.printer_type,
+            "online_status": p.online_status,
+            "last_heartbeat": p.last_heartbeat.isoformat() if p.last_heartbeat else None,
+            "computed_status": status,
+        })
+
+    return make_response(data=data, request=request)
 
 
 # ==================== 统一打印接口 ====================
 
 @router.post("/print")
 async def print_by_category(
-    body: dict,
+    body: PrintByCategoryRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -225,18 +241,13 @@ async def print_by_category(
     """
     store_id = get_store_id(request)
 
-    category_id = body.get("category_id")
-    content = body.get("content")
-    if not category_id or not content:
-        raise ValidationError("分类ID和打印内容不能为空")
-
     service = PrinterService(db)
     result = await service.print_by_category(
         store_id=store_id,
-        category_id=uuid.UUID(category_id),
-        content=content,
-        trigger=body.get("trigger", "order_created"),
-        document_type=body.get("document_type", "order"),
+        category_id=uuid.UUID(body.category_id),
+        content=body.content,
+        trigger=body.trigger,
+        document_type=body.document_type,
     )
 
     if result["status"] == "no_printer":
@@ -247,7 +258,7 @@ async def print_by_category(
 
 @router.post("/print/direct")
 async def print_direct(
-    body: dict,
+    body: PrintDirectRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -261,16 +272,11 @@ async def print_direct(
     """
     store_id = get_store_id(request)
 
-    printer_id = body.get("printer_id")
-    content = body.get("content")
-    if not printer_id or not content:
-        raise ValidationError("打印机ID和打印内容不能为空")
-
     service = PrinterService(db)
     result = await service.print_direct(
         store_id=store_id,
-        printer_id=uuid.UUID(printer_id),
-        content=content,
+        printer_id=uuid.UUID(body.printer_id),
+        content=body.content,
     )
 
     if result["status"] == "failed":
@@ -289,20 +295,14 @@ async def list_routes(
     """获取路由规则列表"""
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(PrintRoute).where(
-            PrintRoute.store_id == store_id,
-        ).order_by(PrintRoute.trigger_event, PrintRoute.priority)
-    )
-    routes = result.scalars().all()
+    repo = PrinterRepository(db)
+    routes = await repo.get_routes_by_store(store_id)
 
     data = []
     for r in routes:
         # 获取打印机名称
-        printer_result = await db.execute(
-            select(Printer.name).where(Printer.printer_id == r.printer_id)
-        )
-        printer_name = printer_result.scalar_one_or_none() or "未知打印机"
+        printer = await repo.get_printer_by_id(r.printer_id, store_id)
+        printer_name = printer.name if printer else "未知打印机"
 
         data.append({
             "route_id": str(r.route_id),
@@ -323,7 +323,7 @@ async def list_routes(
 
 @router.post("/routes")
 async def create_route(
-    body: dict,
+    body: PrintRouteCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -331,25 +331,20 @@ async def create_route(
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
 
-    name = body.get("name")
-    printer_id = body.get("printer_id")
-    if not name or not printer_id:
-        raise ValidationError("规则名称和打印机不能为空")
-
     route = PrintRoute(
         store_id=store_id,
-        name=name,
-        trigger_event=body.get("trigger_event", "order_created"),
-        document_type=body.get("document_type", "order"),
-        filter_type=body.get("filter_type", "category"),
-        filter_value=body.get("filter_value"),
-        printer_id=uuid.UUID(printer_id),
-        priority=body.get("priority", 1),
+        name=body.name,
+        trigger_event=body.trigger_event,
+        document_type=body.document_type,
+        filter_type=body.filter_type,
+        filter_value=body.filter_value,
+        printer_id=uuid.UUID(body.printer_id),
+        priority=body.priority,
         is_active=True,
     )
-    db.add(route)
-    await db.commit()
-    await db.refresh(route)
+
+    repo = PrinterRepository(db)
+    await repo.create_route(route)
 
     return make_response(
         message="路由规则添加成功",
@@ -361,7 +356,7 @@ async def create_route(
 @router.put("/routes/{route_id}")
 async def update_route(
     route_id: uuid.UUID,
-    body: dict,
+    body: PrintRouteUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -369,34 +364,29 @@ async def update_route(
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(PrintRoute).where(
-            PrintRoute.route_id == route_id,
-            PrintRoute.store_id == store_id,
-        )
-    )
-    route = result.scalar_one_or_none()
+    repo = PrinterRepository(db)
+    route = await repo.get_route_by_id(route_id, store_id)
     if not route:
         raise NotFoundError("路由规则不存在")
 
-    if "name" in body:
-        route.name = body["name"]
-    if "trigger_event" in body:
-        route.trigger_event = body["trigger_event"]
-    if "document_type" in body:
-        route.document_type = body["document_type"]
-    if "filter_type" in body:
-        route.filter_type = body["filter_type"]
-    if "filter_value" in body:
-        route.filter_value = body["filter_value"]
-    if "printer_id" in body:
-        route.printer_id = uuid.UUID(body["printer_id"])
-    if "priority" in body:
-        route.priority = body["priority"]
-    if "is_active" in body:
-        route.is_active = body["is_active"]
+    if body.name is not None:
+        route.name = body.name
+    if body.trigger_event is not None:
+        route.trigger_event = body.trigger_event
+    if body.document_type is not None:
+        route.document_type = body.document_type
+    if body.filter_type is not None:
+        route.filter_type = body.filter_type
+    if body.filter_value is not None:
+        route.filter_value = body.filter_value
+    if body.printer_id is not None:
+        route.printer_id = uuid.UUID(body.printer_id)
+    if body.priority is not None:
+        route.priority = body.priority
+    if body.is_active is not None:
+        route.is_active = body.is_active
 
-    await db.commit()
+    await repo.update_route(route)
     return make_response(message="路由规则更新成功", request=request)
 
 
@@ -410,19 +400,12 @@ async def delete_route(
     require_role(request, ["boss"])
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(PrintRoute).where(
-            PrintRoute.route_id == route_id,
-            PrintRoute.store_id == store_id,
-        )
-    )
-    route = result.scalar_one_or_none()
+    repo = PrinterRepository(db)
+    route = await repo.get_route_by_id(route_id, store_id)
     if not route:
         raise NotFoundError("路由规则不存在")
 
-    await db.delete(route)
-    await db.commit()
-
+    await repo.delete_route(route)
     return make_response(message="路由规则已删除", request=request)
 
 
@@ -436,13 +419,8 @@ async def list_categories_with_printer(
     """获取分类列表（含打印机绑定信息）"""
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(Category).where(
-            Category.store_id == store_id,
-            Category.is_active == True,
-        ).order_by(Category.sort_order)
-    )
-    categories = result.scalars().all()
+    repo = PrinterRepository(db)
+    categories = await repo.get_categories_by_store(store_id)
 
     data = []
     for c in categories:
@@ -451,16 +429,12 @@ async def list_categories_with_printer(
         backup_printer_name = None
 
         if c.printer_id:
-            printer_result = await db.execute(
-                select(Printer.name).where(Printer.printer_id == c.printer_id)
-            )
-            printer_name = printer_result.scalar_one_or_none()
+            printer = await repo.get_printer_by_id(c.printer_id, store_id)
+            printer_name = printer.name if printer else None
 
         if c.backup_printer_id:
-            backup_result = await db.execute(
-                select(Printer.name).where(Printer.printer_id == c.backup_printer_id)
-            )
-            backup_printer_name = backup_result.scalar_one_or_none()
+            backup = await repo.get_printer_by_id(c.backup_printer_id, store_id)
+            backup_printer_name = backup.name if backup else None
 
         data.append({
             "category_id": str(c.category_id),
@@ -478,7 +452,7 @@ async def list_categories_with_printer(
 @router.put("/categories/{category_id}/printer")
 async def update_category_printer(
     category_id: uuid.UUID,
-    body: dict,
+    body: CategoryPrinterUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -486,20 +460,13 @@ async def update_category_printer(
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
 
-    result = await db.execute(
-        select(Category).where(
-            Category.category_id == category_id,
-            Category.store_id == store_id,
-        )
-    )
-    category = result.scalar_one_or_none()
+    repo = PrinterRepository(db)
+    category = await repo.get_category_by_id(category_id, store_id)
     if not category:
         raise NotFoundError("分类不存在")
 
-    if "printer_id" in body:
-        category.printer_id = uuid.UUID(body["printer_id"]) if body["printer_id"] else None
-    if "backup_printer_id" in body:
-        category.backup_printer_id = uuid.UUID(body["backup_printer_id"]) if body["backup_printer_id"] else None
+    printer_id = uuid.UUID(body.printer_id) if body.printer_id else None
+    backup_printer_id = uuid.UUID(body.backup_printer_id) if body.backup_printer_id else None
 
-    await db.commit()
+    await repo.update_category_printer(category, printer_id, backup_printer_id)
     return make_response(message="分类打印机绑定更新成功", request=request)
