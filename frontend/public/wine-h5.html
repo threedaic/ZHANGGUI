@@ -135,7 +135,7 @@
       }
 
       try {
-        var r = await fetch(API + '/wines/h5/' + encodeURIComponent(code));
+        var r = await fetch(API + '/wine-storage/h5/' + encodeURIComponent(code));
         var j = await r.json();
         if (j.code || !j.data) throw new Error(j.message || '未找到');
         gWine = j.data;
@@ -197,7 +197,7 @@
       var tableNo = document.getElementById('table-input').value.trim() || null;
 
       try {
-        var r = await fetch(API + '/wines/h5/confirm', {
+        var r = await fetch(API + '/wine-storage/h5/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bottle_label: gWine.bottle_label, retrieve_ml: gMl, table_no: tableNo }),

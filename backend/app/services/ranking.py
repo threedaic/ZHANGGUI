@@ -192,7 +192,7 @@ class RankingService:
                 "  COUNT(*) FILTER (WHERE status = 'late') AS late_count, "
                 "  COUNT(*) FILTER (WHERE status = 'early') AS early_count, "
                 "  COUNT(*) FILTER (WHERE status = 'absent') AS absent_count "
-                "FROM attendance_records "
+                "FROM att_records "
                 "WHERE store_id = :sid "
                 "  AND date_trunc('month', date) = :month "
                 "GROUP BY employee_id"

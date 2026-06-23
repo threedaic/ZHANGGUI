@@ -30,6 +30,22 @@ from app.utils.exceptions import NotFoundError, ValidationError
 router = APIRouter()
 
 
+def _serialize_template(tpl) -> dict:
+    """Serialize ClosingChecklistTemplate, mapping Python attr 'id' to 'template_id'."""
+    return {
+        "template_id": tpl.id,
+        "store_id": tpl.store_id,
+        "name": tpl.name,
+        "session_type": tpl.session_type,
+        "role_tag": tpl.role_tag,
+        "sort_order": tpl.sort_order,
+        "is_active": tpl.is_active,
+        "created_by": tpl.created_by,
+        "created_at": tpl.created_at,
+        "updated_at": tpl.updated_at,
+    }
+
+
 # ==================== 模板管理 ====================
 
 @router.get("/templates")
@@ -65,7 +81,7 @@ async def create_template(
     })
     await db.commit()
     await db.refresh(tpl)
-    d = {c.name: getattr(tpl, c.name) for c in tpl.__table__.columns}
+    d = _serialize_template(tpl)
     return make_response(request=request, data=d, message="模板创建成功")
 
 
@@ -86,7 +102,7 @@ async def update_template(
     tpl = await repo.update_template(tpl, **body.model_dump(exclude_none=True))
     await db.commit()
     await db.refresh(tpl)
-    d = {c.name: getattr(tpl, c.name) for c in tpl.__table__.columns}
+    d = _serialize_template(tpl)
     return make_response(request=request, data=d, message="模板更新成功")
 
 
@@ -185,9 +201,16 @@ async def list_sessions(
     repo = ButlerRepository(db, store_id)
     items, total = await repo.list_sessions(session_type=session_type, page=page, page_size=page_size)
     data = {
-        "items": [{c.name: getattr(s, c.name) for c in s.__table__.columns if c.name != "created_at" and c.name != "updated_at"} | {
+        "items": [{
+            "id": s.id,
+            "store_id": s.store_id,
+            "session_type": s.session_type,
+            "operator_user_id": s.operator_user_id,
+            "status": s.status,
             "started_at": s.started_at.isoformat() if s.started_at else None,
             "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+            "total_items": s.total_items,
+            "completed_items": s.completed_items,
         } for s in items],
         "total": total,
         "page": page,

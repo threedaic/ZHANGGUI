@@ -1,11 +1,8 @@
 -- ===========================================================================
--- Crush 2.0 员工端 Schema 建表脚本（35张表）
--- 依据：SPEC 2.0 + 现有旧表字段映射
+-- Crush 2.0 员工�?Schema 建表脚本�?5张表�?-- 依据：SPEC 2.0 + 现有旧表字段映射
 -- 覆盖模块：考勤/排班/审批/工资/合同/KPI/绩效/排名/评价/罚单/签收/收档/存酒/通知/营收
--- 通用规则（与 20260622_crush_2_0_schema.sql 一致）：
---   * 所有业务表含 store_id UUID NOT NULL（全局字典除外）
---   * 所有业务表启用 RLS 策略
---   * 所有表含 created_at / updated_at 审计字段
+-- 通用规则（与 20260622_crush_2_0_schema.sql 一致）�?--   * 所有业务表�?store_id UUID NOT NULL（全局字典除外�?--   * 所有业务表启用 RLS 策略
+--   * 所有表�?created_at / updated_at 审计字段
 --   * 主键统一 UUID
 --   * 金额统一 NUMERIC(12,2)
 --   * employee_id 引用 shared_employees(employee_id)
@@ -21,7 +18,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ===========================================================================
--- 一、考勤排班审批模块 att_*（8张）
+-- 一、考勤排班审批模块 att_*�?张）
 -- ===========================================================================
 
 -- 1. 班次配置
@@ -48,9 +45,9 @@ CREATE POLICY store_isolation ON att_shift_configs
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_shift_configs;
 CREATE POLICY admin_all_access ON att_shift_configs
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 2. 考勤记录（排班+打卡+判定一体）
+-- 2. 考勤记录（排�?打卡+判定一体）
 CREATE TABLE IF NOT EXISTS att_records (
     record_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
@@ -82,18 +79,16 @@ CREATE POLICY store_isolation ON att_records
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_records;
 CREATE POLICY admin_all_access ON att_records
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 3. 排班表
-CREATE TABLE IF NOT EXISTS att_schedules (
+-- 3. 排班�?CREATE TABLE IF NOT EXISTS att_schedules (
     schedule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
     date DATE NOT NULL,
     shift_type VARCHAR(20) NOT NULL,           -- day / night / rest / leave
     note TEXT,
-    created_by UUID,                            -- 操作人（shared_employees.employee_id）
-    version INTEGER DEFAULT 1,
+    created_by UUID,                            -- 操作人（shared_employees.employee_id�?    version INTEGER DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(employee_id, date)
@@ -106,7 +101,7 @@ CREATE POLICY store_isolation ON att_schedules
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_schedules;
 CREATE POLICY admin_all_access ON att_schedules
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 4. 排班规则
 CREATE TABLE IF NOT EXISTS att_schedule_rules (
@@ -126,7 +121,7 @@ CREATE POLICY store_isolation ON att_schedule_rules
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_schedule_rules;
 CREATE POLICY admin_all_access ON att_schedule_rules
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 5. 排班快照
 CREATE TABLE IF NOT EXISTS att_schedule_snapshots (
@@ -144,7 +139,7 @@ CREATE POLICY store_isolation ON att_schedule_snapshots
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_schedule_snapshots;
 CREATE POLICY admin_all_access ON att_schedule_snapshots
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 6. 调班申请
 CREATE TABLE IF NOT EXISTS att_swap_requests (
@@ -171,9 +166,9 @@ CREATE POLICY store_isolation ON att_swap_requests
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_swap_requests;
 CREATE POLICY admin_all_access ON att_swap_requests
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 7. 审批申请（请假/补卡/调班/报销统一表）
+-- 7. 审批申请（请�?补卡/调班/报销统一表）
 CREATE TABLE IF NOT EXISTS att_approvals (
     approval_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
@@ -183,9 +178,8 @@ CREATE TABLE IF NOT EXISTS att_approvals (
     start_date DATE,
     end_date DATE,
     reason TEXT,
-    extra JSONB,                                -- 各类型自定义字段（请假类型/补卡时间/报销金额等）
-    approver_id UUID,                           -- 审批人（shared_employees.employee_id）
-    approved_at TIMESTAMPTZ,
+    extra JSONB,                                -- 各类型自定义字段（请假类�?补卡时间/报销金额等）
+    approver_id UUID,                           -- 审批人（shared_employees.employee_id�?    approved_at TIMESTAMPTZ,
     reject_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -198,7 +192,7 @@ CREATE POLICY store_isolation ON att_approvals
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_approvals;
 CREATE POLICY admin_all_access ON att_approvals
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 8. 假期余额
 CREATE TABLE IF NOT EXISTS att_leave_balances (
@@ -221,10 +215,10 @@ CREATE POLICY store_isolation ON att_leave_balances
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON att_leave_balances;
 CREATE POLICY admin_all_access ON att_leave_balances
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 二、工资合同模块 wage_*（8张）
+-- 二、工资合同模�?wage_*�?张）
 -- ===========================================================================
 
 -- 9. 账期管理
@@ -250,13 +244,13 @@ CREATE POLICY store_isolation ON wage_periods
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_periods;
 CREATE POLICY admin_all_access ON wage_periods
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 10. 薪资矩阵（5岗位 x 4档）
+-- 10. 薪资矩阵�?岗位 x 4档）
 CREATE TABLE IF NOT EXISTS wage_salary_matrix (
     matrix_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
-    position VARCHAR(30) NOT NULL,               -- 店长/吧员/服务员/厨师/保洁
+    position VARCHAR(30) NOT NULL,               -- 店长/吧员/服务�?厨师/保洁
     grade VARCHAR(20) NOT NULL,                  -- 学徒/正式/副职/正职
     monthly_salary NUMERIC(12,2) NOT NULL,
     base_salary NUMERIC(12,2) DEFAULT 3000.00,
@@ -274,7 +268,7 @@ CREATE POLICY store_isolation ON wage_salary_matrix
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_salary_matrix;
 CREATE POLICY admin_all_access ON wage_salary_matrix
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 11. 劳动合同
 CREATE TABLE IF NOT EXISTS wage_contracts (
@@ -307,7 +301,7 @@ CREATE POLICY store_isolation ON wage_contracts
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_contracts;
 CREATE POLICY admin_all_access ON wage_contracts
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 12. 工资主表
 CREATE TABLE IF NOT EXISTS wage_records (
@@ -339,7 +333,7 @@ CREATE POLICY store_isolation ON wage_records
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_records;
 CREATE POLICY admin_all_access ON wage_records
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 13. 工资明细子表
 CREATE TABLE IF NOT EXISTS wage_record_items (
@@ -360,10 +354,9 @@ CREATE POLICY store_isolation ON wage_record_items
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_record_items;
 CREATE POLICY admin_all_access ON wage_record_items
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 14. 工资项配置
-CREATE TABLE IF NOT EXISTS wage_items_config (
+-- 14. 工资项配�?CREATE TABLE IF NOT EXISTS wage_items_config (
     config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     item_code VARCHAR(50) NOT NULL,
@@ -385,7 +378,7 @@ CREATE POLICY store_isolation ON wage_items_config
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_items_config;
 CREATE POLICY admin_all_access ON wage_items_config
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 15. 薪资规则
 CREATE TABLE IF NOT EXISTS wage_salary_rules (
@@ -408,7 +401,7 @@ CREATE POLICY store_isolation ON wage_salary_rules
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_salary_rules;
 CREATE POLICY admin_all_access ON wage_salary_rules
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 16. 企微收款同步
 CREATE TABLE IF NOT EXISTS wage_wework_payments (
@@ -438,10 +431,10 @@ CREATE POLICY store_isolation ON wage_wework_payments
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wage_wework_payments;
 CREATE POLICY admin_all_access ON wage_wework_payments
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 三、KPI/绩效/排名/评价/罚单模块 hr_*（8张）
+-- 三、KPI/绩效/排名/评价/罚单模块 hr_*�?张）
 -- ===========================================================================
 
 -- 17. KPI 模板
@@ -467,7 +460,7 @@ CREATE POLICY store_isolation ON hr_kpi_templates
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_kpi_templates;
 CREATE POLICY admin_all_access ON hr_kpi_templates
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 18. KPI 维度评分
 CREATE TABLE IF NOT EXISTS hr_kpi_scores (
@@ -493,10 +486,9 @@ CREATE POLICY store_isolation ON hr_kpi_scores
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_kpi_scores;
 CREATE POLICY admin_all_access ON hr_kpi_scores
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 19. KPI 汇总结果
-CREATE TABLE IF NOT EXISTS hr_kpi_results (
+-- 19. KPI 汇总结�?CREATE TABLE IF NOT EXISTS hr_kpi_results (
     result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
@@ -517,7 +509,7 @@ CREATE POLICY store_isolation ON hr_kpi_results
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_kpi_results;
 CREATE POLICY admin_all_access ON hr_kpi_results
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 20. KPI 申诉
 CREATE TABLE IF NOT EXISTS hr_kpi_appeals (
@@ -540,10 +532,9 @@ CREATE POLICY store_isolation ON hr_kpi_appeals
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_kpi_appeals;
 CREATE POLICY admin_all_access ON hr_kpi_appeals
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 21. 员工月度业绩汇总
-CREATE TABLE IF NOT EXISTS hr_performance (
+-- 21. 员工月度业绩汇�?CREATE TABLE IF NOT EXISTS hr_performance (
     perf_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
@@ -567,7 +558,7 @@ CREATE POLICY store_isolation ON hr_performance
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_performance;
 CREATE POLICY admin_all_access ON hr_performance
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 22. 员工排名
 CREATE TABLE IF NOT EXISTS hr_rankings (
@@ -589,7 +580,7 @@ CREATE POLICY store_isolation ON hr_rankings
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_rankings;
 CREATE POLICY admin_all_access ON hr_rankings
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 23. 客户评价
 CREATE TABLE IF NOT EXISTS hr_guest_ratings (
@@ -621,7 +612,7 @@ CREATE POLICY store_isolation ON hr_guest_ratings
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_guest_ratings;
 CREATE POLICY admin_all_access ON hr_guest_ratings
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 24. 罚单
 CREATE TABLE IF NOT EXISTS hr_penalty_notices (
@@ -646,10 +637,10 @@ CREATE POLICY store_isolation ON hr_penalty_notices
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON hr_penalty_notices;
 CREATE POLICY admin_all_access ON hr_penalty_notices
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 四、签收模块 sig_*（1张）
+-- 四、签收模�?sig_*�?张）
 -- ===========================================================================
 
 -- 25. 签收任务
@@ -681,10 +672,10 @@ CREATE POLICY store_isolation ON sig_tasks
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON sig_tasks;
 CREATE POLICY admin_all_access ON sig_tasks
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 五、收档检查模块 butler_*（4张）
+-- 五、收档检查模�?butler_*�?张）
 -- ===========================================================================
 
 -- 26. 清单模板
@@ -708,17 +699,15 @@ CREATE POLICY store_isolation ON butler_checklist_templates
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON butler_checklist_templates;
 CREATE POLICY admin_all_access ON butler_checklist_templates
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 27. 模板明细项
-CREATE TABLE IF NOT EXISTS butler_checklist_items (
+-- 27. 模板明细�?CREATE TABLE IF NOT EXISTS butler_checklist_items (
     item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     template_id UUID NOT NULL REFERENCES butler_checklist_templates(template_id) ON DELETE CASCADE,
     item_name VARCHAR(100) NOT NULL,
     item_type VARCHAR(20) DEFAULT 'checkbox',     -- checkbox / photo
-    device_id UUID,                               -- 预留 IoT（shared_devices）
-    required_photo BOOLEAN DEFAULT FALSE,
+    device_id UUID,                               -- 预留 IoT（shared_devices�?    required_photo BOOLEAN DEFAULT FALSE,
     sort_order INTEGER DEFAULT 0,
     ai_prompt VARCHAR(500),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -730,7 +719,7 @@ CREATE POLICY store_isolation ON butler_checklist_items
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON butler_checklist_items;
 CREATE POLICY admin_all_access ON butler_checklist_items
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 28. 开闭店会话
 CREATE TABLE IF NOT EXISTS butler_sessions (
@@ -754,7 +743,7 @@ CREATE POLICY store_isolation ON butler_sessions
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON butler_sessions;
 CREATE POLICY admin_all_access ON butler_sessions
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 29. 检查项结果
 CREATE TABLE IF NOT EXISTS butler_item_results (
@@ -781,10 +770,10 @@ CREATE POLICY store_isolation ON butler_item_results
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON butler_item_results;
 CREATE POLICY admin_all_access ON butler_item_results
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 六、存酒模块 wine_*（3张）
+-- 六、存酒模�?wine_*�?张）
 -- ===========================================================================
 
 -- 30. 存酒记录
@@ -816,10 +805,9 @@ CREATE POLICY store_isolation ON wine_stored_bottles
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wine_stored_bottles;
 CREATE POLICY admin_all_access ON wine_stored_bottles
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 31. 盘点单
-CREATE TABLE IF NOT EXISTS wine_stocktakes (
+-- 31. 盘点�?CREATE TABLE IF NOT EXISTS wine_stocktakes (
     stocktake_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     period VARCHAR(7) NOT NULL,                   -- YYYY-MM
@@ -844,7 +832,7 @@ CREATE POLICY store_isolation ON wine_stocktakes
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wine_stocktakes;
 CREATE POLICY admin_all_access ON wine_stocktakes
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 32. 盘点明细
 CREATE TABLE IF NOT EXISTS wine_stocktake_items (
@@ -871,11 +859,10 @@ CREATE POLICY store_isolation ON wine_stocktake_items
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON wine_stocktake_items;
 CREATE POLICY admin_all_access ON wine_stocktake_items
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 七、通知模块 sys_*（2张，扩展已有 sys_* 系列）
--- ===========================================================================
+-- 七、通知模块 sys_*�?张，扩展已有 sys_* 系列�?-- ===========================================================================
 
 -- 33. 通知
 CREATE TABLE IF NOT EXISTS sys_notifications (
@@ -896,7 +883,7 @@ CREATE POLICY store_isolation ON sys_notifications
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON sys_notifications;
 CREATE POLICY admin_all_access ON sys_notifications
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 34. 通知配置
 CREATE TABLE IF NOT EXISTS sys_notification_settings (
@@ -920,10 +907,10 @@ CREATE POLICY store_isolation ON sys_notification_settings
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON sys_notification_settings;
 CREATE POLICY admin_all_access ON sys_notification_settings
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
--- 八、营收模块 fin_*（1张）
+-- 八、营收模�?fin_*�?张）
 -- ===========================================================================
 
 -- 35. 每日营收
@@ -934,9 +921,7 @@ CREATE TABLE IF NOT EXISTS fin_daily_revenue (
     pos_revenue NUMERIC(12,2) DEFAULT 0,          -- POS收银收入
     wecom_revenue NUMERIC(12,2) DEFAULT 0,        -- 企微收款收入
     cash_revenue NUMERIC(12,2) DEFAULT 0,         -- 现金收入
-    member_revenue NUMERIC(12,2) DEFAULT 0,       -- 会员卡收入
-    total_revenue NUMERIC(12,2) DEFAULT 0,        -- 总收入
-    guest_count INTEGER DEFAULT 0,
+    member_revenue NUMERIC(12,2) DEFAULT 0,       -- 会员卡收�?    total_revenue NUMERIC(12,2) DEFAULT 0,        -- 总收�?    guest_count INTEGER DEFAULT 0,
     avg_spend NUMERIC(12,2) DEFAULT 0,
     details JSONB,                                -- 明细（各品类收入等）
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -951,7 +936,7 @@ CREATE POLICY store_isolation ON fin_daily_revenue
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
 DROP POLICY IF EXISTS admin_all_access ON fin_daily_revenue;
 CREATE POLICY admin_all_access ON fin_daily_revenue
-    FOR ALL USING (current_setting('app.current_role', true) = 'admin');
+    FOR ALL USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- ===========================================================================
 -- 索引
@@ -991,16 +976,16 @@ CREATE INDEX IF NOT EXISTS idx_fin_daily_revenue_store ON fin_daily_revenue(stor
 -- ===========================================================================
 -- 表数量统计：
 --   att_*    : 8  (班次配置/考勤记录/排班/排班规则/排班快照/调班/审批/假期余额)
---   wage_*   : 8  (账期/薪资矩阵/合同/工资主表/工资明细/工资项配置/薪资规则/企微收款)
+--   wage_*   : 8  (账期/薪资矩阵/合同/工资主表/工资明细/工资项配�?薪资规则/企微收款)
 --   hr_*     : 8  (KPI模板/KPI评分/KPI结果/KPI申诉/月度业绩/排名/客户评价/罚单)
 --   sig_*    : 1  (签收任务)
---   butler_* : 4  (清单模板/模板明细/开闭店会话/检查结果)
---   wine_*   : 3  (存酒记录/盘点单/盘点明细)
+--   butler_* : 4  (清单模板/模板明细/开闭店会话/检查结�?
+--   wine_*   : 3  (存酒记录/盘点�?盘点明细)
 --   sys_*    : 2  (通知/通知配置)
 --   fin_*    : 1  (每日营收)
 --   合计     : 35
 --
--- 与 20260622_crush_2_0_schema.sql 的 28 张表合并后：
+-- �?20260622_crush_2_0_schema.sql �?28 张表合并后：
 --   shared_* : 10
 --   pos_*    : 11
 --   game_*   : 4
@@ -1012,5 +997,5 @@ CREATE INDEX IF NOT EXISTS idx_fin_daily_revenue_store ON fin_daily_revenue(stor
 --   butler_* : 4
 --   wine_*   : 3
 --   fin_*    : 1
---   总合计   : 63 张表
+--   总合�?  : 63 张表
 -- ===========================================================================

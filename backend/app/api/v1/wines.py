@@ -50,7 +50,7 @@ async def _safe_commit(db: AsyncSession, request: Request = None, after_commit=N
 
 # ==================== 存酒 ====================
 
-@router.post("/wines")
+@router.post("")
 async def create_wine(body: WineCreate, request: Request, db: AsyncSession = Depends(get_db)):
     """服务员存酒：填表 → 出标签 + 发短信"""
     store_id = _get_store_id(request)
@@ -69,7 +69,7 @@ async def create_wine(body: WineCreate, request: Request, db: AsyncSession = Dep
     return make_response(data=result, request=request)
 
 
-@router.post("/wines/batch")
+@router.post("/batch")
 async def create_wine_batch(body: WineBatchCreate, request: Request, db: AsyncSession = Depends(get_db)):
     """一次存多种酒"""
     store_id = _get_store_id(request)
@@ -95,7 +95,7 @@ async def create_wine_batch(body: WineBatchCreate, request: Request, db: AsyncSe
 
 # ==================== 列表查询 ====================
 
-@router.get("/wines")
+@router.get("")
 async def list_wines(
     request: Request,
     status: str | None = Query(None),
@@ -122,7 +122,7 @@ async def list_wines(
 
 # ==================== H5 查酒信息（公开） ====================
 
-@router.get("/wines/h5/{bottle_label}")
+@router.get("/h5/{bottle_label}")
 async def h5_wine_info(bottle_label: str, request: Request, db: AsyncSession = Depends(get_db)):
     """客人短信链接查看存酒信息"""
     from sqlalchemy import select
@@ -137,7 +137,7 @@ async def h5_wine_info(bottle_label: str, request: Request, db: AsyncSession = D
 
 # ==================== H5 客人自助取酒 ====================
 
-@router.post("/wines/h5/confirm")
+@router.post("/h5/confirm")
 async def h5_confirm_retrieve(body: WineH5ConfirmRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """客人自助取酒"""
     wine = await self_retrieve(
@@ -151,7 +151,7 @@ async def h5_confirm_retrieve(body: WineH5ConfirmRequest, request: Request, db: 
 
 # ==================== 公开：客人查自己的存酒 ====================
 
-@router.get("/wines/guest")
+@router.get("/guest")
 async def guest_my_wines(request: Request, phone: str = Query(...), db: AsyncSession = Depends(get_db)):
     """客人输入手机号查看所有存酒"""
     from sqlalchemy import select
@@ -174,7 +174,7 @@ async def guest_my_wines(request: Request, phone: str = Query(...), db: AsyncSes
 
 # ==================== 服务员取酒 ====================
 
-@router.post("/wines/retrieve")
+@router.post("/retrieve")
 async def retrieve_wine_api(
     body: WineStaffRetrieve, request: Request, db: AsyncSession = Depends(get_db),
 ):
@@ -195,7 +195,7 @@ async def retrieve_wine_api(
 
 # ==================== 盘点 ====================
 
-@router.get("/wines/inventory/summary")
+@router.get("/inventory/summary")
 async def inventory_summary(request: Request, db: AsyncSession = Depends(get_db)):
     """存酒盘点汇总"""
     store_id = _get_store_id(request)
@@ -204,7 +204,7 @@ async def inventory_summary(request: Request, db: AsyncSession = Depends(get_db)
     return make_response(data=summary, request=request)
 
 
-@router.get("/wines/inventory/items")
+@router.get("/inventory/items")
 async def inventory_items(
     request: Request,
     page: int = Query(1, ge=1),
@@ -230,7 +230,7 @@ async def inventory_items(
 
 # ==================== 详情 ====================
 
-@router.get("/wines/{wine_id}")
+@router.get("/{wine_id}")
 async def get_wine(wine_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)):
     """单条存酒记录详情"""
     store_id = _get_store_id(request)

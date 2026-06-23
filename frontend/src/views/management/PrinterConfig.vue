@@ -213,7 +213,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.printer-page { padding: 16px; background: #000000; min-height: 100vh; padding-bottom: calc(56px + 24px); }
+.printer-page { padding: 16px; background: #000000; min-height: 100vh; padding-bottom: calc(64px + 24px); }
 .page-header { margin-bottom: 20px; }
 .page-title { font-family: "Source Han Sans SC", sans-serif; font-size: 22px; font-weight: 700; color: #FFFFFF; margin: 0; }
 .page-subtitle { font-size: 12px; color: #7A7C80; }

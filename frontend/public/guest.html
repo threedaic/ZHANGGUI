@@ -98,7 +98,7 @@
     async function fetchWines(phone) {
       show('loading');
       try {
-        var r = await fetch(API + '/wines/guest?phone=' + encodeURIComponent(phone));
+        var r = await fetch(API + '/wine-storage/guest?phone=' + encodeURIComponent(phone));
         var j = await r.json();
         if (j.code || !j.data) throw new Error(j.message);
 

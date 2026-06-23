@@ -22,12 +22,16 @@ const icons: Record<string, string> = {
   </svg>`,
 }
 
+// SPEC 2.0 §5.4 角色权限：日常/我的=全员，管理=店长及以上，设置=boss/admin
+const ALL_ROLES = ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager', 'staff']
+const MANAGER_ROLES = ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager']
+
 const tabs = computed(() => {
   const list = [
-    { key: 'daily', label: '日常', path: '/daily', roles: ['boss', 'store_manager', 'staff'] },
-    { key: 'management', label: '管理', path: '/management', roles: ['boss', 'store_manager'] },
-    { key: 'settings', label: '设置', path: '/settings', roles: ['boss'] },
-    { key: 'profile', label: '我的', path: '/profile', roles: ['boss', 'store_manager', 'staff'] },
+    { key: 'daily', label: '日常', path: '/daily', roles: ALL_ROLES },
+    { key: 'management', label: '管理', path: '/management', roles: MANAGER_ROLES },
+    { key: 'settings', label: '设置', path: '/settings', roles: ['boss', 'admin'] },
+    { key: 'profile', label: '我的', path: '/profile', roles: ALL_ROLES },
   ]
   return list.filter((t) => t.roles.includes(auth.role))
 })

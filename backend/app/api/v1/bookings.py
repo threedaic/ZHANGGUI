@@ -1,14 +1,14 @@
 """订桌预约 API 路由。
 
-前缀: /api/v1/bookings (由 main.py 提供)
+前缀: /api/v1/reservations (由 main.py 提供)
 
 完整路径映射:
-  GET  ""               → /api/v1/bookings          (预约列表)
-  POST ""               → /api/v1/bookings          (创建预约)
-  GET  "/stats"         → /api/v1/bookings/stats    (预约统计)
-  GET  "/{booking_id}"  → /api/v1/bookings/{id}     (预约详情)
-  PUT  "/{booking_id}"  → /api/v1/bookings/{id}     (更新预约)
-  DELETE "/{booking_id}" → /api/v1/bookings/{id}    (取消预约)
+  GET  ""               → /api/v1/reservations          (预约列表)
+  POST ""               → /api/v1/reservations          (创建预约)
+  GET  "/stats"         → /api/v1/reservations/stats    (预约统计)
+  GET  "/{booking_id}"  → /api/v1/reservations/{id}     (预约详情)
+  PUT  "/{booking_id}"  → /api/v1/reservations/{id}     (更新预约)
+  DELETE "/{booking_id}" → /api/v1/reservations/{id}    (取消预约)
 """
 
 import uuid

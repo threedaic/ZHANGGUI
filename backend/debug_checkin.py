@@ -2,7 +2,7 @@
 import asyncio
 from datetime import datetime, date, timedelta
 from app.database import AsyncSessionLocal
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, text
 from app.models.employee import Employee
 from app.models.attendance import ShiftConfig, AttendanceRecord
 from app.repositories.attendance import AttendanceRepository
@@ -15,7 +15,15 @@ WECOM_API = "https://qyapi.weixin.qq.com/cgi-bin"
 
 async def main():
     async with AsyncSessionLocal() as session:
-        store_id = 1
+        # 查询第一家门店的 store_id（UUID）
+        store_result = await session.execute(
+            text("SELECT store_id FROM shared_stores ORDER BY created_at LIMIT 1")
+        )
+        store_row = store_result.fetchone()
+        if store_row is None:
+            print("错误：shared_stores 表中没有门店。")
+            return
+        store_id = store_row[0]
         target_date = "2026-06-16"
 
         # Step 1: Load employees

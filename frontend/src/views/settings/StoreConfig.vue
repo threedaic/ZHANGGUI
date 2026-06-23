@@ -252,7 +252,7 @@ onMounted(loadData)
 
 <style scoped>
 .store-page {
-  padding: 16px 16px calc(56px + 24px);
+  padding: 16px 16px calc(64px + 24px);
   min-height: 100vh;
 }
 

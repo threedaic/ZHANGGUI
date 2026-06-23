@@ -80,7 +80,7 @@ async function loadEmployees() {
   loading.value = true
   error.value = ''
   try {
-    const res = await apiClient.get('/store/employees')
+    const res = await apiClient.get('/stores/employees')
     employees.value = res.data.data || []
   } catch (e: any) {
     error.value = e.response?.data?.message || '加载失败'
@@ -92,7 +92,7 @@ async function loadEmployees() {
 async function handleRoleChange(emp: Employee, newRole: string) {
   if (newRole === emp.role) return
   try {
-    await apiClient.put(`/store/employees/${emp.id}/role`, { role: newRole })
+    await apiClient.put(`/stores/employees/${emp.id}/role`, { role: newRole })
     emp.role = newRole
     showToast(`${emp.name} → ${roleOptions.find(r => r.value === newRole)?.label}`)
   } catch (e: any) {
@@ -106,7 +106,7 @@ onMounted(loadEmployees)
 <style scoped>
 .role-page {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
 }
 
 .page-header {

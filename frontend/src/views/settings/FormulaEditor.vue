@@ -228,7 +228,8 @@ onMounted(loadDetail)
       border-color: $brand-primary;
     }
 
-    textarea& {
+    &.textarea,
+    &.is-textarea {
       height: auto;
       padding: 8px 10px;
       resize: vertical;

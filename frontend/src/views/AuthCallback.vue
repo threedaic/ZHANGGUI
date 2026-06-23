@@ -1,64 +1,88 @@
-<template>
-  <div class="callback-loading">
-    <div class="spinner"></div>
-    <span class="text">登录中...</span>
-  </div>
-</template>
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 onMounted(() => {
-  // createWebHistory() — 参数在 search，不在 hash
-  const params = new URLSearchParams(window.location.search)
-  const accessToken = params.get('access_token')
-  const role = (params.get('role') || 'staff') as 'boss' | 'store_manager' | 'staff'
+  const accessToken = route.query.access_token as string | undefined
+  const refreshToken = route.query.refresh_token as string | undefined
+  const role = route.query.role as string | undefined
+  const error = route.query.error as string | undefined
 
-  if (accessToken) {
-    // 先用 token + role 占位设置，随后 fetchUser 补全完整用户信息
-    auth.setAuth(accessToken, {
-      user_id: null,
-      employee_id: null,
-      store_id: null,
-      role,
-    })
-    auth.fetchUser().finally(() => router.replace('/'))
-  } else {
+  // OAuth 失败回调
+  if (error) {
+    const errorMap: Record<string, string> = {
+      config: '门店未配置企微，请联系管理员',
+      oauth_fail: '企微授权失败，请重试',
+      no_user: '未能获取企微身份，请重试',
+      not_found: '企微账号未绑定员工，请联系管理员',
+    }
+    ElMessage.error(errorMap[error] || `登录失败: ${error}`)
     router.replace('/login')
+    return
   }
+
+  // OAuth 成功回调
+  if (!accessToken || !refreshToken) {
+    ElMessage.error('回调参数缺失')
+    router.replace('/login')
+    return
+  }
+
+  auth.setAuth(accessToken, {
+    user_id: '',
+    employee_id: '',
+    store_id: '',
+    role: (role as 'boss' | 'store_manager' | 'staff') || 'staff',
+    username: '',
+  })
+
+  ElMessage.success('企微登录成功')
+  router.replace('/')
 })
 </script>
-<style scoped>
-.callback-loading {
+
+<template>
+  <div class="auth-callback">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <p>正在完成企微登录...</p>
+    </div>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.auth-callback {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  height: 100vh;
-  background: #000;
+  background-color: $color-black;
 }
 
-.text {
-  color: #7A7C80;
-  font-size: 14px;
+.loading-card {
+  text-align: center;
+  color: $brand-white;
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: $brand-primary;
   border-radius: 50%;
-  border: 3px solid rgba(251, 0, 121, 0.15);
-  border-top-color: #FB0079;
-  border-right-color: #FF68A2;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

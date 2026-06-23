@@ -171,7 +171,7 @@ async function loadData() {
     // 并行加载推送设置和群机器人配置
     const [settingsRes, storeRes] = await Promise.all([
       notificationAPI.getSettings(),
-      apiClient.get('/store/settings').catch(() => null),
+      apiClient.get('/stores/settings').catch(() => null),
     ])
     list.value = settingsRes.data.data
 
@@ -187,7 +187,7 @@ async function loadData() {
 
 async function handleBotToggle() {
   try {
-    await apiClient.put('/store/settings', { wecom_bot_enabled: botEnabled.value })
+    await apiClient.put('/stores/settings', { wecom_bot_enabled: botEnabled.value })
   } catch {
     botEnabled.value = !botEnabled.value
   }
@@ -201,7 +201,7 @@ async function handleSaveWebhook() {
   savingWebhook.value = true
   testResult.value = null
   try {
-    await apiClient.put('/store/settings', { wecom_webhook_url: webhookUrl.value.trim() })
+    await apiClient.put('/stores/settings', { wecom_webhook_url: webhookUrl.value.trim() })
     testResult.value = { ok: true, msg: 'Webhook 地址已保存' }
   } catch (e: any) {
     testResult.value = { ok: false, msg: e.response?.data?.message || '保存失败' }

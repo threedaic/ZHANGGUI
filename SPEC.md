@@ -194,7 +194,7 @@ sys_*        系统表（配置/日志/审计）
 - 所有业务表都有 `store_id UUID NOT NULL`（系统表/全局字典除外）
 - 所有业务表都启用 RLS 策略
 - 所有表都有 `created_at` / `updated_at` 审计字段
-- **主键统一用 UUID**
+- **主键统一用 UUID**（例外：sys_audit_logs 用 BIGSERIAL 自增，审计日志量大，自增性能优）
 - 金额统一用 `NUMERIC(12,2)`
 
 ### 3.3 RLS策略（session变量方式）
@@ -445,6 +445,8 @@ CREATE TABLE shared_store_settings (
     -- 群机器人
     wecom_bot_enabled BOOLEAN DEFAULT FALSE,
     wecom_webhook_url TEXT,
+    -- 扩展配置（未来新业务配置放这里，不用改表结构）
+    extra_config JSONB DEFAULT '{}',
     -- 审计字段
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -1034,7 +1036,7 @@ feat/xxx (功能分支)
 | 游戏平台化 | 游戏模板+游戏实例 |
 | 游戏入口 | **员工端日常Tab** |
 | 数据迁移 | 先开发后迁移，P0必迁19张表 |
-| 主键 | **全部UUID** |
+| 主键 | **全部UUID**（sys_audit_logs 例外用 BIGSERIAL 自增） |
 | 多租户隔离 | **应用层+PostgreSQL RLS双层隔离** |
 | RLS豁免 | **session变量(current_setting('app.current_role'))** |
 | 架构 | **模块化单体** |

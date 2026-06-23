@@ -211,7 +211,7 @@ const category = computed(() => {
 <style scoped>
 .category-page {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
 }
 
 .cat-title {

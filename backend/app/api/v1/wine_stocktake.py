@@ -1,6 +1,6 @@
 """
 存酒盘点单 API 路由
-前缀: /api/v1/wines/stocktake
+前缀: /api/v1/wine-storage/stocktake
 """
 import uuid
 from fastapi import APIRouter, Depends, Request, Query
@@ -27,7 +27,7 @@ from app.utils.deps import make_response, get_store_id, get_user_id, require_rol
 router = APIRouter()
 
 
-@router.post("/wines/stocktake")
+@router.post("/stocktake")
 async def create_stocktake(
     body: StocktakeCreateRequest, request: Request, db: AsyncSession = Depends(get_db),
 ):
@@ -42,7 +42,7 @@ async def create_stocktake(
     return make_response(message="盘点单已生成", data={"id": stocktake_id}, request=request)
 
 
-@router.get("/wines/stocktake")
+@router.get("/stocktake")
 async def list_stocktakes(
     request: Request,
     status: str | None = Query(None),
@@ -64,7 +64,7 @@ async def list_stocktakes(
     return make_response(data=result.model_dump(), request=request)
 
 
-@router.get("/wines/stocktake/{stocktake_id}")
+@router.get("/stocktake/{stocktake_id}")
 async def get_stocktake_detail(
     stocktake_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db),
 ):
@@ -77,7 +77,7 @@ async def get_stocktake_detail(
     return make_response(data=StocktakeResponse.model_validate(stocktake).model_dump(), request=request)
 
 
-@router.get("/wines/stocktake/{stocktake_id}/items")
+@router.get("/stocktake/{stocktake_id}/items")
 async def list_stocktake_items(
     stocktake_id: uuid.UUID,
     request: Request,
@@ -101,7 +101,7 @@ async def list_stocktake_items(
     return make_response(data=result.model_dump(), request=request)
 
 
-@router.post("/wines/stocktake/{stocktake_id}/scan")
+@router.post("/stocktake/{stocktake_id}/scan")
 async def scan_stocktake_bottle(
     stocktake_id: uuid.UUID,
     body: StocktakeScanRequest,
@@ -119,7 +119,7 @@ async def scan_stocktake_bottle(
     return make_response(data=result, request=request)
 
 
-@router.post("/wines/stocktake/{stocktake_id}/complete")
+@router.post("/stocktake/{stocktake_id}/complete")
 async def complete_stocktake_api(
     stocktake_id: uuid.UUID,
     body: StocktakeCompleteRequest,

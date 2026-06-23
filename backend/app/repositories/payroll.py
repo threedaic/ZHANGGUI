@@ -165,7 +165,7 @@ class PayrollRepository:
                 "  COALESCE(SUM(late_minutes), 0) AS total_late_minutes, "
                 "  COUNT(*) FILTER (WHERE status = 'absent') AS absent_count, "
                 "  COUNT(*) FILTER (WHERE status = 'early') AS early_count "
-                "FROM attendance_records "
+                "FROM att_records "
                 "WHERE employee_id = :eid "
                 "  AND store_id = :sid "
                 "  AND date_trunc('month', date) = :month"

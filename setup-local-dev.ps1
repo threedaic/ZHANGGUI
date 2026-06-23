@@ -1,4 +1,4 @@
-﻿# 本地开发环境一键启动脚本
+# 本地开发环境一键启动脚本
 # 重启电脑后，双击运行此脚本即可
 # 用法: PowerShell -ExecutionPolicy Bypass -File setup-local-dev.ps1
 
@@ -32,11 +32,11 @@ if (Test-Path $dockerExe) {
     exit 1
 }
 
-# 2. 启动PostgreSQL+Redis容器
-Write-Host "`n[2/5] 启动PostgreSQL+Redis容器..." -ForegroundColor Yellow
+# 2. 启动PostgreSQL+Redis+Backend容器
+Write-Host "`n[2/5] 启动PostgreSQL+Redis+Backend容器..." -ForegroundColor Yellow
 Set-Location "C:\Users\hello\Documents\trae_projects\crush-zhanggui"
 docker compose -f docker-compose.dev.yml up -d
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 10
 Write-Host "  容器状态:" -ForegroundColor Green
 docker compose -f docker-compose.dev.yml ps
 
@@ -57,20 +57,21 @@ if (Test-Path $backupFile) {
     Write-Host "  备份文件不存在: $backupFile" -ForegroundColor Red
 }
 
-# 4. 重启后端
-Write-Host "`n[4/5] 重启后端..." -ForegroundColor Yellow
-$conns = Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue
-if ($conns) {
-    foreach ($c in $conns) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Seconds 2
+# 4. 检查后端容器健康
+Write-Host "`n[4/5] 检查后端容器..." -ForegroundColor Yellow
+Start-Sleep -Seconds 5
+$apiStatus = docker inspect --format='{{.State.Health.Status}}' crush-dev-api 2>&1
+if ($apiStatus -eq "healthy") {
+    Write-Host "  后端容器健康 (crush-dev-api)" -ForegroundColor Green
+} else {
+    Write-Host "  后端容器状态: $apiStatus，等待启动..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
 }
-Start-Process -FilePath "python" -ArgumentList "-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8001" -WorkingDirectory "C:\Users\hello\Documents\trae_projects\crush-zhanggui\backend" -WindowStyle Minimized
-Start-Sleep -Seconds 8
 $health = try { (Invoke-RestMethod -Uri "http://127.0.0.1:8001/health" -TimeoutSec 5) } catch { $null }
 if ($health) {
-    Write-Host "  后端健康检查: $($health | ConvertTo-Json -Compress)" -ForegroundColor Green
+    Write-Host "  后端健康检查通过" -ForegroundColor Green
 } else {
-    Write-Host "  后端启动失败，请检查日志" -ForegroundColor Red
+    Write-Host "  后端启动失败，请运行: docker logs crush-dev-api" -ForegroundColor Red
 }
 
 # 5. 重启前端
@@ -87,9 +88,13 @@ Write-Host "  前端已启动" -ForegroundColor Green
 
 Write-Host "`n=== 启动完成 ===" -ForegroundColor Cyan
 Write-Host "前端: http://localhost:5173/" -ForegroundColor White
-Write-Host "后端: http://127.0.0.1:8001/" -ForegroundColor White
+Write-Host "后端: http://127.0.0.1:8001/docs" -ForegroundColor White
 Write-Host "数据库: localhost:5432 (crush/crush_dev_pwd)" -ForegroundColor White
 Write-Host "Redis: localhost:6379" -ForegroundColor White
+Write-Host ""
+Write-Host "所有服务运行在 Docker 容器中，崩溃会自动重启" -ForegroundColor Green
+Write-Host "查看后端日志: docker logs -f crush-dev-api" -ForegroundColor Gray
+Write-Host "重启后端: docker compose -f docker-compose.dev.yml restart backend" -ForegroundColor Gray
 Write-Host ""
 Write-Host "按任意键打开浏览器预览..." -ForegroundColor Yellow
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

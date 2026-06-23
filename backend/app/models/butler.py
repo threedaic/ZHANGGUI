@@ -38,6 +38,7 @@ class ClosingChecklistItem(TimestampMixin, Base):
     __table_args__ = {'extend_existing': True}
 
     id: Mapped[uuid.UUID] = mapped_column("item_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     template_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("butler_checklist_templates.template_id", ondelete="CASCADE"))
     item_name: Mapped[str] = mapped_column(String(100))
     item_type: Mapped[str] = mapped_column(String(20), default="checkbox")  # checkbox / photo
@@ -72,6 +73,7 @@ class ClosingItemResult(TimestampMixin, Base):
     __table_args__ = {'extend_existing': True}
 
     id: Mapped[uuid.UUID] = mapped_column("result_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("butler_sessions.session_id", ondelete="CASCADE"))
     template_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("butler_checklist_templates.template_id", ondelete="SET NULL"), nullable=True)
     item_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("butler_checklist_items.item_id", ondelete="SET NULL"), nullable=True)

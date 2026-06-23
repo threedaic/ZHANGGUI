@@ -5,7 +5,7 @@ from typing import Optional
 
 
 class StoreSettingsUpdate(BaseModel):
-    """PUT /api/v1/store/settings 请求体"""
+    """PUT /api/v1/stores/settings 请求体"""
     rest_days_per_month: Optional[int] = Field(None, ge=0, le=10)
     rest_allowed_weekdays: Optional[str] = None
     rest_forbidden_weekdays: Optional[str] = None
@@ -45,7 +45,7 @@ class StoreSettingsUpdate(BaseModel):
 
 
 class WeworkConfigUpdate(BaseModel):
-    """PUT /api/v1/store/wework 请求体"""
+    """PUT /api/v1/stores/wework 请求体"""
     wework_corp_id: Optional[str] = None
     wework_agent_id: Optional[int] = None
     wework_secret: Optional[str] = None
@@ -55,7 +55,7 @@ class WeworkConfigUpdate(BaseModel):
 
 
 class EmployeeRoleUpdate(BaseModel):
-    """PUT /api/v1/store/employees/{id}/role 请求体"""
+    """PUT /api/v1/stores/employees/{id}/role 请求体"""
     role: str
 
     @field_validator("role")

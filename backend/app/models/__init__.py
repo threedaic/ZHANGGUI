@@ -1,5 +1,4 @@
 from app.models.base import Base, TimestampMixin
-from app.models.company import Company
 from app.models.store import Store, StoreSettings
 from app.models.employee import Employee
 from app.models.user import User
@@ -72,7 +71,6 @@ from app.models.sys import (
 __all__ = [
     "Base",
     "TimestampMixin",
-    "Company",
     "Store",
     "StoreSettings",
     "Employee",

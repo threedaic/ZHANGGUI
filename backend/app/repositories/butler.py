@@ -17,7 +17,7 @@ from app.utils.pagination import PageParams
 class ButlerRepository:
     """智能管家 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: str):
         self.session = session
         self.store_id = store_id
 
@@ -52,8 +52,29 @@ class ButlerRepository:
         output = []
         for tpl in templates:
             items = items_by_tpl.get(tpl.id, [])
-            d = {c.name: getattr(tpl, c.name) for c in tpl.__table__.columns}
-            d["items"] = [{c.name: getattr(i, c.name) for c in i.__table__.columns} for i in items]
+            d = {
+                "id": tpl.id,
+                "store_id": tpl.store_id,
+                "name": tpl.name,
+                "session_type": tpl.session_type,
+                "role_tag": tpl.role_tag,
+                "sort_order": tpl.sort_order,
+                "is_active": tpl.is_active,
+                "created_by": tpl.created_by,
+                "created_at": tpl.created_at,
+                "updated_at": tpl.updated_at,
+            }
+            d["items"] = [{
+                "id": i.id,
+                "store_id": i.store_id,
+                "template_id": i.template_id,
+                "item_name": i.item_name,
+                "item_type": i.item_type,
+                "device_id": i.device_id,
+                "required_photo": i.required_photo,
+                "sort_order": i.sort_order,
+                "ai_prompt": i.ai_prompt,
+            } for i in items]
             output.append(d)
         return output
 
@@ -98,7 +119,7 @@ class ButlerRepository:
         # 插入新项
         new_items = []
         for item in items:
-            obj = ClosingChecklistItem(template_id=template_id, **item)
+            obj = ClosingChecklistItem(template_id=template_id, store_id=self.store_id, **item)
             self.session.add(obj)
             new_items.append(obj)
         await self.session.flush()
@@ -163,7 +184,7 @@ class ButlerRepository:
     # ==================== 检查结果 ====================
 
     async def create_results_batch(self, results: list[dict]) -> list[ClosingItemResult]:
-        objs = [ClosingItemResult(**r) for r in results]
+        objs = [ClosingItemResult(store_id=self.store_id, **r) for r in results]
         self.session.add_all(objs)
         await self.session.flush()
         return objs
@@ -193,7 +214,7 @@ class ButlerRepository:
         return result
 
     async def create_result(self, data: dict) -> ClosingItemResult:
-        obj = ClosingItemResult(**data)
+        obj = ClosingItemResult(store_id=self.store_id, **data)
         self.session.add(obj)
         await self.session.flush()
         return obj

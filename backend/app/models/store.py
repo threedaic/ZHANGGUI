@@ -8,8 +8,8 @@ StoreSettings → shared_store_settings（平铺结构，UUID主键）
 """
 import uuid
 from datetime import date
-from sqlalchemy import String, Integer, Text, Boolean, Date
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Integer, Text, Boolean, Date, Numeric
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
 
@@ -38,6 +38,7 @@ class Store(TimestampMixin, Base):
     daily_booking_limit: Mapped[int | None] = mapped_column(Integer, default=30, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32))
     opened_at: Mapped[date | None] = mapped_column("opened_at", Date, nullable=True)  # 开业日期
+    brand_fee_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0.05)  # 品牌费率 SPEC §3.4.1
     # 企微配置：Python 属性保持 wework_*，DB 列是 wecom_*
     wework_corp_id: Mapped[str | None] = mapped_column("wecom_corp_id", String(100))
     wework_agent_id: Mapped[str | None] = mapped_column("wecom_agent_id", String(20))
@@ -107,3 +108,6 @@ class StoreSettings(TimestampMixin, Base):
     # 企微机器人
     wecom_bot_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     wecom_webhook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # 扩展配置（未来新业务配置放这里，不用改表结构）
+    extra_config: Mapped[dict | None] = mapped_column(JSONB, default=dict)

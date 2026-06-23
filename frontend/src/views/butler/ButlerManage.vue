@@ -182,7 +182,7 @@ async function loadData() {
     const [tplRes, sessRes, settingsRes] = await Promise.all([
       listTemplates().catch(() => null),
       listSessions({ page: 1, page_size: 10 }).catch(() => null),
-      apiClient.get('/store/settings').catch(() => null),
+      apiClient.get('/stores/settings').catch(() => null),
     ])
     if (tplRes) {
       templates.value = (tplRes.data as any).data || (tplRes.data as any) || []
@@ -251,7 +251,7 @@ function goWecomBot() {
 <style scoped>
 .butler-manage-page {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
   max-width: 640px;
   margin: 0 auto;
 }

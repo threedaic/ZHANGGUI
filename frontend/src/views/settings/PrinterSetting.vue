@@ -114,7 +114,7 @@ const brandApiPlaceholder = computed(() => {
 
 onMounted(async () => {
   try {
-    const { data: res } = await apiClient.get('/store/settings')
+    const { data: res } = await apiClient.get('/stores/settings')
     const d = res.data
     form.printer_enabled = d.printer_enabled ?? false
     form.printer_brand = d.printer_brand || 'yilianyun'
@@ -132,7 +132,7 @@ onMounted(async () => {
 async function save() {
   saving.value = true
   try {
-    const { data: res } = await apiClient.put('/store/settings', {
+    const { data: res } = await apiClient.put('/stores/settings', {
       printer_enabled: form.printer_enabled,
       printer_brand: form.printer_brand,
       printer_api_url: form.printer_api_url,

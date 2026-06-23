@@ -268,7 +268,7 @@ class PayrollService:
                 "  COUNT(*) FILTER (WHERE status = 'early') AS early_count, "
                 "  COUNT(*) FILTER (WHERE status IN ('present','late','early')) AS present_days, "
                 "  COUNT(*) AS total_days "
-                "FROM attendance_records "
+                "FROM att_records "
                 "WHERE employee_id = :eid "
                 "  AND store_id = :sid "
                 "  AND date_trunc('month', date) = :month"

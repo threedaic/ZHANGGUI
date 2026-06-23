@@ -221,7 +221,7 @@ def _write_sync(rows: list[dict]) -> None:
         with engine.begin() as conn:
             conn.execute(
                 sa.text(
-                    """INSERT INTO audit_logs
+                    """INSERT INTO sys_audit_logs
                     (user_id, store_id, action, entity_type, entity_id,
                      old_value, new_value, request_id, ip_address, user_agent, created_at)
                     VALUES

@@ -164,7 +164,7 @@ async function updateTemplate(id: string, data: Record<string, any>) {
 <style scoped>
 .butler-setting-page {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
   max-width: 640px;
   margin: 0 auto;
 }

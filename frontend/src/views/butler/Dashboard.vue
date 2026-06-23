@@ -90,7 +90,7 @@ function formatTime(t: string | null) {
   margin: 0 auto;
   padding: 16px;
   min-height: 100vh;
-  background: #1a1a2e;
+  background: #111111;
   color: #e0e0e0;
 }
 
@@ -108,7 +108,7 @@ function formatTime(t: string | null) {
 }
 
 .refresh-btn {
-  background: #2a2a4a;
+  background: #1a1a1a;
   border: 1px solid #444;
   color: #ccc;
   padding: 6px 14px;
@@ -127,12 +127,12 @@ function formatTime(t: string | null) {
   padding: 16px;
   border-radius: 12px;
   border: 1px solid #333;
-  background: #1e1e36;
+  background: #1a1a1a;
 }
 
 .store-card.active {
-  border-color: #ff4081;
-  background: linear-gradient(135deg, #2a1a3a, #1e1e36);
+  border-color: #FB0079;
+  background: linear-gradient(135deg, rgba(251, 0, 121, 0.08), #1a1a1a);
 }
 
 .store-card.no-session {
@@ -190,7 +190,7 @@ function formatTime(t: string | null) {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff4081, #ff6fa7);
+  background: linear-gradient(90deg, #FB0079, #ff3d9e);
   border-radius: 3px;
   transition: width 0.3s;
 }
@@ -228,7 +228,7 @@ function formatTime(t: string | null) {
   width: fit-content;
 }
 
-.badge.closing { background: #3d1a3d; color: #ff4081; }
+.badge.closing { background: rgba(251, 0, 121, 0.15); color: #FB0079; }
 .badge.opening { background: #1a3d2a; color: #4caf50; }
 
 .no-history {

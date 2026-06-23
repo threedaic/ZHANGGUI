@@ -203,7 +203,7 @@ function goToSession(id: string) {
   color: #FFFFFF;
   min-height: 100vh;
   background: #000000;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
 }
 
 .page-header {

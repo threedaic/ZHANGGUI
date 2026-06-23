@@ -10,7 +10,6 @@ from app.config import get_settings
 from app.database import engine, AsyncSessionLocal
 from app.models import Base
 from app.models.user import User
-from app.models.company import Company
 from app.models.store import Store
 from app.utils.security import hash_password
 from app.utils.redis_client import init_redis, close_redis
@@ -116,9 +115,9 @@ async def seed_default_data(conn):
     # Employees (shared_employees)
     employees = [
         ("EMP001", "老板", "boss", 8000.0, "day", True),
-        ("EMP002", "张吧员", "bartender", 5000.0, "night", False),
-        ("EMP003", "李服务员", "server", 4000.0, "day", False),
-        ("EMP004", "王厨师", "chef", 4500.0, "day", False),
+        ("EMP002", "张吧员", "bar_manager", 5000.0, "night", False),
+        ("EMP003", "李服务员", "staff", 4000.0, "day", False),
+        ("EMP004", "王厨师", "kitchen_manager", 4500.0, "day", False),
         ("EMP005", "赵店长", "store_manager", 6000.0, "day", True),
     ]
     emp_ids = []
@@ -157,14 +156,15 @@ async def seed_default_data(conn):
     )
     # NOTE: do NOT call conn.commit() — engine.begin() manages the transaction
 
-    # Seed default butler checklists（暂用旧表，后续迁移 butler 模型时改）
-    await seed_default_checklists(conn)
+    # Seed default butler checklists
+    await seed_default_checklists(conn, store_id)
 
 
-async def seed_default_checklists(conn):
-    """Insert default butler checklists if none exist for store_id=1."""
+async def seed_default_checklists(conn, store_id):
+    """Insert default butler checklists if none exist for this store."""
     result = await conn.execute(
-        text("SELECT id FROM closing_checklist_templates WHERE store_id = 1 LIMIT 1")
+        text("SELECT template_id FROM butler_checklist_templates WHERE store_id = :store_id LIMIT 1"),
+        {"store_id": store_id},
     )
     if result.scalar_one_or_none() is not None:
         return
@@ -239,10 +239,11 @@ async def seed_default_checklists(conn):
     for tpl in default_templates:
         result = await conn.execute(
             text(
-                "INSERT INTO closing_checklist_templates (store_id, name, session_type, role_tag, sort_order, is_active) "
-                "VALUES (1, :name, :session_type, :role_tag, :sort_order, true) RETURNING id"
+                "INSERT INTO butler_checklist_templates (store_id, name, session_type, role_tag, sort_order, is_active) "
+                "VALUES (:store_id, :name, :session_type, :role_tag, :sort_order, true) RETURNING template_id"
             ),
             {
+                "store_id": store_id,
                 "name": tpl["name"],
                 "session_type": tpl["session_type"],
                 "role_tag": tpl["role_tag"],
@@ -254,7 +255,7 @@ async def seed_default_checklists(conn):
         for i, (item_name, item_type) in enumerate(tpl["items"]):
             await conn.execute(
                 text(
-                    "INSERT INTO closing_checklist_items (template_id, item_name, item_type, required_photo, sort_order) "
+                    "INSERT INTO butler_checklist_items (template_id, item_name, item_type, required_photo, sort_order) "
                     "VALUES (:template_id, :item_name, :item_type, :required_photo, :sort_order)"
                 ),
                 {
@@ -268,10 +269,15 @@ async def seed_default_checklists(conn):
     # NOTE: do NOT call conn.commit() — engine.begin() manages the transaction
 
 
+# 生产环境关闭 API 文档（防止暴露接口结构）
+_is_prod = settings.APP_ENV == "production"
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     lifespan=lifespan,
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
 )
 
 # Middleware: order matters
@@ -308,11 +314,11 @@ async def limit_body_size(request: Request, call_next):
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(kpi_router, prefix="/api/v1/kpi", tags=["KPI考核"])
 app.include_router(schedule_router, prefix="/api/v1/schedules", tags=["排班管理"])
-# 注意：stocktake 必须在 wines 之前注册，否则 /wines/stocktake 会被 /wines/{wine_id} 抢先匹配
-app.include_router(wine_stocktake_router, prefix="/api/v1", tags=["存酒盘点"])
-app.include_router(wines_router, prefix="/api/v1", tags=["存酒管理"])
+# 注意：stocktake 必须在 wines 之前注册，否则 /wine-storage/stocktake 会被 /wine-storage/{wine_id} 抢先匹配
+app.include_router(wine_stocktake_router, prefix="/api/v1/wine-storage", tags=["存酒盘点"])
+app.include_router(wines_router, prefix="/api/v1/wine-storage", tags=["存酒管理"])
 app.include_router(tables_router, prefix="/api/v1/tables", tags=["桌位管理"])
-app.include_router(bookings_router, prefix="/api/v1/bookings", tags=["订桌预约"])
+app.include_router(bookings_router, prefix="/api/v1/reservations", tags=["订桌预约"])
 app.include_router(ratings_router, prefix="/api/v1/ratings", tags=["桌面评分码"])
 app.include_router(attendance_router, prefix="/api/v1/attendance", tags=["考勤管理"])
 app.include_router(approval_router, prefix="/api/v1/approvals", tags=["审批管理"])
@@ -325,7 +331,7 @@ app.include_router(period_router, prefix="/api/v1/periods", tags=["账期管理"
 app.include_router(ranking_router, prefix="/api/v1/rankings", tags=["员工排名"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["数据看板"])
 app.include_router(ai_router, prefix="/api/v1/ai", tags=["小C AI助手"])
-app.include_router(store_router, prefix="/api/v1/store", tags=["门店配置"])
+app.include_router(store_router, prefix="/api/v1/stores", tags=["门店配置"])
 app.include_router(leaves_router, prefix="/api/v1", tags=["假期余额"])
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["操作日志"])
 app.include_router(butler_router, prefix="/api/v1/butler", tags=["开闭店管理"])

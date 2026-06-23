@@ -93,7 +93,7 @@ async function saveWework() {
 async function syncContacts() {
   syncing.value = true
   try {
-    await apiClient.post('/store/wework/sync-contacts')
+    await apiClient.post('/stores/wework/sync-contacts')
   } catch { /* silent */ }
   syncing.value = false
 }

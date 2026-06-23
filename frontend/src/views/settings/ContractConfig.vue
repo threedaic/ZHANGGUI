@@ -168,20 +168,20 @@ async function save() {
 .section-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1A1C1E;
+  color: #FFFFFF;
   margin: 0 0 4px;
 }
 .section-desc {
   font-size: 13px;
-  color: #999;
+  color: #888;
   margin: 0 0 20px;
 }
 .config-block {
-  background: #fff;
+  background: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 .config-block h3 {
   font-size: 15px;
@@ -195,18 +195,21 @@ async function save() {
 .form-group label {
   display: block;
   font-size: 13px;
-  color: #666;
+  color: #888;
   margin-bottom: 4px;
 }
 .form-group input {
   width: 100%;
   height: 40px;
-  border: 1px solid #E5E5E5;
+  border: 1px solid #333333;
   border-radius: 8px;
   padding: 0 12px;
   font-size: 14px;
   outline: none;
+  background: #111111;
+  color: #FFFFFF;
   transition: border-color 0.2s;
+  box-sizing: border-box;
 }
 .form-group input:focus {
   border-color: #FB0079;
@@ -228,7 +231,7 @@ async function save() {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #E5E5E5;
+  border: 1px solid #333333;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s;
@@ -236,7 +239,7 @@ async function save() {
 }
 .employee-item.checked {
   border-color: #FB0079;
-  background: #FFF0F5;
+  background: rgba(251, 0, 121, 0.1);
 }
 .checkbox {
   accent-color: #FB0079;
@@ -244,11 +247,11 @@ async function save() {
   height: 16px;
 }
 .emp-name {
-  color: #1A1C1E;
+  color: #FFFFFF;
   font-weight: 500;
 }
 .emp-role {
-  color: #999;
+  color: #888;
   font-size: 12px;
 }
 .btn-row {

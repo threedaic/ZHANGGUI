@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS shared_store_settings (
     printer_label_height INTEGER NOT NULL DEFAULT 50,
     wecom_bot_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     wecom_webhook_url TEXT,
+    extra_config JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

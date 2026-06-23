@@ -240,7 +240,7 @@ onMounted(() => {
 <style scoped>
 .stocktake-detail-page {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
 }
 
 .page-header {

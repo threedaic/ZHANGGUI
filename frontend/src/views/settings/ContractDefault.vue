@@ -171,7 +171,7 @@ async function save() {
 <style scoped>
 .contract-default {
   padding: 16px;
-  padding-bottom: calc(56px + 24px);
+  padding-bottom: calc(64px + 24px);
 }
 
 .nav-bar {

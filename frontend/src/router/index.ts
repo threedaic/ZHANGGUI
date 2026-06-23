@@ -91,7 +91,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/management',
     component: () => import('@/layouts/ManagementLayout.vue'),
-    meta: { roles: ['boss', 'store_manager'] },
+    meta: { roles: ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager'] },
     children: [
       {
         path: '',
@@ -252,7 +252,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/settings',
     component: () => import('@/layouts/SettingsLayout.vue'),
-    meta: { roles: ['boss'] },
+    meta: { roles: ['boss', 'admin'] },
     children: [
       {
         path: '',

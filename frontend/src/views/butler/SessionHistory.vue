@@ -83,7 +83,7 @@ function formatDate(t: string | null) {
   margin: 0 auto;
   padding: 16px;
   min-height: 100vh;
-  background: #1a1a2e;
+  background: #111111;
   color: #e0e0e0;
 }
 
@@ -117,14 +117,14 @@ function formatDate(t: string | null) {
 }
 
 .tab-switch button.active {
-  background: #ff4081;
-  border-color: #ff4081;
+  background: #FB0079;
+  border-color: #FB0079;
   color: #fff;
 }
 
 .session-card {
   padding: 14px;
-  background: #1e1e36;
+  background: #1a1a1a;
   border-radius: 8px;
   margin-bottom: 8px;
   cursor: pointer;
@@ -156,12 +156,12 @@ function formatDate(t: string | null) {
   font-size: 11px;
   font-weight: 600;
 }
-.badge.closing { background: #3d1a3d; color: #ff4081; }
+.badge.closing { background: rgba(251, 0, 121, 0.15); color: #FB0079; }
 .badge.opening { background: #1a3d2a; color: #4caf50; }
 .badge.completed { background: #1a3d2a; color: #4caf50; }
 .badge.in_progress { background: #3d3d1a; color: #ffc107; }
 .badge.abnormal { background: #3d1a1a; color: #f44336; }
 
-.arrow { color: #ff4081; }
+.arrow { color: #FB0079; }
 .loading, .empty { text-align: center; padding: 32px; color: #666; }
 </style>

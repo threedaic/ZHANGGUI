@@ -53,35 +53,35 @@ export interface InventoryItem {
 export const wineAPI = {
   /** 存酒 */
   create(params: WineCreateParams) {
-    return apiClient.post<ApiResponse<WineInfo>>('/wines', params)
+    return apiClient.post<ApiResponse<WineInfo>>('/wine-storage', params)
   },
 
   /** 存酒列表 */
   list(params?: { status?: string; keyword?: string; search_type?: string; page?: number; page_size?: number }) {
-    return apiClient.get<ApiResponse<PageResult<WineInfo>>>('/wines', { params })
+    return apiClient.get<ApiResponse<PageResult<WineInfo>>>('/wine-storage', { params })
   },
 
   /** 存酒详情 */
   getById(id: string) {
-    return apiClient.get<ApiResponse<WineInfo>>(`/wines/${id}`)
+    return apiClient.get<ApiResponse<WineInfo>>(`/wine-storage/${id}`)
   },
 
   /** 服务员取酒 */
   retrieve(params: WineStaffRetrieveParams) {
     return apiClient.post<ApiResponse<{ id: string; bottle_label: string; status: string; remaining_ml: number }>>(
-      '/wines/retrieve',
+      '/wine-storage/retrieve',
       params
     )
   },
 
   /** 盘点汇总 */
   inventorySummary() {
-    return apiClient.get<ApiResponse<InventorySummary>>('/wines/inventory/summary')
+    return apiClient.get<ApiResponse<InventorySummary>>('/wine-storage/inventory/summary')
   },
 
   /** 盘点明细 */
   inventoryItems(params?: { page?: number; page_size?: number }) {
-    return apiClient.get<ApiResponse<PageResult<InventoryItem>>>('/wines/inventory/items', { params })
+    return apiClient.get<ApiResponse<PageResult<InventoryItem>>>('/wine-storage/inventory/items', { params })
   },
 
   /** 批量存酒 */
@@ -91,7 +91,7 @@ export const wineAPI = {
     wines: Array<{ wine_name: string; remaining_ml: number; quantity: number }>
     notes?: string
   }) {
-    return apiClient.post<ApiResponse<null>>('/wines/batch', data)
+    return apiClient.post<ApiResponse<null>>('/wine-storage/batch', data)
   },
 }
 
@@ -143,31 +143,31 @@ export interface StocktakeScanResult {
 export const stocktakeAPI = {
   /** 盘点单列表 */
   list(params?: { status?: string; page?: number; page_size?: number }) {
-    return apiClient.get<ApiResponse<PageResult<Stocktake>>>('/wines/stocktake', { params })
+    return apiClient.get<ApiResponse<PageResult<Stocktake>>>('/wine-storage/stocktake', { params })
   },
 
   /** 盘点单详情 */
   getById(id: string) {
-    return apiClient.get<ApiResponse<Stocktake>>(`/wines/stocktake/${id}`)
+    return apiClient.get<ApiResponse<Stocktake>>(`/wine-storage/stocktake/${id}`)
   },
 
   /** 盘点单明细列表 */
   listItems(id: string, params?: { check_status?: string; page?: number; page_size?: number }) {
-    return apiClient.get<ApiResponse<PageResult<StocktakeItem>>>(`/wines/stocktake/${id}/items`, { params })
+    return apiClient.get<ApiResponse<PageResult<StocktakeItem>>>(`/wine-storage/stocktake/${id}/items`, { params })
   },
 
   /** 手动创建盘点单 */
   create(params?: { period?: string }) {
-    return apiClient.post<ApiResponse<{ id: string }>>('/wines/stocktake', params || {})
+    return apiClient.post<ApiResponse<{ id: string }>>('/wine-storage/stocktake', params || {})
   },
 
   /** 扫码核对 */
   scan(stocktakeId: string, params: { bottle_label: string; actual_ml?: number }) {
-    return apiClient.post<ApiResponse<StocktakeScanResult>>(`/wines/stocktake/${stocktakeId}/scan`, params)
+    return apiClient.post<ApiResponse<StocktakeScanResult>>(`/wine-storage/stocktake/${stocktakeId}/scan`, params)
   },
 
   /** 完成盘点 */
   complete(stocktakeId: string, params?: { notes?: string }) {
-    return apiClient.post<ApiResponse<unknown>>(`/wines/stocktake/${stocktakeId}/complete`, params || {})
+    return apiClient.post<ApiResponse<unknown>>(`/wine-storage/stocktake/${stocktakeId}/complete`, params || {})
   },
 }

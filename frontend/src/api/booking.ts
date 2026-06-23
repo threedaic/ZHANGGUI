@@ -100,26 +100,26 @@ export const tableAPI = {
 
 export const bookingAPI = {
   list(params?: { date?: string; status?: string; page?: number; page_size?: number }) {
-    return apiClient.get<ApiResponse<PageResult<BookingItem>>>('/bookings', { params })
+    return apiClient.get<ApiResponse<PageResult<BookingItem>>>('/reservations', { params })
   },
 
   create(data: BookingCreateParams) {
-    return apiClient.post<ApiResponse<BookingItem>>('/bookings', data)
+    return apiClient.post<ApiResponse<BookingItem>>('/reservations', data)
   },
 
   get(id: string) {
-    return apiClient.get<ApiResponse<BookingItem>>(`/bookings/${id}`)
+    return apiClient.get<ApiResponse<BookingItem>>(`/reservations/${id}`)
   },
 
   update(id: string, data: BookingUpdateParams) {
-    return apiClient.put<ApiResponse<BookingItem>>(`/bookings/${id}`, data)
+    return apiClient.put<ApiResponse<BookingItem>>(`/reservations/${id}`, data)
   },
 
   cancel(id: string) {
-    return apiClient.delete<ApiResponse<BookingItem>>(`/bookings/${id}`)
+    return apiClient.delete<ApiResponse<BookingItem>>(`/reservations/${id}`)
   },
 
   stats(date: string) {
-    return apiClient.get<ApiResponse<BookingStats>>('/bookings/stats', { params: { date } })
+    return apiClient.get<ApiResponse<BookingStats>>('/reservations/stats', { params: { date } })
   },
 }

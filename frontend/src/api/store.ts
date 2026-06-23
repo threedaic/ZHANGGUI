@@ -53,17 +53,17 @@ export interface StoreSettingsData {
 export const storeAPI = {
   /** 获取门店基本信息 */
   getInfo() {
-    return apiClient.get<ApiResponse<StoreInfo>>('/store')
+    return apiClient.get<ApiResponse<StoreInfo>>('/stores')
   },
 
   /** 获取门店设置 */
   getSettings() {
-    return apiClient.get<ApiResponse<StoreSettingsData>>('/store/settings')
+    return apiClient.get<ApiResponse<StoreSettingsData>>('/stores/settings')
   },
 
   /** 更新门店设置 */
   updateSettings(data: Partial<StoreSettingsData>) {
-    return apiClient.put<ApiResponse<StoreSettingsData>>('/store/settings', data)
+    return apiClient.put<ApiResponse<StoreSettingsData>>('/stores/settings', data)
   },
 
   /** 更新企微配置 */
@@ -75,11 +75,11 @@ export const storeAPI = {
     wework_aes_key?: string
     wework_department_id?: number | null
   }) {
-    return apiClient.put<ApiResponse<StoreInfo>>('/store/wework', data)
+    return apiClient.put<ApiResponse<StoreInfo>>('/stores/wework', data)
   },
 
   /** 获取门店员工列表 */
   listEmployees() {
-    return apiClient.get<ApiResponse<EmployeeBrief[]>>('/store/employees')
+    return apiClient.get<ApiResponse<EmployeeBrief[]>>('/stores/employees')
   },
 }
