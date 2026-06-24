@@ -190,14 +190,121 @@
           <label class="form-label">设备SN</label>
           <input v-model="printerForm.device_sn" class="form-input" placeholder="打印机背面贴纸上的设备号" />
         </div>
-        <div class="form-group">
-          <label class="form-label">账号 / Client ID</label>
-          <input v-model="printerForm.api_user" class="form-input" placeholder="云打印平台账号" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">密钥 / Client Secret</label>
-          <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="云打印平台密钥" />
-        </div>
+        <!-- 易联云：client_id + client_secret -->
+        <template v-if="printerForm.brand === 'yilianyun'">
+          <div class="form-group">
+            <label class="form-label">应用ID (client_id)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="易联云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">应用密钥 (client_secret)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="易联云开放平台获取" />
+          </div>
+        </template>
+        <!-- 飞鹅：user + ukey -->
+        <template v-else-if="printerForm.brand === 'feie'">
+          <div class="form-group">
+            <label class="form-label">账号 (user)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="飞鹅云后台注册的账号" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">密钥 (ukey)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="飞鹅云后台生成的UKEY" />
+          </div>
+        </template>
+        <!-- 芯烨：user + userKey -->
+        <template v-else-if="printerForm.brand === 'xpyun'">
+          <div class="form-group">
+            <label class="form-label">开发者ID (user)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="芯烨云平台注册用户名" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">开发者密钥 (userKey)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="芯烨云开放平台获取" />
+          </div>
+        </template>
+        <!-- 佳博：memberCode + apiKey -->
+        <template v-else-if="printerForm.brand === 'gainscha'">
+          <div class="form-group">
+            <label class="form-label">商户编码 (memberCode)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="佳博云平台商户编码" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">API密钥 (apiKey)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="佳博云平台API密钥" />
+          </div>
+        </template>
+        <!-- 映美云：app_id + app_key -->
+        <template v-else-if="printerForm.brand === 'jolimark'">
+          <div class="form-group">
+            <label class="form-label">应用ID (app_id)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="映美云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">应用密钥 (app_key)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="映美云开放平台获取" />
+          </div>
+        </template>
+        <!-- 中午云：appid + appsecret + deviceid + devicesecret -->
+        <template v-else-if="printerForm.brand === 'zhongwu'">
+          <div class="form-group">
+            <label class="form-label">应用ID (appid)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="中午云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">应用密钥 (appsecret)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="中午云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">设备编号 (deviceid)</label>
+            <input v-model="printerForm.device_sn" class="form-input" placeholder="打印机设备编号" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">设备密钥 (devicesecret)</label>
+            <input v-model="printerForm.extra_config" class="form-input" type="password" placeholder="打印机设备密钥" />
+          </div>
+        </template>
+        <!-- 优声云：appId + appSecret + deviceid + devicesecret -->
+        <template v-else-if="printerForm.brand === 'ushengyun'">
+          <div class="form-group">
+            <label class="form-label">应用ID (appId)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="优声云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">应用密钥 (appSecret)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="优声云开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">设备编号 (deviceid)</label>
+            <input v-model="printerForm.device_sn" class="form-input" placeholder="打印机设备编号" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">设备密钥 (devicesecret)</label>
+            <input v-model="printerForm.extra_config" class="form-input" type="password" placeholder="打印机设备密钥" />
+          </div>
+        </template>
+        <!-- 快递100：key + secret -->
+        <template v-else-if="printerForm.brand === 'kuaidi100'">
+          <div class="form-group">
+            <label class="form-label">应用Key</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="快递100开放平台获取" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">应用Secret</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="快递100开放平台获取" />
+          </div>
+        </template>
+        <!-- 365智能云：deviceNo + key -->
+        <template v-else-if="printerForm.brand === 'printcenter'">
+          <div class="form-group">
+            <label class="form-label">打印机编号 (deviceNo)</label>
+            <input v-model="printerForm.api_user" class="form-input" placeholder="365智能云打印机编号" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">密钥 (key)</label>
+            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="365智能云打印机密钥" />
+          </div>
+        </template>
         <div class="form-group">
           <label class="form-label">纸宽 (mm)</label>
           <select v-model.number="printerForm.paper_width" class="form-input">

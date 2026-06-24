@@ -344,7 +344,7 @@ class PrinterService:
     async def _call_cloud_printer(self, printer: Printer, content: str) -> bool:
         """调用云打印机API
 
-        支持易联云、飞鹅等云打印机
+        支持9种云打印机品牌，根据官方文档实现
         """
         brand = printer.brand or "yilianyun"
         sn = printer.device_sn
@@ -362,21 +362,8 @@ class PrinterService:
             logger.warning(f"打印机API地址未配置: {printer.name}")
             return False
 
-        # 构建请求参数
-        payload = {"sn": sn, "content": content, "times": 1}
-
-        if brand == "feie":
-            payload["user"] = printer.api_user or ""
-            payload["ukey"] = printer.api_secret or ""
-        elif brand == "yilianyun":
-            payload["client_id"] = printer.api_user or ""
-            payload["client_secret"] = printer.api_secret or ""
-        elif brand in ("xpyun", "gainscha"):
-            payload["user"] = printer.api_user or ""
-            payload["user_key"] = printer.api_secret or ""
-        elif brand == "jolimark":
-            payload["app_id"] = printer.api_user or ""
-            payload["app_secret"] = printer.api_secret or ""
+        # 根据品牌构建请求参数
+        payload = self._build_payload(brand, printer, content)
 
         try:
             response = await http_client.post(api_url, json_body=payload)
@@ -386,14 +373,157 @@ class PrinterService:
             logger.error(f"云打印API调用失败: {e}")
             return False
 
+    def _build_payload(self, brand: str, printer: Printer, content: str) -> dict:
+        """根据不同品牌构建打印请求参数"""
+        sn = printer.device_sn
+
+        if brand == "yilianyun":
+            # 易联云：OAuth2.0，需要先获取access_token
+            return {
+                "client_id": printer.api_user or "",
+                "client_secret": printer.api_secret or "",
+                "machine_code": sn,
+                "content": content,
+                "times": 1,
+            }
+        elif brand == "feie":
+            # 飞鹅：user + ukey + stime，MD5签名
+            import hashlib
+            import time
+            user = printer.api_user or ""
+            ukey = printer.api_secret or ""
+            stime = str(int(time.time()))
+            sign = hashlib.md5(f"{user}{ukey}{stime}".encode()).hexdigest()
+            return {
+                "user": user,
+                "stime": stime,
+                "sig": sign,
+                "apiname": "Open_printMsg",
+                "sn": sn,
+                "content": content,
+                "times": 1,
+            }
+        elif brand == "xpyun":
+            # 芯烨：user + userKey + timestamp，SHA1签名
+            import hashlib
+            import time
+            user = printer.api_user or ""
+            user_key = printer.api_secret or ""
+            timestamp = str(int(time.time()))
+            sign = hashlib.sha1(f"{user}{user_key}{timestamp}".encode()).hexdigest()
+            return {
+                "user": user,
+                "timestamp": timestamp,
+                "sign": sign,
+                "sn": sn,
+                "content": content,
+                "copies": 1,
+            }
+        elif brand == "gainscha":
+            # 佳博：memberCode + apiKey + msgId + timestamp，MD5签名
+            import hashlib
+            import time
+            member_code = printer.api_user or ""
+            api_key = printer.api_secret or ""
+            msg_id = str(uuid.uuid4())
+            timestamp = str(int(time.time()))
+            sign = hashlib.md5(f"{member_code}{api_key}{msg_id}{timestamp}".encode()).hexdigest()
+            return {
+                "memberCode": member_code,
+                "msgId": msg_id,
+                "timestamp": timestamp,
+                "sign": sign,
+                "deviceID": sn,
+                "content": content,
+                "printTimes": 1,
+            }
+        elif brand == "jolimark":
+            # 映美云：app_id + app_key
+            return {
+                "app_id": printer.api_user or "",
+                "app_key": printer.api_secret or "",
+                "device_no": sn,
+                "content": content,
+                "copies": 1,
+            }
+        elif brand == "zhongwu":
+            # 中午云：appid + appsecret + deviceid + devicesecret，MD5签名
+            import hashlib
+            import time
+            appid = printer.api_user or ""
+            appsecret = printer.api_secret or ""
+            deviceid = sn
+            timestamp = str(int(time.time()))
+            sign = hashlib.md5(f"{appid}{deviceid}{timestamp}{appsecret}".encode()).hexdigest()
+            return {
+                "appid": appid,
+                "sign": sign,
+                "timestamp": timestamp,
+                "deviceid": deviceid,
+                "content": content,
+                "times": 1,
+            }
+        elif brand == "ushengyun":
+            # 优声云：appId + appSecret + deviceid + devicesecret，MD5签名
+            import hashlib
+            import time
+            app_id = printer.api_user or ""
+            app_secret = printer.api_secret or ""
+            device_id = sn
+            timestamp = str(int(time.time()))
+            sign = hashlib.md5(f"{app_id}{device_id}{timestamp}{app_secret}".encode()).hexdigest()
+            return {
+                "appId": app_id,
+                "sign": sign,
+                "timestamp": timestamp,
+                "deviceId": device_id,
+                "content": content,
+                "times": 1,
+            }
+        elif brand == "kuaidi100":
+            # 快递100：key + secret，MD5签名
+            import hashlib
+            import time
+            key = printer.api_user or ""
+            secret = printer.api_secret or ""
+            timestamp = str(int(time.time()))
+            sign = hashlib.md5(f"{key}{secret}{timestamp}".encode()).hexdigest()
+            return {
+                "key": key,
+                "sign": sign,
+                "timestamp": timestamp,
+                "deviceNo": sn,
+                "content": content,
+                "times": 1,
+            }
+        elif brand == "printcenter":
+            # 365智能云：deviceNo + key，无签名
+            return {
+                "deviceNo": sn,
+                "key": printer.api_secret or "",
+                "printContent": content,
+                "times": 1,
+            }
+        else:
+            # 默认使用通用参数
+            return {
+                "sn": sn,
+                "content": content,
+                "times": 1,
+            }
+
     def _get_default_api_url(self, brand: str) -> str:
         """获取品牌默认API地址"""
         brand_urls = {
-            "feie": "http://api.feieyun.cn/Api/Open/printMsg",
             "yilianyun": "https://open-api.10ss.net/printer/print",
-            "xpyun": "http://open.xpyun.net/api/openapi/xprinter/print",
-            "gainscha": "https://api.poscom.cn/apisc/print",
+            "feie": "http://api.feieyun.com/FeieServer/printOrderAction",
+            "xpyun": "https://open.xpyun.net/api/openapi/xprinter/print",
+            "gainscha": "https://api.poscom.cn/apisc/sendMsg",
             "jolimark": "https://cloud.jolimark.com/api/print",
+            "zhongwu": "http://api.zhongwuyun.com/sendprint",
+            "ushengyun": "https://api.ushengyun.com/print/send",
+            "kuaidi100": "https://api.kuaidi100.com/printer/send",
+            "printcenter": "http://open.printcenter.cn:8080/addOrder",
         }
         return brand_urls.get(brand, "")
 

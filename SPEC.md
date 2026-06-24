@@ -930,6 +930,41 @@ CREATE TABLE print_queue (
 | 小票机 | `receipt` | 客户收据 | 支付完成时打印小票 |
 | 标签机 | `label` | 标签打印 | 存酒标签、商品标签 |
 
+#### 支持的云打印机品牌
+
+> **开发者注意**：各品牌的认证参数和调用方式不同，前端配置页面需根据品牌动态显示字段。
+
+| 品牌 | 标识 | 认证参数 | API地址 | 签名方式 | 官方文档 |
+|------|------|----------|---------|----------|----------|
+| **易联云** | `yilianyun` | client_id, client_secret | api.10ss.net | OAuth2.0 Bearer Token | [文档](https://www.kancloud.cn/ly6886/oauth-api/3170299) |
+| **飞鹅** | `feie` | user, ukey | api.feieyun.com | MD5(user+ukey+stime) | [文档](http://help.feieyun.com/document.php) |
+| **芯烨** | `xpyun` | user, userKey | open.xpyun.net | SHA1(user+userKey+timestamp) | [文档](https://www.xpyun.net/open/index.html) |
+| **佳博** | `gainscha` | memberCode, apiKey | api.poscom.cn | MD5(memberCode+apiKey+msgId+timestamp) | [文档](https://dev.poscom.cn/) |
+| **映美云** | `jolimark` | app_id, app_key | open.jolimark.com | REST API | [文档](http://open.jolimark.com) |
+| **中午云** | `zhongwu` | appid, appsecret, deviceid, devicesecret | api.zhongwuyun.com | MD5(appid+deviceid+timestamp+appsecret) | [文档](http://open.zhongwu.co/) |
+| **优声云** | `ushengyun` | appId, appSecret, deviceid, devicesecret | api.ushengyun.com | MD5(appId+deviceid+timestamp+appSecret) | [文档](https://www.kancloud.cn/fage/us_api/content) |
+| **快递100** | `kuaidi100` | key, secret | api.kuaidi100.com | MD5(key+secret+timestamp) | [文档](https://api.kuaidi100.com/document) |
+| **365智能云** | `printcenter` | deviceNo, key | open.printcenter.cn:8080 | 无签名，直接传key | [文档](https://developer.aliyun.com/article/242257) |
+
+#### 各品牌认证参数配置
+
+> **前端配置页面**：根据选择的品牌，动态显示需要填写的字段。
+
+```typescript
+// 品牌配置字段映射
+const brandFields = {
+  yilianyun: ['client_id', 'client_secret'],           // 易联云
+  feie: ['user', 'ukey'],                               // 飞鹅
+  xpyun: ['user', 'userKey'],                           // 芯烨
+  gainscha: ['memberCode', 'apiKey'],                   // 佳博
+  jolimark: ['app_id', 'app_key'],                      // 映美云
+  zhongwu: ['appid', 'appsecret', 'deviceid', 'devicesecret'],  // 中午云
+  ushengyun: ['appId', 'appSecret', 'deviceid', 'devicesecret'], // 优声云
+  kuaidi100: ['key', 'secret'],                         // 快递100
+  printcenter: ['deviceNo', 'key'],                     // 365智能云
+}
+```
+
 #### 调用方式
 
 **方式一：根据分类自动路由（推荐）**
