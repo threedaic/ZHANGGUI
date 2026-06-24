@@ -72,6 +72,7 @@
               <option value="卡座">卡座</option>
               <option value="包间">包间</option>
               <option value="吧台">吧台</option>
+              <option value="二人桌">二人桌</option>
               <option value="四人桌">四人桌</option>
               <option value="六人桌">六人桌</option>
               <option value="八人桌">八人桌</option>
@@ -126,7 +127,7 @@ const activeCount = computed(() => tables.value.filter(t => t.status === 'active
 const inactiveCount = computed(() => tables.value.filter(t => t.status === 'inactive').length)
 
 // 按区域分组
-const areaOrder = ['大桌', '卡座', '包间', '吧台', '四人桌', '六人桌', '八人桌']
+const areaOrder = ['大桌', '卡座', '包间', '吧台', '二人桌', '四人桌', '六人桌', '八人桌']
 const groupedTables = computed(() => {
   const map = new Map<string, TableItem[]>()
   for (const t of tables.value) {

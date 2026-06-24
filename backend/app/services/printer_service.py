@@ -916,3 +916,245 @@ class PrinterService:
         category.backup_printer_id = uuid.UUID(backup_printer_id) if backup_printer_id else None
         await self.db.commit()
         return True
+
+    # ==================== 模块打印配置 CRUD ====================
+
+    # 系统内置的模块打印场景
+    SYSTEM_PRINT_SCENES = [
+        {
+            "module_code": "wine_storage",
+            "scene_code": "store_label",
+            "scene_name": "存酒标签",
+            "description": "客户存酒时打印的标签，贴在酒瓶上",
+            "document_type": "label",
+            "trigger_event": "order_created",
+            "printer_type": "label",
+        },
+        {
+            "module_code": "wine_storage",
+            "scene_code": "take_receipt",
+            "scene_name": "取酒凭证",
+            "description": "客户取酒时打印的凭证小票",
+            "document_type": "receipt",
+            "trigger_event": "manual",
+            "printer_type": "receipt",
+        },
+        {
+            "module_code": "pos",
+            "scene_code": "order_slip",
+            "scene_name": "厨房/吧台出单",
+            "description": "订单创建时，根据商品分类自动路由到厨房或吧台打印机",
+            "document_type": "order",
+            "trigger_event": "order_created",
+            "printer_type": "order",
+        },
+        {
+            "module_code": "pos",
+            "scene_code": "receipt",
+            "scene_name": "客户小票",
+            "description": "支付完成时打印的客户收据",
+            "document_type": "receipt",
+            "trigger_event": "payment_completed",
+            "printer_type": "receipt",
+        },
+        {
+            "module_code": "pos",
+            "scene_code": "refund_receipt",
+            "scene_name": "退款凭证",
+            "description": "退款时打印的退款凭证",
+            "document_type": "receipt",
+            "trigger_event": "manual",
+            "printer_type": "receipt",
+        },
+        {
+            "module_code": "inventory",
+            "scene_code": "stocktake_list",
+            "scene_name": "盘点单",
+            "description": "库存盘点时打印的盘点清单",
+            "document_type": "receipt",
+            "trigger_event": "manual",
+            "printer_type": "receipt",
+        },
+        {
+            "module_code": "employee",
+            "scene_code": "sign_form",
+            "scene_name": "签收单",
+            "description": "员工签收工资条或其他文件时打印",
+            "document_type": "receipt",
+            "trigger_event": "manual",
+            "printer_type": "receipt",
+        },
+        {
+            "module_code": "booking",
+            "scene_code": "booking_confirm",
+            "scene_name": "预订确认",
+            "description": "客户预订桌位时打印的确认单",
+            "document_type": "receipt",
+            "trigger_event": "order_created",
+            "printer_type": "receipt",
+        },
+    ]
+
+    async def list_module_configs(self, store_id: uuid.UUID) -> List[Dict[str, Any]]:
+        """获取模块打印配置列表
+
+        如果门店还没有配置，自动创建默认配置
+        """
+        from app.models.sys import ModulePrintConfig
+
+        # 查询现有配置
+        result = await self.db.execute(
+            select(ModulePrintConfig).where(
+                ModulePrintConfig.store_id == store_id,
+            ).order_by(ModulePrintConfig.module_code, ModulePrintConfig.scene_code)
+        )
+        configs = result.scalars().all()
+
+        # 如果没有配置，自动创建默认配置
+        if not configs:
+            configs = []
+            for scene in self.SYSTEM_PRINT_SCENES:
+                config = ModulePrintConfig(
+                    store_id=store_id,
+                    module_code=scene["module_code"],
+                    scene_code=scene["scene_code"],
+                    scene_name=scene["scene_name"],
+                    description=scene.get("description"),
+                    document_type=scene["document_type"],
+                    trigger_event=scene["trigger_event"],
+                    printer_type=scene["printer_type"],
+                    enabled=True,
+                )
+                self.db.add(config)
+                configs.append(config)
+            await self.db.commit()
+            for c in configs:
+                await self.db.refresh(c)
+
+        # 查询打印机名称
+        printer_ids = {c.printer_id for c in configs if c.printer_id}
+        printer_map = {}
+        if printer_ids:
+            printers_result = await self.db.execute(
+                select(Printer).where(
+                    Printer.printer_id.in_(printer_ids),
+                    Printer.store_id == store_id,
+                )
+            )
+            printer_map = {p.printer_id: p.name for p in printers_result.scalars().all()}
+
+        return [
+            {
+                "config_id": str(c.config_id),
+                "module_code": c.module_code,
+                "scene_code": c.scene_code,
+                "scene_name": c.scene_name,
+                "description": c.description,
+                "document_type": c.document_type,
+                "trigger_event": c.trigger_event,
+                "printer_type": c.printer_type,
+                "enabled": c.enabled,
+                "printer_id": str(c.printer_id) if c.printer_id else None,
+                "printer_name": printer_map.get(c.printer_id) if c.printer_id else None,
+            }
+            for c in configs
+        ]
+
+    async def update_module_config(
+        self,
+        store_id: uuid.UUID,
+        config_id: uuid.UUID,
+        data: Dict[str, Any],
+    ) -> bool:
+        """更新模块打印配置"""
+        from app.models.sys import ModulePrintConfig
+
+        result = await self.db.execute(
+            select(ModulePrintConfig).where(
+                ModulePrintConfig.config_id == config_id,
+                ModulePrintConfig.store_id == store_id,
+            )
+        )
+        config = result.scalar_one_or_none()
+        if not config:
+            return False
+
+        if "enabled" in data:
+            config.enabled = data["enabled"]
+        if "printer_id" in data:
+            config.printer_id = uuid.UUID(data["printer_id"]) if data["printer_id"] else None
+
+        await self.db.commit()
+        return True
+
+    async def batch_update_module_configs(
+        self,
+        store_id: uuid.UUID,
+        updates: List[Dict[str, Any]],
+    ) -> int:
+        """批量更新模块打印配置"""
+        from app.models.sys import ModulePrintConfig
+
+        updated_count = 0
+        for update in updates:
+            config_id = uuid.UUID(update["config_id"])
+            result = await self.db.execute(
+                select(ModulePrintConfig).where(
+                    ModulePrintConfig.config_id == config_id,
+                    ModulePrintConfig.store_id == store_id,
+                )
+            )
+            config = result.scalar_one_or_none()
+            if not config:
+                continue
+
+            if "enabled" in update:
+                config.enabled = update["enabled"]
+            if "printer_id" in update:
+                config.printer_id = uuid.UUID(update["printer_id"]) if update["printer_id"] else None
+
+            updated_count += 1
+
+        await self.db.commit()
+        return updated_count
+
+    async def get_module_printer(
+        self,
+        store_id: uuid.UUID,
+        module_code: str,
+        scene_code: str,
+    ) -> Optional[Printer]:
+        """获取模块打印场景对应的打印机
+
+        如果模块配置了指定打印机，使用指定的；
+        否则使用默认的打印机类型匹配。
+        """
+        from app.models.sys import ModulePrintConfig
+
+        # 查询模块配置
+        result = await self.db.execute(
+            select(ModulePrintConfig).where(
+                ModulePrintConfig.store_id == store_id,
+                ModulePrintConfig.module_code == module_code,
+                ModulePrintConfig.scene_code == scene_code,
+                ModulePrintConfig.enabled == True,
+            )
+        )
+        config = result.scalar_one_or_none()
+
+        if not config:
+            return None
+
+        # 如果配置了指定打印机
+        if config.printer_id:
+            printer_result = await self.db.execute(
+                select(Printer).where(
+                    Printer.printer_id == config.printer_id,
+                    Printer.store_id == store_id,
+                    Printer.is_active == True,
+                )
+            )
+            return printer_result.scalar_one_or_none()
+
+        # 否则按打印机类型匹配
+        return await self._find_printer_by_type(store_id, config.printer_type)

@@ -112,8 +112,19 @@ async def list_wines(
         status=status, keyword=keyword, search_type=search_type,
         params=PageParams(page=page, page_size=page_size),
     )
+    # 批量获取取酒人信息（避免 N+1）
+    retriever_ids = [w.retrieved_by for w in items if w.retrieved_by]
+    retriever_map = await repo.get_retriever_info(retriever_ids)
+    wine_dicts = []
+    for w in items:
+        d = WineResponse.model_validate(w).model_dump()
+        if w.retrieved_by and w.retrieved_by in retriever_map:
+            info = retriever_map[w.retrieved_by]
+            d["retriever_name"] = info.get("name")
+            d["retriever_employee_code"] = info.get("employee_code")
+        wine_dicts.append(d)
     result = PageResult(
-        items=[WineResponse.model_validate(w).model_dump() for w in items],
+        items=wine_dicts,
         total=total, page=page, page_size=page_size,
         total_pages=(total + page_size - 1) // page_size,
     )
@@ -238,4 +249,10 @@ async def get_wine(wine_id: uuid.UUID, request: Request, db: AsyncSession = Depe
     wine = await repo.get_by_id(wine_id)
     if not wine:
         raise NotFoundError("存酒记录不存在")
-    return make_response(data=WineResponse.model_validate(wine).model_dump(), request=request)
+    d = WineResponse.model_validate(wine).model_dump()
+    if wine.retrieved_by:
+        info_map = await repo.get_retriever_info([wine.retrieved_by])
+        if wine.retrieved_by in info_map:
+            d["retriever_name"] = info_map[wine.retrieved_by].get("name")
+            d["retriever_employee_code"] = info_map[wine.retrieved_by].get("employee_code")
+    return make_response(data=d, request=request)

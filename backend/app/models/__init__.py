@@ -68,6 +68,7 @@ from app.models.sys import (
     Printer,
     PrintRoute,
     PrintQueue,
+    ModulePrintConfig,
 )
 
 __all__ = [

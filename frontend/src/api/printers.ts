@@ -167,4 +167,34 @@ export const printersAPI = {
   }) {
     return apiClient.put<ApiResponse<void>>(`/printers/categories/${categoryId}/printer`, data)
   },
+
+  // ==================== 模块打印配置 ====================
+
+  /** 获取模块打印配置列表 */
+  listModuleConfigs() {
+    return apiClient.get<ApiResponse<ModulePrintConfig[]>>('/printers/module-configs')
+  },
+
+  /** 更新模块打印配置 */
+  updateModuleConfig(configId: string, data: {
+    enabled?: boolean
+    printer_id?: string | null
+  }) {
+    return apiClient.put<ApiResponse<void>>(`/printers/module-configs/${configId}`, data)
+  },
+}
+
+/** 模块打印配置 */
+export interface ModulePrintConfig {
+  config_id: string
+  module_code: string
+  scene_code: string
+  scene_name: string
+  description?: string
+  document_type: string
+  trigger_event: string
+  printer_type: string
+  enabled: boolean
+  printer_id?: string
+  printer_name?: string
 }

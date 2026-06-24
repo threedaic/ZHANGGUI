@@ -1,8 +1,9 @@
 # Crush 2.0 系统规范文档（SPEC）
 
-> 日期：2026-06-22 | 版本：2.0 | 状态：修正版
+> 日期：2026-06-22 | 版本：2.1 | 状态：修正版
 >
 > 修正说明：基于完整阅读全部12份项目文档后，对比v1.0发现30个矛盾点和13项遗漏，经逐条确认后修正。
+> v2.1 补充：新增att_*/wage_*/hr_*完整表结构（24张表）、工资公式引擎、薪资规则时间线、工资异常处理流程。
 
 ---
 
@@ -182,8 +183,9 @@ crush-2.0/
 ```
 shared_*     共享基础表（门店/员工/会员/商品/桌台）
 pos_*        收银模块（订单/支付/桌台会话/退单/对账/纸条）
-wage_*       工资模块
-att_*        考勤模块
+wage_*       工资模块（合同/工资主表/明细/工资项配置/薪资规则/账期）
+att_*        考勤模块（排班/打卡/审批/调班/假期余额）
+hr_*         人力资源模块（KPI模板/评分/结果/申诉/业绩/排名/评价/罚单）
 sig_*        签收模块
 game_*       游戏模块
 sys_*        系统表（配置/日志/审计）
@@ -826,15 +828,452 @@ CREATE TABLE print_queue (
 );
 ```
 
+#### 3.4.5 考勤排班审批模块表（att_*）
+
+> **v2.1 补充**：原SPEC标注"掌柜已有"，现补充完整表结构定义（8张表）。
+
+```sql
+-- 班次配置表
+CREATE TABLE att_shift_configs (
+    shift_config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    shift_code VARCHAR(20) NOT NULL,          -- day / night / custom1
+    shift_name VARCHAR(20) NOT NULL,          -- 白班 / 晚班
+    start_time VARCHAR(8) NOT NULL,           -- 12:00
+    end_time VARCHAR(8) NOT NULL,             -- 20:00
+    is_overnight BOOLEAN DEFAULT FALSE,
+    color VARCHAR(8) DEFAULT '#FB0079',
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, shift_code)
+);
+
+-- 考勤记录表（排班+打卡+判定一体）
+CREATE TABLE att_records (
+    record_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    date DATE NOT NULL,
+    scheduled_shift VARCHAR(20),
+    shift_start_time VARCHAR(8),
+    shift_end_time VARCHAR(8),
+    is_overnight BOOLEAN DEFAULT FALSE,
+    clock_in TIMESTAMPTZ,
+    clock_out TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT 'unknown',     -- normal/late/early/absent/leave/makeup/unknown
+    late_minutes INTEGER DEFAULT 0,
+    early_minutes INTEGER DEFAULT 0,
+    source VARCHAR(20) DEFAULT 'manual',      -- manual/wecom/wifi_photo/makeup
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, date)
+);
+
+-- 排班表
+CREATE TABLE att_schedules (
+    schedule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    date DATE NOT NULL,
+    shift_type VARCHAR(20) NOT NULL,           -- day / night / rest / leave
+    note TEXT,
+    created_by UUID,
+    version INTEGER DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, date)
+);
+
+-- 排班规则表
+CREATE TABLE att_schedule_rules (
+    rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    rule_type VARCHAR(50) NOT NULL,
+    rule_config JSONB NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 排班快照表
+CREATE TABLE att_schedule_snapshots (
+    snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    period VARCHAR(7) NOT NULL,                 -- YYYY-MM
+    snapshot_data JSONB NOT NULL,
+    version INTEGER NOT NULL,
+    created_by UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 调班申请表
+CREATE TABLE att_swap_requests (
+    swap_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    requester_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    swap_with_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    swap_date DATE NOT NULL,
+    swap_shift VARCHAR(20) NOT NULL,
+    reason TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending_swap_with', -- pending_swap_with/swap_with_confirmed/approved/rejected
+    swap_with_confirmed_at TIMESTAMPTZ,
+    approved_by UUID,
+    approved_at TIMESTAMPTZ,
+    reject_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 审批申请表（请假/补卡/调班/报销统一）
+CREATE TABLE att_approvals (
+    approval_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    type VARCHAR(20) NOT NULL,                  -- leave / makeup / swap / expense
+    status VARCHAR(20) DEFAULT 'pending',       -- pending / approved / rejected
+    start_date DATE,
+    end_date DATE,
+    reason TEXT,
+    extra JSONB,                                -- 各类型自定义字段
+    approver_id UUID,
+    approved_at TIMESTAMPTZ,
+    reject_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 假期余额表
+CREATE TABLE att_leave_balances (
+    balance_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    year INTEGER NOT NULL,
+    leave_type VARCHAR(20) NOT NULL,             -- comp_off / sick / personal / annual
+    total_days NUMERIC(5,1) DEFAULT 0,
+    used_days NUMERIC(5,1) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, year, leave_type)
+);
+```
+
+#### 3.4.6 工资合同模块表（wage_*）
+
+> **v2.1 补充**：原SPEC标注"掌柜已有"，现补充完整表结构定义（8张表）。
+
+```sql
+-- 账期管理表
+CREATE TABLE wage_periods (
+    period_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    period VARCHAR(7) NOT NULL,                 -- YYYY-MM
+    status VARCHAR(20) DEFAULT 'open',           -- open / locked / closed
+    locked_at TIMESTAMPTZ,
+    locked_by UUID,
+    closed_at TIMESTAMPTZ,
+    closed_by UUID,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, period)
+);
+
+-- 薪资矩阵表（岗位 x 档位）
+CREATE TABLE wage_salary_matrix (
+    matrix_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    position VARCHAR(30) NOT NULL,               -- 店长/吧员/服务员/厨师/保洁
+    grade VARCHAR(20) NOT NULL,                  -- 学徒/正式/副职/正职
+    monthly_salary NUMERIC(12,2) NOT NULL,
+    base_salary NUMERIC(12,2) DEFAULT 3000.00,
+    meal_allowance NUMERIC(12,2) DEFAULT 400.00,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, position, grade)
+);
+
+-- 劳动合同表
+CREATE TABLE wage_contracts (
+    contract_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    contract_no VARCHAR(50) UNIQUE NOT NULL,
+    position VARCHAR(30) NOT NULL,
+    grade VARCHAR(20) NOT NULL,
+    monthly_salary NUMERIC(12,2) NOT NULL,
+    base_salary NUMERIC(12,2) DEFAULT 3000.00,
+    meal_allowance NUMERIC(12,2) DEFAULT 400.00,
+    allowance NUMERIC(12,2) DEFAULT 0.00,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    status VARCHAR(30) DEFAULT 'draft',          -- draft/pending_sign/signed/expired/terminated
+    esign_flow_id VARCHAR(100),
+    signed_at TIMESTAMPTZ,
+    signed_by UUID,
+    template_data JSONB,
+    created_by UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 工资主表
+CREATE TABLE wage_records (
+    wage_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,                  -- YYYY-MM
+    total_income NUMERIC(12,2) DEFAULT 0,
+    total_deduction NUMERIC(12,2) DEFAULT 0,
+    net_pay NUMERIC(12,2) DEFAULT 0,
+    kpi_coefficient NUMERIC(5,2) DEFAULT 1.00,
+    snapshot JSONB,
+    status VARCHAR(20) DEFAULT 'draft',          -- draft / confirmed / paid
+    generated_at TIMESTAMPTZ,
+    finalized_at TIMESTAMPTZ,
+    finalized_by UUID,
+    paid_at TIMESTAMPTZ,
+    paid_by UUID,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, period)
+);
+
+-- 工资明细子表
+CREATE TABLE wage_record_items (
+    item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL,
+    wage_id UUID NOT NULL REFERENCES wage_records(wage_id) ON DELETE CASCADE,
+    item_code VARCHAR(50) NOT NULL,
+    item_name VARCHAR(50) NOT NULL,
+    item_type VARCHAR(20) NOT NULL,              -- income / deduction
+    amount NUMERIC(12,2) DEFAULT 0,
+    data_source VARCHAR(30) NOT NULL,            -- contract/attendance/performance/kpi/rule/manual
+    sort_order INTEGER DEFAULT 0,
+    detail JSONB
+);
+
+-- 工资项配置表（公式引擎核心）
+CREATE TABLE wage_items_config (
+    config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    item_code VARCHAR(50) NOT NULL,
+    item_name VARCHAR(50) NOT NULL,
+    item_type VARCHAR(20) NOT NULL,              -- income / deduction
+    data_source VARCHAR(30) NOT NULL,
+    formula JSONB,                               -- 公式AST（拖拽式可视化编辑器生成）
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, item_code)
+);
+
+-- 薪资规则表
+CREATE TABLE wage_salary_rules (
+    rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    rule_code VARCHAR(50) NOT NULL,
+    rule_name VARCHAR(100) NOT NULL,
+    rule_type VARCHAR(30) NOT NULL,              -- late_penalty/early_penalty/absent_penalty/bonus
+    rule_config JSONB NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, rule_code)
+);
+
+-- 企微收款同步表
+CREATE TABLE wage_wework_payments (
+    payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    transaction_id VARCHAR(100) NOT NULL,
+    employee_id UUID REFERENCES shared_employees(employee_id),
+    table_session_id UUID,
+    amount NUMERIC(12,2) NOT NULL,
+    pay_time TIMESTAMPTZ NOT NULL,
+    payer_name VARCHAR(100),
+    payer_account VARCHAR(100),
+    remark TEXT,
+    raw_data JSONB,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    sync_error TEXT,
+    is_settled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, transaction_id)
+);
+```
+
+#### 3.4.7 人力资源模块表（hr_*）
+
+> **v2.1 补充**：KPI/绩效/排名/评价/罚单模块完整表结构定义（7张表）。
+
+```sql
+-- KPI 模板表（维度配置）
+CREATE TABLE hr_kpi_templates (
+    template_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    role VARCHAR(30) NOT NULL,
+    dimension VARCHAR(50) NOT NULL,
+    dimension_label VARCHAR(50) NOT NULL,
+    weight NUMERIC(5,2) NOT NULL,
+    formula_type VARCHAR(30) DEFAULT 'ratio',
+    formula_config JSONB DEFAULT '{}',
+    data_source VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- KPI 维度评分表
+CREATE TABLE hr_kpi_scores (
+    score_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,
+    dimension VARCHAR(50) NOT NULL,
+    raw_value NUMERIC(12,2),
+    raw_description TEXT,
+    normalized_score NUMERIC(12,2) NOT NULL,
+    weight NUMERIC(5,2) NOT NULL,
+    weighted_score NUMERIC(12,2) NOT NULL,
+    data_source VARCHAR(50),
+    source_reference JSONB,
+    calculated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, period, dimension)
+);
+
+-- KPI 汇总结果表
+CREATE TABLE hr_kpi_results (
+    result_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,
+    total_score NUMERIC(12,2) NOT NULL,
+    coefficient NUMERIC(5,2) DEFAULT 1.00,
+    coefficient_reason TEXT,
+    rank_in_store INTEGER,
+    status VARCHAR(20) DEFAULT 'pending',
+    confirmed_by UUID,
+    confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(employee_id, period)
+);
+
+-- KPI 申诉表
+CREATE TABLE hr_kpi_appeals (
+    appeal_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL,
+    result_id UUID NOT NULL REFERENCES hr_kpi_results(result_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    dimension VARCHAR(50),
+    reason TEXT NOT NULL,
+    evidence JSONB,
+    status VARCHAR(20) DEFAULT 'pending',
+    reviewed_by UUID,
+    resolution TEXT,
+    resolved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 员工月度业绩汇总表
+CREATE TABLE hr_performance (
+    perf_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,
+    performance_type VARCHAR(30) NOT NULL,        -- booking/wework_payment/bottle/card/manual
+    total_amount NUMERIC(12,2) DEFAULT 0,
+    detail_count INTEGER DEFAULT 0,
+    source VARCHAR(20) DEFAULT 'auto',           -- auto / manual
+    source_ref JSONB,
+    calculated_at TIMESTAMPTZ,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, employee_id, period, performance_type)
+);
+
+-- 员工排名表
+CREATE TABLE hr_rankings (
+    ranking_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,
+    rank_type VARCHAR(30) NOT NULL,               -- performance/kpi/attendance/rating
+    rank_value NUMERIC(12,2) DEFAULT 0,
+    rank_position INTEGER NOT NULL,
+    detail TEXT,
+    calculated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(store_id, employee_id, period, rank_type)
+);
+
+-- 客户评价表
+CREATE TABLE hr_guest_ratings (
+    rating_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    employee_id UUID REFERENCES shared_employees(employee_id),
+    table_no VARCHAR(16),
+    food_quality INTEGER,
+    food_speed INTEGER,
+    drink_quality INTEGER,
+    drink_speed INTEGER,
+    service_attitude INTEGER,
+    service_speed INTEGER,
+    cleanliness INTEGER,
+    overall_score NUMERIC(3,1) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+#### 3.4.8 工资申诉表（wage_disputes）
+
+> **v2.1 新增**：工资异常处理流程所需表（1张表）。
+
+```sql
+-- 工资申诉表
+CREATE TABLE wage_disputes (
+    dispute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES shared_stores(store_id),
+    wage_id UUID NOT NULL REFERENCES wage_records(wage_id),
+    employee_id UUID NOT NULL REFERENCES shared_employees(employee_id),
+    period VARCHAR(7) NOT NULL,
+    dispute_type VARCHAR(20) NOT NULL,            -- less/more/wrong_formula/other
+    original_amount NUMERIC(12,2),
+    expected_amount NUMERIC(12,2),
+    reason TEXT NOT NULL,
+    evidence JSONB,
+    status VARCHAR(20) DEFAULT 'pending',         -- pending/confirmed/rejected/adjusted
+    resolution TEXT,
+    adjusted_amount NUMERIC(12,2),
+    adjusted_in_period VARCHAR(7),
+    reviewed_by UUID,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
 ### 3.5 表数量统计
 
 | 模块 | 表数量 | 说明 |
 |------|:---:|------|
-| shared_* | 9 | 门店/加盟商/员工/会员/等级/分类/商品/桌台/设备/配置 |
-| pos_* | 10 | 订单/明细/支付/支付方式/会话/退单/审批/流水/日志/对账/纸条 |
+| shared_* | 10 | 门店/加盟商/员工/会员/等级/分类/商品/桌台/设备/配置 |
+| pos_* | 11 | 订单/明细/支付/支付方式/会话/退单/审批/流水/日志/对账/纸条 |
+| att_* | 8 | 班次配置/考勤记录/排班/排班规则/排班快照/调班申请/审批/假期余额 |
+| wage_* | 9 | 账期/薪资矩阵/合同/工资主表/工资明细/工资项配置/薪资规则/企微收款/工资申诉 |
+| hr_* | 7 | KPI模板/KPI评分/KPI结果/KPI申诉/业绩/排名/客户评价 |
 | game_* | 4 | 模板/会话/参与者/奖品 |
 | sys_* | 5 | 配置/审计/打印机/路由规则/打印队列 |
-| **合计** | **28** | 不含掌柜已有的wage_*/att_*/sig_*/app_* |
+| **合计** | **54** | 全部表（v2.1更新） |
 
 ---
 
@@ -1072,6 +1511,199 @@ await printersAPI.printByCategory({
 
 ---
 
+## 四-A、工资计算流程与公式引擎
+
+> **v2.1 新增**：工资自动化计算完整流程设计。
+
+### 4A.1 工资计算数据流
+
+```
+合同 (wage_contracts) ──→ _get_contract_data() 取最新 signed 合同
+    ↓                      monthly_salary / base_salary / meal_allowance
+打卡 (att_records)    ──→ _get_attendance_data() SQL 聚合
+    ↓                      late_count / total_late_minutes / absent_count
+审批 (att_approvals)  ──→ _apply_approval() 改写 att_records
+    ↓                      请假→不参与缺勤 / 补卡→改写打卡
+业绩 (hr_performance) ──→ performance_service 取业绩数据
+KPI (hr_kpi_results)  ──→ _get_kpi_data() 取系数(0.60~1.50)
+    ↓
+公式引擎 (PayrollEngine)
+    ↓ evaluate(formula_ast) 逐项计算
+工资表 (wage_records + wage_record_items)
+    → 老板确认 → 推送企微工资条 → 员工签收
+```
+
+### 4A.2 工资公式引擎（PayrollEngine）
+
+#### 公式AST格式
+
+工资项配置表 `wage_items_config.formula` 使用 JSON AST 存储公式，由前端拖拽式可视化编辑器生成：
+
+```json
+{
+  "type": "binary",
+  "op": "*",
+  "left": {
+    "type": "variable",
+    "source": "contract",
+    "field": "base_salary",
+    "label": "底薪"
+  },
+  "right": {
+    "type": "variable",
+    "source": "kpi",
+    "field": "coefficient",
+    "label": "KPI系数"
+  }
+}
+```
+
+#### 支持的数据源（变量）
+
+| 数据源 | 变量 | 说明 |
+|--------|------|------|
+| contract | monthly_salary | 月薪 |
+| contract | base_salary | 基本工资 |
+| contract | meal_allowance | 餐补 |
+| contract | allowance | 津贴 |
+| attendance | present_days | 出勤天数 |
+| attendance | total_days | 应出勤天数 |
+| attendance | late_count | 迟到次数 |
+| attendance | total_late_minutes | 迟到总分钟 |
+| attendance | absent_count | 缺勤天数 |
+| attendance | early_count | 早退次数 |
+| attendance | total_early_minutes | 早退总分钟 |
+| performance | wework_payment | 企微收款业绩 |
+| performance | booking | 订桌业绩 |
+| performance | bottle | 瓶装酒业绩 |
+| performance | card | 开卡业绩 |
+| kpi | coefficient | KPI系数(0.60~1.50) |
+| kpi | total_score | KPI总分 |
+
+#### 支持的运算符与函数
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| 运算符 | +, -, *, / | 四则运算 |
+| 函数 | IF(cond, a, b) | 条件判断 |
+| 函数 | ROUND(x, n) | 四舍五入 |
+| 函数 | MAX(a, b) | 取最大值 |
+| 函数 | MIN(a, b) | 取最小值 |
+| 函数 | FLOOR(x) | 向下取整 |
+| 函数 | CEIL(x) | 向上取整 |
+| 常量 | 数字 | 固定数值 |
+
+#### 预设公式模板
+
+| 模板名称 | 公式 |
+|----------|------|
+| 底薪计算 | 底薪 × KPI系数 × (出勤天数/应出勤天数) |
+| 餐补 | 餐补 × (出勤天数/应出勤天数) |
+| 企微提成 | 企微收款业绩 × 提成比例 |
+| 订桌提成 | 订桌业绩 × 提成比例 |
+| 瓶装提成 | 瓶装酒业绩 × 提成比例 |
+| 迟到扣款 | 迟到总分钟 × 每分钟单价 |
+| 缺勤扣款 | 缺勤天数 × 日薪 |
+| 早退扣款 | 早退总分钟 × 每分钟单价 |
+
+### 4A.3 薪资规则时间线（可配置）
+
+> **v2.1 新增**：自动化流程时间线，每个步骤可开关、日期可自定义。
+
+以5号发薪日为例的6步流程：
+
+| # | 步骤 | 默认日期 | 可关闭 | 说明 |
+|---|------|---------|--------|------|
+| 1 | 考勤锁定 | 每月2日 | ✅ | 锁定上月考勤，不再接受补卡 |
+| 2 | KPI评分截止 | 每月3日 | ✅ | 店长完成上月员工KPI评分（不用KPI可关） |
+| 3 | 业绩确认截止 | 每月3日 | ✅ | 业绩数据录入截止（无业绩可关） |
+| 4 | 自动生成工资 | 每月4日 | ✅ | 系统自动计算工资草稿 |
+| 5 | 老板审核 | 4日~发薪日 | ❌ 固定 | 老板检查确认工资（不可关闭） |
+| 6 | 发薪日 | 每月5日 | ❌ 固定 | 推送工资条给员工，锁定账期（不可关闭） |
+
+#### 薪资规则配置表（wage_salary_rules）
+
+规则存储在 `rule_config` JSONB 字段中：
+
+```json
+{
+  "day_of_month": 5,
+  "is_enabled": true,
+  "description": "每月5日发放工资"
+}
+```
+
+#### 规则类型（rule_code）
+
+| rule_code | 说明 | 默认值 |
+|-----------|------|--------|
+| pay_day | 发薪日 | 每月5日 |
+| auto_generate | 自动生成工资 | 提前1天 |
+| attendance_lock | 考勤锁定 | 每月2日 |
+| auto_lock_period | 自动锁定账期 | 开启 |
+| kpi_deadline | KPI评分截止 | 每月3日 |
+| late_penalty_rate | 迟到每分钟扣款 | 2元/分钟 |
+| early_penalty_rate | 早退每分钟扣款 | 2元/分钟 |
+| absent_penalty_rate | 缺勤每日扣款 | 日薪 |
+
+### 4A.4 工资状态流转
+
+```
+draft（草稿）
+  ↓ 老板确认
+confirmed（已确认）
+  ↓ 发放工资
+paid（已发放）
+  ↓ 员工发现异常
+disputed（有申诉）→ 老板核实 → adjusted（已调整）→ 差额并入下月工资
+```
+
+### 4A.5 工资异常处理流程
+
+> **v2.1 新增**：员工对工资有异议时的处理流程。
+
+#### 流程步骤
+
+```
+1. 员工查看工资条 → 发现异常
+2. 在员工端提交工资申诉（选择类型：少发/多发/公式错误/其他）
+3. 填写申诉原因 + 期望金额 + 上传证据
+4. 老板/店长在管理端收到申诉通知
+5. 核查原始数据（考勤/合同/KPI/业绩）
+6. 确认有误 → 修改工资 → 差额并入下月工资
+   确认无误 → 驳回申诉 → 说明原因
+7. 员工收到处理结果通知
+```
+
+#### 申诉类型（dispute_type）
+
+| 类型 | 说明 | 处理方式 |
+|------|------|---------|
+| less | 少发了 | 补发差额到下月工资 |
+| more | 多发了 | 从下月工资扣回差额 |
+| wrong_formula | 公式算错 | 修改公式 → 重新计算 → 补发/扣回 |
+| other | 其他 | 人工协商处理 |
+
+#### 申诉状态（status）
+
+| 状态 | 说明 |
+|------|------|
+| pending | 待处理 |
+| confirmed | 已确认有误 |
+| rejected | 已驳回 |
+| adjusted | 已调整（差额已并入工资） |
+
+#### 权限规则
+
+| 操作 | 角色 |
+|------|------|
+| 提交申诉 | 员工（仅限自己的工资） |
+| 查看申诉 | boss / store_manager |
+| 处理申诉 | boss |
+| 修改工资 | boss |
+
+---
+
 ## 五、权限模型
 
 ### 5.1 角色体系（8个角色）
@@ -1305,3 +1937,4 @@ feat/xxx (功能分支)
 |------|------|------|
 | 1.0 | 2026-06-22 | 初版 |
 | 2.0 | 2026-06-22 | 修正版：修正30个矛盾点+补充13项遗漏 |
+| 2.1 | 2026-06-24 | 补充att_*/wage_*/hr_*完整表结构（24张）、工资公式引擎、薪资规则时间线（6步可配置）、工资异常处理流程、工资申诉表 |

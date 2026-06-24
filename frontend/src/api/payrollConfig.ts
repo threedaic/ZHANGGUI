@@ -5,7 +5,7 @@ import type { ApiResponse } from './types'
 // ====== 公式 AST 类型定义（与后端 formula_engine.py 对齐）======
 
 export type FormulaNode =
-  | { type: 'const'; value: number }
+  | { type: 'const'; value: number; isPlaceholder?: boolean }
   | { type: 'field'; source: FormulaSource; field: string }
   | { type: 'op'; op: '+' | '-' | '*' | '/'; left: FormulaNode; right: FormulaNode }
   | { type: 'func'; name: 'max' | 'min' | 'round' | 'abs' | 'if'; args: FormulaNode[] }

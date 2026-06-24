@@ -27,6 +27,7 @@ from app.database import get_db
 from app.schemas.printer import (
     PrinterCreate, PrinterUpdate, PrintRouteCreate, PrintRouteUpdate,
     PrintByCategoryRequest, PrintDirectRequest, CategoryPrinterUpdate,
+    ModulePrintConfigUpdate,
 )
 from app.utils.deps import get_store_id, require_role, make_response
 from app.utils.exceptions import NotFoundError, ValidationError
@@ -318,3 +319,44 @@ async def update_category_printer(
         raise NotFoundError("分类不存在")
 
     return make_response(message="分类打印机绑定更新成功", request=request)
+
+
+# ==================== 模块打印配置 ====================
+
+@router.get("/module-configs")
+async def list_module_configs(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取模块打印配置列表
+
+    首次调用时自动创建默认配置。
+    """
+    store_id = get_store_id(request)
+    service = PrinterService(db)
+    data = await service.list_module_configs(store_id)
+    return make_response(data=data, request=request)
+
+
+@router.put("/module-configs/{config_id}")
+async def update_module_config(
+    config_id: uuid.UUID,
+    body: ModulePrintConfigUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新模块打印配置"""
+    require_role(request, ["boss", "store_manager"])
+    store_id = get_store_id(request)
+
+    service = PrinterService(db)
+    success = await service.update_module_config(
+        store_id,
+        config_id,
+        body.model_dump(exclude_unset=True),
+    )
+
+    if not success:
+        raise NotFoundError("配置不存在")
+
+    return make_response(message="模块打印配置更新成功", request=request)

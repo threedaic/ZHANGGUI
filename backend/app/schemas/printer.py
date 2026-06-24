@@ -160,3 +160,31 @@ class CategoryPrinterResponse(BaseModel):
     printer_name: Optional[str]
     backup_printer_id: Optional[str]
     backup_printer_name: Optional[str]
+
+
+# ==================== 模块打印配置 Schema ====================
+
+class ModulePrintConfigUpdate(BaseModel):
+    """模块打印配置更新请求体"""
+    enabled: Optional[bool] = Field(None, description="是否启用")
+    printer_id: Optional[str] = Field(None, description="指定打印机ID")
+
+
+class ModulePrintConfigBatchUpdate(BaseModel):
+    """模块打印配置批量更新请求体"""
+    updates: list[ModulePrintConfigUpdate] = Field(..., description="更新列表")
+
+
+class ModulePrintConfigResponse(BaseModel):
+    """模块打印配置响应体"""
+    config_id: str
+    module_code: str
+    scene_code: str
+    scene_name: str
+    description: Optional[str]
+    document_type: str
+    trigger_event: str
+    printer_type: str
+    enabled: bool
+    printer_id: Optional[str]
+    printer_name: Optional[str]

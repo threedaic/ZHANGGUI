@@ -61,6 +61,35 @@ DEFAULT_SALARY_RULES = [
         "rule_unit": "天",
         "note": "每月固定4天休息",
     },
+    # ====== 自动化流程规则 ======
+    {
+        "rule_code": "auto_generate_days_before",
+        "rule_name": "提前生成天数",
+        "rule_value": 1.0,
+        "rule_unit": "天",
+        "note": "发薪日前N天自动生成工资草稿（0=发薪日当天）",
+    },
+    {
+        "rule_code": "attendance_lock_day",
+        "rule_name": "考勤锁定日",
+        "rule_value": 2.0,
+        "rule_unit": "日",
+        "note": "每月N日后锁定上月考勤，不再接受补卡",
+    },
+    {
+        "rule_code": "auto_lock_period",
+        "rule_name": "自动锁定账期",
+        "rule_value": 1.0,
+        "rule_unit": "",
+        "note": "发薪日自动锁定账期（1=是, 0=否）",
+    },
+    {
+        "rule_code": "kpi_deadline_day",
+        "rule_name": "KPI评分截止日",
+        "rule_value": 3.0,
+        "rule_unit": "日",
+        "note": "每月N日前完成上月KPI评分",
+    },
 ]
 
 

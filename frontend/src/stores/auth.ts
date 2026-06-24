@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getCurrentUser } from '@/api/auth'
 
-export type UserRole = 'boss' | 'store_manager' | 'staff'
+export type UserRole = 'admin' | 'boss' | 'store_manager' | 'accountant' | 'bar_manager' | 'service_manager' | 'kitchen_manager' | 'staff'
 
 export interface UserInfo {
   user_id: string | null
@@ -37,7 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
   const role = computed(() => info.value.role)
   const isBoss = computed(() => info.value.role === 'boss')
   const isManager = computed(() =>
-    ['boss', 'store_manager'].includes(info.value.role)
+    ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager'].includes(info.value.role)
   )
 
   function setAuth(t: string, payload: UserInfo) {

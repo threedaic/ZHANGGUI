@@ -12,6 +12,7 @@ import {
   type PayrollMonthlySummary,
 } from '@/api/payroll'
 import { getPeriod, type PeriodInfo } from '@/api/period'
+import { storeAPI } from '@/api/store'
 import dayjs from 'dayjs'
 
 const router = useRouter()
@@ -22,6 +23,7 @@ const periodInfo = ref<PeriodInfo | null>(null)
 const loading = ref(false)
 const generating = ref(false)
 const selectedIds = ref<string[]>([])
+const payrollDay = ref<number>(5)
 
 const isLocked = computed(
   () => periodInfo.value?.status === 'locked' || periodInfo.value?.status === 'closed'
@@ -126,7 +128,13 @@ const statusLabel = (s: string) => {
 }
 
 watch(period, load)
-onMounted(load)
+onMounted(async () => {
+  await load()
+  try {
+    const res = await storeAPI.getSettings()
+    payrollDay.value = res.data.data.payroll_day_of_month
+  } catch { /* silent */ }
+})
 </script>
 
 <template>
@@ -149,6 +157,22 @@ onMounted(load)
         {{ periodInfo.status === 'open' ? '开放中' : periodInfo.status === 'locked' ? '已锁定' : '已关账' }}
       </span>
       <span v-if="isLocked" class="lock-tip">账期已锁定，无法修改</span>
+    </div>
+
+    <!-- 薪资配置快捷入口 -->
+    <div class="payroll-config-bar">
+      <div class="config-info">
+        <span class="config-label">发薪日</span>
+        <span class="config-value">每月 {{ payrollDay }} 日</span>
+      </div>
+      <div class="config-actions">
+        <button class="config-link" @click="router.push({ name: 'SalaryRulesSetting' })">
+          薪资规则
+        </button>
+        <button class="config-link" @click="router.push({ name: 'PayrollConfig' })">
+          工资项公式
+        </button>
+      </div>
     </div>
 
     <!-- 汇总卡片 -->
@@ -244,6 +268,55 @@ onMounted(load)
   align-items: center;
   gap: 8px;
   font-size: 12px;
+}
+
+// 薪资配置快捷入口
+.payroll-config-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: $color-bg;
+  border: 1px solid $color-divider;
+  border-radius: $radius-sm;
+  padding: 10px 14px;
+}
+
+.config-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .config-label {
+    font-size: 12px;
+    color: #888;
+  }
+
+  .config-value {
+    font-size: 13px;
+    color: $brand-white;
+    font-weight: 600;
+    font-family: $font-family-number;
+  }
+}
+
+.config-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.config-link {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: $brand-primary;
+  background: transparent;
+  border: 1px solid $brand-primary;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background-color: rgba(251, 0, 121, 0.1);
+  }
 }
 
 .status-tag {

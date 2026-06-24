@@ -18,6 +18,61 @@
       </button>
     </div>
 
+    <!-- 模块打印配置 -->
+    <div v-if="activeTab === 'modules'" class="tab-content">
+      <div class="section-header">
+        <h2 class="section-title">模块打印配置</h2>
+        <span class="section-desc">配置哪些场景需要打印，哪些不需要</span>
+      </div>
+
+      <div class="module-config-list">
+        <div
+          v-for="config in moduleConfigs"
+          :key="config.config_id"
+          class="module-config-card"
+        >
+          <div class="module-config-header">
+            <div class="module-config-info">
+              <div class="module-config-name">{{ config.scene_name }}</div>
+              <div class="module-config-desc">{{ config.description }}</div>
+            </div>
+            <div class="module-config-toggle">
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  :checked="config.enabled"
+                  @change="toggleModuleConfig(config)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="module-config-detail">
+            <span class="detail-tag">{{ moduleLabels[config.module_code] || config.module_code }}</span>
+            <span class="detail-tag">{{ typeLabels[config.printer_type] }}</span>
+            <span class="detail-tag">{{ triggerLabels[config.trigger_event] }}</span>
+          </div>
+          <div class="module-config-printer" v-if="config.enabled">
+            <label class="form-label">指定打印机：</label>
+            <select
+              v-model="config.printer_id"
+              class="form-input-sm"
+              @change="updateModuleConfigPrinter(config)"
+            >
+              <option value="">自动选择（按类型）</option>
+              <option
+                v-for="p in printers"
+                :key="p.printer_id"
+                :value="p.printer_id"
+              >
+                {{ p.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 打印机列表 -->
     <div v-if="activeTab === 'printers'" class="tab-content">
       <div class="section-header">
@@ -397,7 +452,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { printersAPI, type PrinterInfo, type PrintRoute, type CategoryPrinter, type PrinterForm, type PrintRouteForm } from '@/api/printers'
+import { printersAPI, type PrinterInfo, type PrintRoute, type CategoryPrinter, type PrinterForm, type PrintRouteForm, type ModulePrintConfig } from '@/api/printers'
 
 const activeTab = ref('printers')
 const saving = ref(false)
@@ -406,6 +461,7 @@ const tabs = [
   { key: 'printers', label: '打印机' },
   { key: 'routes', label: '路由规则' },
   { key: 'categories', label: '分类绑定' },
+  { key: 'modules', label: '模块配置' },
 ]
 
 const typeLabels: Record<string, string> = {
@@ -418,6 +474,14 @@ const triggerLabels: Record<string, string> = {
   order_created: '订单创建',
   payment_completed: '支付完成',
   manual: '手动重打',
+}
+
+const moduleLabels: Record<string, string> = {
+  wine_storage: '存酒管理',
+  pos: '收银台',
+  inventory: '库存管理',
+  employee: '员工管理',
+  booking: '预订管理',
 }
 
 // 打印机相关
@@ -451,6 +515,9 @@ const routeForm = reactive<PrintRouteForm>({
 // 分类相关
 const categories = ref<CategoryPrinter[]>([])
 
+// 模块打印配置相关
+const moduleConfigs = ref<ModulePrintConfig[]>([])
+
 // 加载数据
 async function loadPrinters() {
   try {
@@ -482,6 +549,17 @@ async function loadCategories() {
     }
   } catch (e: any) {
     ElMessage.error('加载分类列表失败')
+  }
+}
+
+async function loadModuleConfigs() {
+  try {
+    const { data: res } = await printersAPI.listModuleConfigs()
+    if (res.code === 0) {
+      moduleConfigs.value = res.data || []
+    }
+  } catch (e: any) {
+    ElMessage.error('加载模块配置失败')
   }
 }
 
@@ -675,11 +753,44 @@ async function updateCategoryPrinter(cat: CategoryPrinter) {
   }
 }
 
+// 模块打印配置操作
+async function toggleModuleConfig(config: ModulePrintConfig) {
+  try {
+    const { data: res } = await printersAPI.updateModuleConfig(config.config_id, {
+      enabled: !config.enabled,
+    })
+    if (res.code === 0) {
+      config.enabled = !config.enabled
+      ElMessage.success(config.enabled ? '已启用' : '已禁用')
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '操作失败')
+  }
+}
+
+async function updateModuleConfigPrinter(config: ModulePrintConfig) {
+  try {
+    const { data: res } = await printersAPI.updateModuleConfig(config.config_id, {
+      printer_id: config.printer_id || null,
+    })
+    if (res.code === 0) {
+      ElMessage.success('打印机绑定更新成功')
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '更新失败')
+  }
+}
+
 // 初始化
 onMounted(() => {
   loadPrinters()
   loadRoutes()
   loadCategories()
+  loadModuleConfigs()
 })
 </script>
 
@@ -1103,5 +1214,135 @@ onMounted(() => {
   background: #111111;
   border: 1px dashed #333333;
   border-radius: 12px;
+}
+
+/* 区块描述 */
+.section-desc {
+  font-size: 12px;
+  color: #7A7C80;
+}
+
+/* 模块打印配置 */
+.module-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.module-config-card {
+  padding: 16px;
+  background: #111111;
+  border: 1px solid #333333;
+  border-radius: 12px;
+}
+
+.module-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.module-config-info {
+  flex: 1;
+}
+
+.module-config-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+}
+
+.module-config-desc {
+  font-size: 12px;
+  color: #7A7C80;
+}
+
+.module-config-toggle {
+  margin-left: 16px;
+}
+
+/* 开关 */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #333333;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #7A7C80;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #FB0079;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+  background-color: #FFFFFF;
+}
+
+.module-config-detail {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-tag {
+  padding: 4px 8px;
+  background: #222222;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #7A7C80;
+}
+
+.module-config-printer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.module-config-printer .form-label {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.form-input-sm {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  background: #0a0a0a;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 13px;
 }
 </style>

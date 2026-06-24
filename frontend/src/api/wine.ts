@@ -31,6 +31,9 @@ export interface WineInfo {
   table_no: string | null
   status: string
   retrieved_at: string | null
+  retrieved_by: string | null
+  retriever_name: string | null
+  retriever_employee_code: string | null
   notes: string | null
   created_at: string | null
   updated_at: string | null

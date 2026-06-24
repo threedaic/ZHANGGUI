@@ -5,9 +5,19 @@ import type {
 } from '@/api/payrollConfig'
 import { SOURCE_FIELDS, SOURCE_LABELS } from '@/api/payrollConfig'
 
-// 构造常量节点
+// 构造常量节点（isPlaceholder=false 表示真实常量，区别于占位槽位的 const(0)）
 export function constNode(value: number): FormulaNode {
-  return { type: 'const', value }
+  return { type: 'const', value, isPlaceholder: false }
+}
+
+// 构造占位槽位节点（渲染为"拖入"槽位，不会传给后端）
+export function placeholderNode(): FormulaNode {
+  return { type: 'const', value: 0, isPlaceholder: true }
+}
+
+// 判断是否为占位槽位
+export function isPlaceholder(node: FormulaNode): boolean {
+  return node.type === 'const' && node.isPlaceholder === true
 }
 
 // 构造字段引用节点
@@ -37,6 +47,7 @@ export function astToString(node: FormulaNode | null): string {
   if (!node) return ''
   switch (node.type) {
     case 'const':
+      if (isPlaceholder(node)) return '?'
       return String(node.value)
     case 'field': {
       const label =
@@ -75,6 +86,7 @@ export function validateAst(node: FormulaNode | null): string | null {
   if (!node) return '公式不能为空'
   switch (node.type) {
     case 'const':
+      if (isPlaceholder(node)) return '存在未填入的槽位'
       if (typeof node.value !== 'number' || Number.isNaN(node.value)) {
         return '常量值无效'
       }

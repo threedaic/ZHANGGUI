@@ -224,6 +224,8 @@ class WineResponse(BaseModel):
     expiry_date: str | None = None
     retrieved_at: str | None = None
     retrieved_by: uuid.UUID | None = None
+    retriever_name: str | None = None
+    retriever_employee_code: str | None = None
     notes: str | None = None
     created_at: str | None = None
     updated_at: str | None = None

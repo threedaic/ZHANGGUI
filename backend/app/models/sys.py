@@ -118,3 +118,26 @@ class PrintQueue(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     printed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class ModulePrintConfig(Base):
+    """模块打印配置表（sys_module_print_configs）
+
+    让老板自己选择哪些场景需要打印，哪些不需要。
+    例如：有的店没有标签打印机，就不需要打印存酒标签。
+    """
+    __tablename__ = "sys_module_print_configs"
+
+    config_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    module_code: Mapped[str] = mapped_column(String(50), nullable=False)  # 模块代码：wine_storage/pos/kitchen等
+    scene_code: Mapped[str] = mapped_column(String(50), nullable=False)   # 场景代码：store_label/take_receipt/order_slip等
+    scene_name: Mapped[str] = mapped_column(String(100), nullable=False)  # 场景名称：存酒标签/取酒小票/厨房出单等
+    description: Mapped[Optional[str]] = mapped_column(Text)              # 场景描述
+    document_type: Mapped[str] = mapped_column(String(20), default="order")  # 文档类型：label/receipt/order
+    trigger_event: Mapped[str] = mapped_column(String(50), default="order_created")  # 触发时机
+    printer_type: Mapped[str] = mapped_column(String(20), default="order")  # 需要的打印机类型
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)          # 是否启用
+    printer_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))  # 指定打印机（可选）
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -2,9 +2,11 @@
 存酒管理数据访问层
 封装 SQL 查询，返回 ORM 对象。
 """
+import uuid
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.wine_storage import WineStorage
+from app.models.employee import Employee
 from app.utils.pagination import PageParams, paginate
 
 
@@ -37,6 +39,14 @@ class WineRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_retriever_info(self, retriever_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
+        """批量查询取酒人姓名+工号，避免 N+1"""
+        if not retriever_ids:
+            return {}
+        stmt = select(Employee.id, Employee.name, Employee.employee_code).where(Employee.id.in_(retriever_ids))
+        result = await self.session.execute(stmt)
+        return {row[0]: {"name": row[1], "employee_code": row[2]} for row in result.all()}
 
     async def list_wines(
         self,

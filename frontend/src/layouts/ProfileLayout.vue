@@ -4,8 +4,10 @@ import AppShell from '@/components/AppShell.vue'
 
 <template>
   <AppShell title="我的">
-    <Transition name="page-fade" mode="out-in">
-      <RouterView />
-    </Transition>
+    <RouterView v-slot="{ Component }">
+      <Transition name="page-fade" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
   </AppShell>
 </template>
