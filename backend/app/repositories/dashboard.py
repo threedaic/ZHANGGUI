@@ -3,6 +3,7 @@
 封装聚合 SQL 查询，返回 ORM 对象 / 原始数据。
 依赖: DailyRevenue, GuestRating, Booking, Table, AttendanceRecord
 """
+import uuid
 from datetime import date, timedelta
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,7 @@ from app.schemas.dashboard import (
 class DashboardRepository:
     """数据看板 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -353,7 +354,7 @@ class DashboardRepository:
 
     # ==================== 我的业绩 ====================
 
-    async def get_my_performance(self, employee_id: int) -> MyPerformance:
+    async def get_my_performance(self, employee_id: uuid.UUID) -> MyPerformance:
         """获取当前员工本月累计企微个人收款"""
         now = date.today()
         month_start = date(now.year, now.month, 1)
@@ -374,7 +375,7 @@ class DashboardRepository:
             period=period,
         )
 
-    async def get_my_performance_detail(self, employee_id: int) -> list[dict]:
+    async def get_my_performance_detail(self, employee_id: uuid.UUID) -> list[dict]:
         """获取当前员工本月每日企微收款明细"""
         from sqlalchemy import cast, Date
         from sqlalchemy.dialects.postgresql import TEXT

@@ -5,6 +5,7 @@
 - 企微群预警推送
 """
 import json
+import uuid
 from datetime import date, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -19,7 +20,7 @@ from app.utils.exceptions import AppError, NotFoundError, ValidationError
 class AntiFraudService:
     """防飞单 Service。每请求新实例。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.repo = AntiFraudRepository(session, store_id)
         self.session = session
         self.store_id = store_id
@@ -432,7 +433,7 @@ class AntiFraudService:
         date_from: str | None = None,
         date_to: str | None = None,
         risk_level: str | None = None,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
@@ -485,7 +486,7 @@ class AntiFraudService:
             "total_pages": (total + page_size - 1) // page_size if total > 0 else 0,
         }
 
-    async def get_alert_detail(self, session_id: int) -> dict:
+    async def get_alert_detail(self, session_id: uuid.UUID) -> dict:
         """获取单条预警详情（含完整规则明细）"""
         session = await self.repo.get_session_by_id(session_id)
         if not session:

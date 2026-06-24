@@ -4,6 +4,7 @@
 封装 SQL 查询，返回 ORM 对象。
 所有查询强制带上 store_id（RLS 应用层兜底）。
 """
+import uuid
 from datetime import date
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,13 +15,13 @@ from app.models.employee import Employee
 class ScheduleRepository:
     """排班相关数据访问。每个请求实例化一次，绑定 store_id。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
     # -- Schedule CRUD --
 
-    async def get_by_id(self, schedule_id: int) -> Schedule | None:
+    async def get_by_id(self, schedule_id: uuid.UUID) -> Schedule | None:
         result = await self.session.execute(
             select(Schedule).where(
                 Schedule.id == schedule_id,
@@ -30,7 +31,7 @@ class ScheduleRepository:
         return result.scalar_one_or_none()
 
     async def get_by_employee_date(
-        self, employee_id: int, schedule_date: date
+        self, employee_id: uuid.UUID, schedule_date: date
     ) -> Schedule | None:
         result = await self.session.execute(
             select(Schedule).where(
@@ -137,7 +138,7 @@ class ScheduleRepository:
         return list(result.scalars().all())
 
     async def get_by_employee_week(
-        self, employee_id: int, start_date: date, end_date: date
+        self, employee_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[Schedule]:
         """获取指定员工在日期范围内的排班。用于员工个人视图。"""
         result = await self.session.execute(

@@ -15,6 +15,7 @@
   - 提成比例 10%
   - 月休息 4 天
 """
+import uuid
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -172,7 +173,7 @@ DEFAULT_PAYROLL_ITEMS = [
 class PayrollConfigService:
     """工资项配置 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -193,9 +194,12 @@ class PayrollConfigService:
                     store_id=self.store_id,
                     rule_code=rule["rule_code"],
                     rule_name=rule["rule_name"],
-                    rule_value=rule["rule_value"],
-                    rule_unit=rule["rule_unit"],
-                    note=rule.get("note"),
+                    rule_type=rule.get("rule_code", "other"),
+                    rule_config={
+                        "value": rule["rule_value"],
+                        "unit": rule.get("rule_unit", ""),
+                        "note": rule.get("note", ""),
+                    },
                 )
             )
 
@@ -210,8 +214,6 @@ class PayrollConfigService:
                     data_source=item["data_source"],
                     formula_ast=item["formula_ast"],
                     sort_order=item["sort_order"],
-                    is_system=item.get("is_system", False),
-                    note=item.get("note"),
                 )
             )
 
@@ -273,8 +275,6 @@ class PayrollConfigService:
             existing.data_source = data_source
             existing.formula_ast = formula_ast
             existing.sort_order = sort_order
-            existing.default_value = default_value
-            existing.note = note
             return existing
         else:
             item = PayrollItemConfig(
@@ -284,9 +284,7 @@ class PayrollConfigService:
                 item_type=item_type,
                 data_source=data_source,
                 formula_ast=formula_ast,
-                default_value=default_value,
                 sort_order=sort_order,
-                note=note,
             )
             self.session.add(item)
             return item
@@ -307,3 +305,33 @@ class PayrollConfigService:
             rule.rule_value = rule_value
             return rule
         return None
+
+    async def toggle_rule_active(self, rule_code: str, is_active: bool) -> SalaryRule | None:
+        """启用/禁用薪资规则（流程步骤开关）"""
+        stmt = select(SalaryRule).where(
+            and_(
+                SalaryRule.store_id == self.store_id,
+                SalaryRule.rule_code == rule_code,
+            )
+        )
+        result = await self.session.execute(stmt)
+        rule = result.scalar_one_or_none()
+        if rule:
+            rule.is_active = is_active
+            return rule
+        return None
+
+    async def get_active_modules(self) -> dict[str, bool]:
+        """获取各模块是否启用（供公式引擎使用）"""
+        stmt = select(SalaryRule).where(
+            SalaryRule.store_id == self.store_id
+        )
+        result = await self.session.execute(stmt)
+        rules = {r.rule_code: r for r in result.scalars().all()}
+
+        return {
+            "kpi_enabled": rules.get("kpi_deadline_day", type('R', (), {'is_active': True})()).is_active if "kpi_deadline_day" in rules else True,
+            "attendance_lock_enabled": rules.get("attendance_lock_day", type('R', (), {'is_active': True})()).is_active if "attendance_lock_day" in rules else True,
+            "auto_generate_enabled": rules.get("auto_generate_days_before", type('R', (), {'is_active': True})()).is_active if "auto_generate_days_before" in rules else True,
+            "performance_enabled": True,  # 业绩模块默认启用
+        }

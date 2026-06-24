@@ -168,7 +168,7 @@ def set_ai_provider(provider: AIProvider) -> None:
     _ai_provider = provider
 
 
-async def get_vision_provider(db: AsyncSession, store_id: int) -> VisionLLMProvider | DummyProvider:
+async def get_vision_provider(db: AsyncSession, store_id: uuid.UUID) -> VisionLLMProvider | DummyProvider:
     """根据门店 AI 配置动态创建 Vision Provider"""
     try:
         from app.services.ai_engine import get_ai_config
@@ -203,8 +203,8 @@ async def save_uploaded_photo(file_content: bytes, filename: str) -> str:
 
 async def start_session(
     db: AsyncSession,
-    store_id: int,
-    user_id: int,
+    store_id: uuid.UUID,
+    user_id: uuid.UUID,
     session_type: str,
 ) -> dict:
     """创建开店/闭店会话，自动拉取所有相关模板并预创建检查项"""
@@ -254,7 +254,7 @@ async def start_session(
     return await _build_session_detail(repo, session.id)
 
 
-async def _build_session_detail(repo: ButlerRepository, session_id: int) -> dict:
+async def _build_session_detail(repo: ButlerRepository, session_id: uuid.UUID) -> dict:
     """组装会话详情（含模板和检查结果分组）"""
     session = await repo.get_session(session_id)
     if not session:
@@ -341,7 +341,7 @@ async def _build_session_detail(repo: ButlerRepository, session_id: int) -> dict
     }
 
 
-async def _check_session_complete(repo: ButlerRepository, session_id: int) -> None:
+async def _check_session_complete(repo: ButlerRepository, session_id: uuid.UUID) -> None:
     """检查会话是否所有项都已完成，如果是则自动标记 completed"""
     session = await repo.get_session(session_id)
     if not session or session.status != "in_progress":
@@ -359,10 +359,10 @@ async def _check_session_complete(repo: ButlerRepository, session_id: int) -> No
 
 async def confirm_item(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
-    result_id: int,
-    user_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
+    result_id: uuid.UUID,
+    user_id: uuid.UUID,
     comment: str | None = None,
 ) -> dict:
     """打勾确认一个检查项（checkbox 类型）"""
@@ -397,10 +397,10 @@ async def confirm_item(
 
 async def upload_photo(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
-    result_id: int,
-    user_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
+    result_id: uuid.UUID,
+    user_id: uuid.UUID,
     file_content: bytes,
     filename: str,
 ) -> dict:
@@ -475,13 +475,13 @@ async def upload_photo(
 
 async def _notify_manual_review(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
-    result_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
+    result_id: uuid.UUID,
     item_name: str,
     photo_url: str,
     image_bytes: bytes,
-    submitted_by: int,
+    submitted_by: uuid.UUID,
 ) -> None:
     """发送人工审核通知（统一推送：站内信 + 企微群机器人图片+文本）
 
@@ -538,8 +538,8 @@ async def _notify_manual_review(
 
 async def add_adhoc_item(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
     item_name: str,
     item_type: str,
 ) -> dict:
@@ -576,10 +576,10 @@ async def add_adhoc_item(
 
 async def manual_review(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
-    result_id: int,
-    reviewer_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
+    result_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
     action: str,
     comment: str | None = None,
 ) -> dict:
@@ -625,10 +625,10 @@ async def manual_review(
 
 async def resubmit_photo(
     db: AsyncSession,
-    store_id: int,
-    session_id: int,
-    result_id: int,
-    user_id: int,
+    store_id: uuid.UUID,
+    session_id: uuid.UUID,
+    result_id: uuid.UUID,
+    user_id: uuid.UUID,
     file_content: bytes,
     filename: str,
 ) -> dict:

@@ -1,6 +1,7 @@
 """
 处罚通知 Service — 业务逻辑层
 """
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,18 +15,18 @@ from app.utils.pagination import PageParams
 
 
 class PenaltyService:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
         self.repo = PenaltyRepository(session, store_id)
 
     async def create(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         penalty_type: str,
         amount: float,
         reason: str,
-        issued_by: int,
+        issued_by: uuid.UUID,
         auto_issue: bool = True,
     ) -> PenaltyNotice:
         notice = PenaltyNotice(
@@ -96,7 +97,7 @@ class PenaltyService:
         self,
         penalty_type: str | None = None,
         status: str | None = None,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[dict], int]:
@@ -110,17 +111,17 @@ class PenaltyService:
         items = await self._enrich(notices)
         return items, total
 
-    async def get_detail(self, notice_id: int) -> dict | None:
+    async def get_detail(self, notice_id: uuid.UUID) -> dict | None:
         notice = await self.repo.get_by_id(notice_id)
         if not notice:
             return None
         items = await self._enrich([notice])
         return items[0] if items else None
 
-    async def update(self, notice_id: int, **kwargs) -> PenaltyNotice | None:
+    async def update(self, notice_id: uuid.UUID, **kwargs) -> PenaltyNotice | None:
         return await self.repo.update(notice_id, **kwargs)
 
-    async def delete(self, notice_id: int) -> bool:
+    async def delete(self, notice_id: uuid.UUID) -> bool:
         return await self.repo.delete(notice_id)
 
     async def _enrich(self, notices: list[PenaltyNotice]) -> list[dict]:

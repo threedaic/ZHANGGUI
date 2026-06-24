@@ -2,7 +2,7 @@
 
 所有查询通过 store_id 过滤（RLS），boss 角色传入 store_id=None 查全部。
 """
-
+import uuid
 from datetime import date as date_type
 
 from sqlalchemy import select, func, and_, or_
@@ -18,14 +18,14 @@ class TableRepo:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create(self, store_id: int, data: dict) -> Table:
+    async def create(self, store_id: uuid.UUID, data: dict) -> Table:
         table = Table(store_id=store_id, **data)
         self.session.add(table)
         await self.session.commit()
         await self.session.refresh(table)
         return table
 
-    async def get_by_id(self, table_id: int, store_id: int | None = None) -> Table | None:
+    async def get_by_id(self, table_id: uuid.UUID, store_id: uuid.UUID | None = None) -> Table | None:
         stmt = select(Table).where(Table.id == table_id)
         if store_id is not None:
             stmt = stmt.where(Table.store_id == store_id)
@@ -33,7 +33,7 @@ class TableRepo:
         return result.scalar_one_or_none()
 
     async def get_by_ids(
-        self, table_ids: list[int], store_id: int | None = None
+        self, table_ids: list[uuid.UUID], store_id: uuid.UUID | None = None
     ) -> list[Table]:
         """批量按 ID 查询桌位，避免 N+1"""
         if not table_ids:
@@ -45,8 +45,8 @@ class TableRepo:
         return list(result.scalars().all())
 
     async def get_employee_name_map(
-        self, employee_ids: list[int]
-    ) -> dict[int, str]:
+        self, employee_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
         """批量获取员工姓名，返回 {employee_id: name}"""
         if not employee_ids:
             return {}
@@ -56,7 +56,7 @@ class TableRepo:
 
     async def list_by_store(
         self,
-        store_id: int,
+        store_id: uuid.UUID,
         *,
         area: str | None = None,
         status: str | None = None,
@@ -89,7 +89,7 @@ class TableRepo:
         await self.session.delete(table)
         await self.session.commit()
 
-    async def count_active(self, store_id: int) -> int:
+    async def count_active(self, store_id: uuid.UUID) -> int:
         stmt = select(func.count()).where(
             Table.store_id == store_id,
             Table.status == "active",
@@ -103,7 +103,7 @@ class BookingRepo:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create(self, store_id: int, data: dict) -> Booking:
+    async def create(self, store_id: uuid.UUID, data: dict) -> Booking:
         booking = Booking(store_id=store_id, **data)
         self.session.add(booking)
         await self.session.commit()
@@ -111,7 +111,7 @@ class BookingRepo:
         return booking
 
     async def get_by_id(
-        self, booking_id: int, store_id: int | None = None
+        self, booking_id: uuid.UUID, store_id: uuid.UUID | None = None
     ) -> Booking | None:
         stmt = select(Booking).where(Booking.id == booking_id)
         if store_id is not None:
@@ -121,7 +121,7 @@ class BookingRepo:
 
     async def list_by_date(
         self,
-        store_id: int,
+        store_id: uuid.UUID,
         *,
         date: str | None = None,
         status: str | None = None,
@@ -156,7 +156,7 @@ class BookingRepo:
         await self.session.commit()
 
     async def count_by_date_status(
-        self, store_id: int, date: str, status: str = "confirmed"
+        self, store_id: uuid.UUID, date: str, status: str = "confirmed"
     ) -> int:
         date_obj = date_type.fromisoformat(date) if isinstance(date, str) else date
         stmt = select(func.count()).where(
@@ -167,7 +167,7 @@ class BookingRepo:
         return (await self.session.execute(stmt)).scalar_one()
 
     async def find_conflict(
-        self, store_id: int, date: str, table_id: int, time_slot: str | None = None
+        self, store_id: uuid.UUID, date: str, table_id: uuid.UUID, time_slot: str | None = None
     ) -> Booking | None:
         """查找指定桌位在指定日期的冲突预约。"""
         date_obj = date_type.fromisoformat(date) if isinstance(date, str) else date

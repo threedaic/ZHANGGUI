@@ -1,6 +1,7 @@
 """
 签收任务 Repository — 数据访问层
 """
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from app.utils.pagination import PageParams
 
 
 class SignTaskRepository:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -19,7 +20,7 @@ class SignTaskRepository:
         await self.session.refresh(task)
         return task
 
-    async def get_by_id(self, task_id: int) -> SignTask | None:
+    async def get_by_id(self, task_id: uuid.UUID) -> SignTask | None:
         stmt = select(SignTask).where(
             and_(
                 SignTask.id == task_id,
@@ -31,7 +32,7 @@ class SignTaskRepository:
 
     async def list_inbox(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         status: str | None = None,
         page: PageParams | None = None,
     ) -> tuple[list[SignTask], int]:
@@ -57,7 +58,7 @@ class SignTaskRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_pending_count(self, employee_id: int) -> int:
+    async def get_pending_count(self, employee_id: uuid.UUID) -> int:
         stmt = (
             select(func.count())
             .select_from(SignTask)
@@ -74,7 +75,7 @@ class SignTaskRepository:
 
     async def list_issued(
         self,
-        issued_by: int,
+        issued_by: uuid.UUID,
         status: str | None = None,
         page: PageParams | None = None,
     ) -> tuple[list[SignTask], int]:
@@ -124,7 +125,7 @@ class SignTaskRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def sign(self, task_id: int, employee_id: int, signature_data: str, notes: str | None = None) -> bool:
+    async def sign(self, task_id: uuid.UUID, employee_id: uuid.UUID, signature_data: str, notes: str | None = None) -> bool:
         now = datetime.now(timezone.utc)
         stmt = (
             update(SignTask)
@@ -146,7 +147,7 @@ class SignTaskRepository:
         result = await self.session.execute(stmt)
         return result.rowcount > 0
 
-    async def dispute(self, task_id: int, employee_id: int, reason: str) -> bool:
+    async def dispute(self, task_id: uuid.UUID, employee_id: uuid.UUID, reason: str) -> bool:
         now = datetime.now(timezone.utc)
         stmt = (
             update(SignTask)
@@ -167,7 +168,7 @@ class SignTaskRepository:
         result = await self.session.execute(stmt)
         return result.rowcount > 0
 
-    async def revoke(self, task_id: int, reason: str | None = None, revoked_by: int | None = None) -> bool:
+    async def revoke(self, task_id: uuid.UUID, reason: str | None = None, revoked_by: uuid.UUID | None = None) -> bool:
         """撤回已签收任务，原签名存入 extra.revoked_signatures"""
         from sqlalchemy import text
 
@@ -219,7 +220,7 @@ class SignTaskRepository:
         result = await self.session.execute(stmt_update)
         return result.rowcount > 0
 
-    async def get_by_ref(self, ref_type: str, ref_id: int, employee_id: int) -> SignTask | None:
+    async def get_by_ref(self, ref_type: str, ref_id: uuid.UUID, employee_id: uuid.UUID) -> SignTask | None:
         stmt = select(SignTask).where(
             and_(
                 SignTask.store_id == self.store_id,

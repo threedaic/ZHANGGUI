@@ -4,6 +4,7 @@
 封装 SQL 查询，返回 ORM 对象。
 所有查询强制带上 store_id（RLS 应用层兜底）。
 """
+import uuid
 from typing import Optional
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ from app.models.employee import Employee
 class ContractRepository:
     """合同相关数据访问。每个请求实例化一次，绑定 store_id。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -71,7 +72,7 @@ class ContractRepository:
         return result.scalar_one_or_none()
 
     async def get_active_by_employee(
-        self, employee_id: int
+        self, employee_id: uuid.UUID
     ) -> Contract | None:
         """获取某员工当前有效合同（signed 或 pending_sign）。"""
         result = await self.session.execute(
@@ -92,7 +93,7 @@ class ContractRepository:
         page: int = 1,
         page_size: int = 20,
         status: Optional[str] = None,
-        employee_id: Optional[int] = None,
+        employee_id: Optional[uuid.UUID] = None,
         position: Optional[str] = None,
     ) -> tuple[list[Contract], int]:
         """分页查询合同列表，支持按 status/employee/position 筛选。"""
@@ -154,7 +155,7 @@ class ContractRepository:
         )
         return list(result.scalars().all())
 
-    async def get_employee(self, employee_id: int) -> Employee | None:
+    async def get_employee(self, employee_id: uuid.UUID) -> Employee | None:
         result = await self.session.execute(
             select(Employee).where(
                 Employee.id == employee_id,
@@ -163,7 +164,7 @@ class ContractRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_employees_by_ids(self, employee_ids: set[int]) -> dict[int, Employee]:
+    async def get_employees_by_ids(self, employee_ids: set[uuid.UUID]) -> dict[uuid.UUID, Employee]:
         """Batch fetch employees by IDs (M-005 fix: eliminates N+1 query)."""
         if not employee_ids:
             return {}
@@ -175,7 +176,7 @@ class ContractRepository:
         )
         return {e.id: e for e in result.scalars().all()}
 
-    async def get_next_contract_seq(self, store_id: int) -> int:
+    async def get_next_contract_seq(self, store_id: uuid.UUID) -> int:
         """Get next contract sequence number for a store (DB-based, survives restarts).
 
         Scans existing contract_no values to find the max sequence.

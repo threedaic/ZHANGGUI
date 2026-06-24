@@ -52,12 +52,14 @@ async def get_repo(request: Request, db: AsyncSession = Depends(get_db)):
     return ContractRepository(db, store_id)
 
 
-async def get_user_id(request: Request) -> int:
+async def get_user_id(request: Request) -> uuid.UUID:
     """获取当前用户 ID，必须已登录。
     实际使用中该依赖只在认证路由中被调用，user_id 始终存在。"""
     user_id = getattr(request.state, "user_id", None)
     if user_id is None:
         raise ForbiddenError("无法获取用户信息")
+    if isinstance(user_id, str):
+        return uuid.UUID(user_id)
     return user_id
 
 
@@ -201,7 +203,7 @@ async def create_contract(
     body: ContractCreate,
     request: Request,
     repo: ContractRepository = Depends(get_repo),
-    user_id: int = Depends(get_user_id),
+    user_id: uuid.UUID = Depends(get_user_id),
     _perm=Depends(require_contract_initiator),
 ):
     """创建合同。

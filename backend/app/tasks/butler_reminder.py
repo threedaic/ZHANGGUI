@@ -6,6 +6,7 @@
 - 闭店检查单：每天 23:00 检查，若今日无闭店会话则提醒
 - 超时未执行：标记提醒，连续未执行可计入考核
 """
+import uuid
 from datetime import datetime, date, timedelta
 from loguru import logger
 from sqlalchemy import select, and_, func
@@ -21,7 +22,7 @@ async def _get_active_stores(db) -> list[Store]:
     return list(result.scalars().all())
 
 
-async def _has_session_today(db, store_id: int, session_type: str) -> bool:
+async def _has_session_today(db, store_id: uuid.UUID, session_type: str) -> bool:
     """检查今日是否已有指定类型的检查会话"""
     today_start = datetime.combine(date.today(), datetime.min.time())
     today_end = datetime.combine(date.today(), datetime.max.time())
@@ -37,7 +38,7 @@ async def _has_session_today(db, store_id: int, session_type: str) -> bool:
     return (result.scalar() or 0) > 0
 
 
-async def _has_template(db, store_id: int, session_type: str) -> bool:
+async def _has_template(db, store_id: uuid.UUID, session_type: str) -> bool:
     """检查门店是否配置了指定类型的检查单模板"""
     stmt = select(func.count(ClosingChecklistTemplate.id)).where(
         and_(

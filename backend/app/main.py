@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, text
+from sqlalchemy import text
 from loguru import logger
 from app.config import get_settings
 from app.database import engine, AsyncSessionLocal
@@ -41,6 +41,7 @@ from app.api.v1.butler import router as butler_router
 from app.api.v1.sign_tasks import router as sign_tasks_router
 from app.api.v1.penalties import router as penalties_router
 from app.api.v1.printers import router as printers_router
+from app.api.v1.disputes import router as disputes_router
 from app.middleware.rls import RLSMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -340,6 +341,7 @@ app.include_router(butler_router, prefix="/api/v1/butler", tags=["开闭店管�
 app.include_router(sign_tasks_router, prefix="/api/v1/sign-tasks", tags=["签收任务"])
 app.include_router(penalties_router, prefix="/api/v1/penalties", tags=["处罚通知"])
 app.include_router(printers_router, prefix="/api/v1/printers", tags=["打印机管理"])
+app.include_router(disputes_router, prefix="/api/v1/disputes", tags=["工资申诉"])
 
 # 静态文件服务（上传的图片等）
 import os as _os

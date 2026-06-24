@@ -6,6 +6,7 @@
 """
 
 import json
+import uuid
 from datetime import datetime, date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -24,7 +25,7 @@ TOKEN_KEY = "wework:access_token:{corp_id}"
 TOKEN_TTL = 7000  # 7200 - 200 安全余量
 
 
-async def _get_store_config(db: AsyncSession, store_id: int | None = None) -> dict | None:
+async def _get_store_config(db: AsyncSession, store_id: uuid.UUID | None = None) -> dict | None:
     """读取企微配置：优先环境变量（全局），其次门店表（兼容旧数据）。"""
     settings = get_settings()
 
@@ -51,7 +52,7 @@ async def _get_store_config(db: AsyncSession, store_id: int | None = None) -> di
     }
 
 
-async def get_access_token(db: AsyncSession, store_id: int | None = None) -> str:
+async def get_access_token(db: AsyncSession, store_id: uuid.UUID | None = None) -> str:
     """获取/刷新企微 access_token，自动 Redis 缓存。"""
     cfg = await _get_store_config(db, store_id)
     if not cfg:
@@ -171,7 +172,7 @@ async def _fetch_department_users(token: str, dept_id: int, fetch_child: bool = 
     return data.get("userlist", [])
 
 
-async def sync_contacts(db: AsyncSession, store_id: int) -> dict:
+async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
     """同步企微通讯录到本地 employees 表，自动映射角色。
 
     角色映射规则（优先级从高到低）：
@@ -378,7 +379,7 @@ def _calc_late_minutes(clock_in: str, scheduled_start: str = "18:00") -> int:
 
 
 async def fetch_checkin_data(
-    db: AsyncSession, store_id: int, target_date: str
+    db: AsyncSession, store_id: uuid.UUID, target_date: str
 ) -> dict:
     """拉取当日打卡数据，写入 attendance_records。
 
@@ -602,7 +603,7 @@ async def fetch_checkin_data(
 
 # ==================== OAuth 登录辅助 ====================
 
-async def get_userid_by_code(db: AsyncSession, store_id: int | None, code: str) -> str | None:
+async def get_userid_by_code(db: AsyncSession, store_id: uuid.UUID | None, code: str) -> str | None:
     """用 OAuth code 换取企微成员 userid。
 
     调用企微 user/getuserinfo 接口，返回企业成员的 UserId；

@@ -1,6 +1,7 @@
 """
 评分码数据访问层
 """
+import uuid
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.rating import GuestRating
@@ -17,7 +18,7 @@ class RatingRepository:
         await self.session.refresh(rating)
         return rating
 
-    async def get_by_id(self, rating_id: int, store_id: int) -> GuestRating | None:
+    async def get_by_id(self, rating_id: uuid.UUID, store_id: uuid.UUID) -> GuestRating | None:
         result = await self.session.execute(
             select(GuestRating).where(
                 and_(GuestRating.id == rating_id, GuestRating.store_id == store_id)
@@ -25,7 +26,7 @@ class RatingRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_by_store(self, store_id: int, params: PageParams):
+    async def list_by_store(self, store_id: uuid.UUID, params: PageParams):
         base = select(GuestRating).where(GuestRating.store_id == store_id)
 
         count_result = await self.session.execute(
@@ -42,7 +43,7 @@ class RatingRepository:
 
         return paginate(items, total, params)
 
-    async def get_alerts(self, store_id: int, limit: int = 50):
+    async def get_alerts(self, store_id: uuid.UUID, limit: int = 50):
         result = await self.session.execute(
             select(GuestRating)
             .where(
@@ -53,7 +54,7 @@ class RatingRepository:
         )
         return result.scalars().all()
 
-    async def get_summary(self, store_id: int) -> dict | None:
+    async def get_summary(self, store_id: uuid.UUID) -> dict | None:
         result = await self.session.execute(
             select(
                 func.count(GuestRating.id).label("total"),
@@ -90,7 +91,7 @@ class RatingRepository:
         }
 
     async def update_response(
-        self, rating_id: int, store_id: int, response_text: str, user_id: int
+        self, rating_id: uuid.UUID, store_id: uuid.UUID, response_text: str, user_id: uuid.UUID
     ) -> GuestRating | None:
         from datetime import datetime
 

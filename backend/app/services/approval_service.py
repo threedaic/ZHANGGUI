@@ -3,6 +3,7 @@
 - 请假、补卡、调班、加班、报销
 - 审批通过后联动排班/考勤/工资
 """
+import uuid
 from datetime import date, datetime
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ TYPE_LABELS = {"leave": "请假", "makeup": "补卡", "swap": "调班", "expense
 class ApprovalService:
     """审批 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
         self.repo = ApprovalRepository(session, store_id)
@@ -28,13 +29,13 @@ class ApprovalService:
 
     async def create_approval(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         approval_type: str,
         start_date: date | None,
         end_date: date | None,
         reason: str,
         extra: dict[str, Any] | None = None,
-        approver_id: int | None = None,
+        approver_id: uuid.UUID | None = None,
     ) -> ApprovalRequest:
         if approval_type not in ("leave", "makeup", "swap", "expense"):
             raise ValidationError(f"不支持的审批类型: {approval_type}")
@@ -130,7 +131,7 @@ class ApprovalService:
 
         return result
 
-    async def approve(self, approval_id: int, approver_id: int) -> ApprovalRequest:
+    async def approve(self, approval_id: uuid.UUID, approver_id: uuid.UUID) -> ApprovalRequest:
         approval = await self.repo.get_approval_by_id(approval_id)
         if not approval:
             raise NotFoundError("审批记录不存在")
@@ -162,7 +163,7 @@ class ApprovalService:
 
         return approval
 
-    async def _check_position_coverage(self, employee_id: int, start_date: date, end_date: date) -> None:
+    async def _check_position_coverage(self, employee_id: uuid.UUID, start_date: date, end_date: date) -> None:
         """岗位覆盖率校验：请假后同岗位在岗比例不得低于配置阈值"""
         from sqlalchemy import select as sa_select, func, and_
         from app.models.employee import Employee
@@ -236,7 +237,7 @@ class ApprovalService:
                 f"如确需请假，请改选病假或调整日期。"
             )
 
-    async def reject(self, approval_id: int, approver_id: int, reject_reason: str | None = None) -> ApprovalRequest:
+    async def reject(self, approval_id: uuid.UUID, approver_id: uuid.UUID, reject_reason: str | None = None) -> ApprovalRequest:
         approval = await self.repo.get_approval_by_id(approval_id)
         if not approval:
             raise NotFoundError("审批记录不存在")
@@ -269,7 +270,7 @@ class ApprovalService:
 
         return approval
 
-    async def _resolve_user_ids(self, employee_id: int) -> list[int]:
+    async def _resolve_user_ids(self, employee_id: uuid.UUID) -> list[int]:
         from sqlalchemy import select as sa_select, and_
         from app.models.user import User
         stmt = sa_select(User.id).where(

@@ -9,6 +9,7 @@
   - locked:  明细数据冻结，仅允许工资条状态流转
   - closed:  完全冻结，任何写入均被拒绝
 """
+import uuid
 from datetime import datetime
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,7 @@ from app.utils.exceptions import NotFoundError, ValidationError, ConflictError
 class PeriodService:
     """账期管理 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -79,7 +80,7 @@ class PeriodService:
         if period_obj and period_obj.status == "closed":
             raise ConflictError(f"账期 {period} 已关账，不可修改工资条")
 
-    async def lock_period(self, period: str, user_id: int) -> Period:
+    async def lock_period(self, period: str, user_id: uuid.UUID) -> Period:
         """锁定账期: open -> locked"""
         period_obj = await self.get_or_create_period(period)
         if period_obj.status != "open":
@@ -93,7 +94,7 @@ class PeriodService:
         logger.info(f"[Period] 门店 {self.store_id} 账期 {period} 已锁定")
         return period_obj
 
-    async def close_period(self, period: str, user_id: int) -> Period:
+    async def close_period(self, period: str, user_id: uuid.UUID) -> Period:
         """关账: locked -> closed"""
         period_obj = await self.get_period(period)
         if not period_obj:
@@ -109,7 +110,7 @@ class PeriodService:
         logger.info(f"[Period] 门店 {self.store_id} 账期 {period} 已关账")
         return period_obj
 
-    async def reopen_period(self, period: str, user_id: int) -> Period:
+    async def reopen_period(self, period: str, user_id: uuid.UUID) -> Period:
         """重新开放账期: locked/closed -> open（需老板权限）"""
         period_obj = await self.get_period(period)
         if not period_obj:

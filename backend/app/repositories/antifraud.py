@@ -2,6 +2,7 @@
 防飞单数据访问层
 封装 table_sessions / bookings / daily_revenue 查询。
 """
+import uuid
 from datetime import date, timedelta
 from sqlalchemy import select, func, and_, or_, extract, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from app.utils.pagination import PageParams, paginate
 class AntiFraudRepository:
     """防飞单 Repository。每个请求新实例。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -59,7 +60,7 @@ class AntiFraudRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_session_by_id(self, session_id: int) -> TableSession | None:
+    async def get_session_by_id(self, session_id: uuid.UUID) -> TableSession | None:
         stmt = select(TableSession).where(
             and_(
                 TableSession.id == session_id,
@@ -74,7 +75,7 @@ class AntiFraudRepository:
         date_from: str | None = None,
         date_to: str | None = None,
         risk_level: str | None = None,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         page: PageParams | None = None,
     ) -> tuple[list[TableSession], int]:
         """查询异常会话列表（分页）"""
@@ -153,8 +154,8 @@ class AntiFraudRepository:
     # ==================== 员工查询 ====================
 
     async def get_employee_names(
-        self, employee_ids: list[int]
-    ) -> dict[int, dict]:
+        self, employee_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict]:
         """批量获取员工信息（仅本店）"""
         if not employee_ids:
             return {}
@@ -168,7 +169,7 @@ class AntiFraudRepository:
         }
 
     async def get_employee_anomaly_history(
-        self, employee_id: int, days: int = 30
+        self, employee_id: uuid.UUID, days: int = 30
     ) -> int:
         """获取员工近 N 天的异常会话数"""
         since = date.today() - timedelta(days=days)
@@ -188,8 +189,8 @@ class AntiFraudRepository:
         return result.scalar() or 0
 
     async def get_employee_anomaly_history_batch(
-        self, employee_ids: list[int], days: int = 30
-    ) -> dict[int, int]:
+        self, employee_ids: list[uuid.UUID], days: int = 30
+    ) -> dict[uuid.UUID, int]:
         """批量获取员工近 N 天的异常会话数，返回 {employee_id: count}"""
         if not employee_ids:
             return {}
@@ -218,31 +219,29 @@ class AntiFraudRepository:
     async def get_store_avg_per_guest(
         self, scan_date: str, days: int = 7
     ) -> float:
-        """获取门店近 N 天人均消费均值"""
+        """获取门店近 N 天人均消费均值（使用 avg_spend 字段）"""
         end_date = scan_date
         start_date = (date.fromisoformat(scan_date) - timedelta(days=days)).isoformat()
 
         stmt = (
-            select(
-                func.avg(DailyRevenue.avg_order_value),
-                func.avg(DailyRevenue.total_revenue / func.nullif(DailyRevenue.total_guests, 0)),
-            )
+            select(func.avg(DailyRevenue.avg_spend))
             .where(
                 and_(
                     DailyRevenue.store_id == self.store_id,
                     DailyRevenue.date >= start_date,
                     DailyRevenue.date <= end_date,
+                    DailyRevenue.avg_spend.isnot(None),
                 )
             )
         )
         result = await self.session.execute(stmt)
         row = result.one()
-        return float(row[0] or row[1] or 0)
+        return float(row[0] or 0)
 
     # ==================== 更新会话标记 ====================
 
     async def update_session_anomaly(
-        self, session_id: int, is_anomaly: bool, anomaly_reason: str | None = None
+        self, session_id: uuid.UUID, is_anomaly: bool, anomaly_reason: str | None = None
     ) -> TableSession | None:
         session = await self.get_session_by_id(session_id)
         if not session:

@@ -11,6 +11,7 @@
   - booking        订桌业绩（来自 table_sessions.commission_base）
   - wework_payment 企微收款业绩（来自 wework_payment_sync.amount）
 """
+import uuid
 from datetime import datetime
 from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,12 +25,12 @@ from app.models.wework_payment import WeworkPaymentSync
 class PerformanceService:
     """员工业绩汇总 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
     async def sync_monthly_performance(
-        self, period: str, employee_ids: list[int] | None = None
+        self, period: str, employee_ids: list[uuid.UUID] | None = None
     ) -> list[EmployeeMonthlyPerformance]:
         """
         汇总指定月份的员工业绩到 employee_monthly_performance 表。
@@ -185,7 +186,7 @@ class PerformanceService:
         ]
 
     async def get_employee_performance(
-        self, employee_id: int, period: str
+        self, employee_id: uuid.UUID, period: str
     ) -> dict:
         """获取员工月度业绩汇总（按业绩类型聚合）
 

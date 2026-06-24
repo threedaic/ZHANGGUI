@@ -1,14 +1,15 @@
+import uuid
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.leave_balance import LeaveBalance
 
 
 class LeaveBalanceRepository:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
-    async def get_balance(self, employee_id: int, year: int) -> list[LeaveBalance]:
+    async def get_balance(self, employee_id: uuid.UUID, year: int) -> list[LeaveBalance]:
         stmt = select(LeaveBalance).where(
             and_(
                 LeaveBalance.store_id == self.store_id,
@@ -19,7 +20,7 @@ class LeaveBalanceRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def deduct_leave(self, employee_id: int, year: int, leave_type: str, days: float) -> LeaveBalance | None:
+    async def deduct_leave(self, employee_id: uuid.UUID, year: int, leave_type: str, days: float) -> LeaveBalance | None:
         stmt = select(LeaveBalance).where(
             and_(
                 LeaveBalance.store_id == self.store_id,

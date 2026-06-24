@@ -1,6 +1,7 @@
 """
 考勤相关推送组装
 """
+import uuid
 from datetime import date, timedelta
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from app.services.notification_service import NotificationService
 from app.repositories.attendance import AttendanceRepository
 
 
-async def push_daily_report(session: AsyncSession, store_id: int, target_date: date | None = None) -> None:
+async def push_daily_report(session: AsyncSession, store_id: uuid.UUID, target_date: date | None = None) -> None:
     """每日考勤日报"""
     if target_date is None:
         target_date = date.today()
@@ -53,7 +54,7 @@ async def push_daily_report(session: AsyncSession, store_id: int, target_date: d
 
 async def push_attendance_alert(
     session: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     employee_name: str,
     alert_type: str,
     detail: str,
@@ -67,7 +68,7 @@ async def push_attendance_alert(
 
 async def push_shift_status(
     session: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     target_date: str,
     shift_code: str,
 ) -> None:
@@ -134,8 +135,8 @@ async def push_shift_status(
 
 async def push_shift_change(
     session: AsyncSession,
-    store_id: int,
-    employee_id: int,
+    store_id: uuid.UUID,
+    employee_id: uuid.UUID,
     employee_name: str,
     old_shift: str | None,
     new_shift: str | None,
@@ -155,7 +156,7 @@ async def push_shift_change(
 
 async def push_approval_notification(
     session: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     notification_type: str,
     title: str,
     content: str,

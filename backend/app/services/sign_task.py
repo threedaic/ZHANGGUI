@@ -1,6 +1,7 @@
 """
 签收任务 Service — 业务逻辑层
 """
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,19 +16,19 @@ from app.utils.pagination import PageParams
 
 
 class SignTaskService:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
         self.repo = SignTaskRepository(session, store_id)
 
     async def create_task(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         task_type: str,
         title: str,
         ref_type: str,
-        ref_id: int,
-        issued_by: int,
+        ref_id: uuid.UUID,
+        issued_by: uuid.UUID,
         extra: dict[str, Any] | None = None,
     ) -> SignTask:
         task = SignTask(
@@ -48,12 +49,12 @@ class SignTaskService:
 
     async def create_batch(
         self,
-        employee_ids: list[int],
+        employee_ids: list[uuid.UUID],
         task_type: str,
         title_template: str,
         ref_type: str,
-        ref_ids: list[int],
-        issued_by: int,
+        ref_ids: list[uuid.UUID],
+        issued_by: uuid.UUID,
         extra: dict[str, Any] | None = None,
     ) -> list[SignTask]:
         """批量创建签收任务，一个员工一条"""
@@ -75,7 +76,7 @@ class SignTaskService:
 
     async def get_inbox(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         status: str | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -85,17 +86,17 @@ class SignTaskService:
         items = await self._enrich_tasks(tasks)
         return items, total
 
-    async def get_pending_count(self, employee_id: int) -> int:
+    async def get_pending_count(self, employee_id: uuid.UUID) -> int:
         return await self.repo.get_pending_count(employee_id)
 
-    async def get_detail(self, task_id: int, employee_id: int) -> dict | None:
+    async def get_detail(self, task_id: uuid.UUID, employee_id: uuid.UUID) -> dict | None:
         task = await self.repo.get_by_id(task_id)
         if not task or task.employee_id != employee_id:
             return None
         items, _ = await self._enrich_tasks([task])
         return items[0] if items else None
 
-    async def sign(self, task_id: int, employee_id: int, signature_data: str, notes: str | None = None) -> bool:
+    async def sign(self, task_id: uuid.UUID, employee_id: uuid.UUID, signature_data: str, notes: str | None = None) -> bool:
         ok = await self.repo.sign(task_id, employee_id, signature_data, notes)
         if ok:
             # 更新关联业务表状态
@@ -104,8 +105,8 @@ class SignTaskService:
 
     async def batch_sign(
         self,
-        task_ids: list[int],
-        employee_id: int,
+        task_ids: list[uuid.UUID],
+        employee_id: uuid.UUID,
         signature_data: str,
         notes: str | None = None,
     ) -> dict:
@@ -126,18 +127,18 @@ class SignTaskService:
             "failed": failed,
         }
 
-    async def dispute(self, task_id: int, employee_id: int, reason: str) -> bool:
+    async def dispute(self, task_id: uuid.UUID, employee_id: uuid.UUID, reason: str) -> bool:
         ok = await self.repo.dispute(task_id, employee_id, reason)
         if ok:
             await self._notify_dispute(task_id)
         return ok
 
-    async def revoke(self, task_id: int, reason: str | None = None, revoked_by: int | None = None) -> bool:
+    async def revoke(self, task_id: uuid.UUID, reason: str | None = None, revoked_by: uuid.UUID | None = None) -> bool:
         return await self.repo.revoke(task_id, reason=reason, revoked_by=revoked_by)
 
     async def get_issued(
         self,
-        issued_by: int,
+        issued_by: uuid.UUID,
         status: str | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -199,7 +200,7 @@ class SignTaskService:
             items.append(item)
         return items
 
-    async def _sync_ref_status(self, task_id: int, new_status: str):
+    async def _sync_ref_status(self, task_id: uuid.UUID, new_status: str):
         """签收后同步关联业务表状态"""
         task = await self.repo.get_by_id(task_id)
         if not task:
@@ -226,7 +227,7 @@ class SignTaskService:
         except Exception as e:
             logger.warning(f"同步关联业务状态失败: {e}")
 
-    async def _notify_dispute(self, task_id: int):
+    async def _notify_dispute(self, task_id: uuid.UUID):
         """异议通知推送给 boss + store_manager + accountant"""
         task = await self.repo.get_by_id(task_id)
         if not task:

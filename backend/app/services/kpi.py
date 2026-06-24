@@ -4,6 +4,7 @@ KPI 考核业务逻辑层
 - 系数换算
 - 申诉流程
 """
+import uuid
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -22,7 +23,7 @@ from app.utils.exceptions import (
 class KPIService:
     """KPI 考核 Service。每个请求创建新实例。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.repo = KPIRepository(session, store_id)
         self.session = session
         self.store_id = store_id
@@ -35,7 +36,7 @@ class KPIService:
     # ==================== 评分计算 ====================
 
     async def calculate_scores(
-        self, employee_ids: list[int], period: str
+        self, employee_ids: list[uuid.UUID], period: str
     ) -> list[KPIResult]:
         """
         5 维度加权计算。
@@ -121,7 +122,7 @@ class KPIService:
         return results
 
     async def _fetch_raw_value(
-        self, employee_id: int, template: KPITemplate, period: str
+        self, employee_id: uuid.UUID, template: KPITemplate, period: str
     ) -> float | None:
         """
         自动从数据源拉取原始值。
@@ -232,7 +233,7 @@ class KPIService:
     # ==================== 查询 ====================
 
     async def get_employee_results(
-        self, employee_id: int, period: str | None = None
+        self, employee_id: uuid.UUID, period: str | None = None
     ) -> list[KPIResult]:
         results, _ = await self.repo.get_results(
             employee_id=employee_id, period=period
@@ -310,7 +311,7 @@ class KPIService:
     # ==================== 确认 ====================
 
     async def confirm_result(
-        self, result_id: int, user_id: int, coefficient: float | None = None, reason: str | None = None
+        self, result_id: uuid.UUID, user_id: uuid.UUID, coefficient: float | None = None, reason: str | None = None
     ) -> KPIResult:
         result = await self.repo.get_result_by_id(result_id)
         if not result:
@@ -334,7 +335,7 @@ class KPIService:
     # ==================== 申诉 ====================
 
     async def create_appeal(
-        self, employee_id: int, result_id: int, dimension: str | None,
+        self, employee_id: uuid.UUID, result_id: uuid.UUID, dimension: str | None,
         reason: str, evidence: str | None = None
     ) -> KPIAppeal:
         """员工发起申诉"""
@@ -364,7 +365,7 @@ class KPIService:
         return await self.repo.create_appeal(appeal)
 
     async def review_appeal(
-        self, appeal_id: int, reviewer_id: int, action: str, resolution: str | None = None
+        self, appeal_id: uuid.UUID, reviewer_id: uuid.UUID, action: str, resolution: str | None = None
     ) -> KPIAppeal:
         """店长审批申诉"""
         appeal = await self.repo.get_appeal_by_id(appeal_id)
@@ -421,7 +422,7 @@ class KPIService:
         }
 
     async def get_employee_appeals(
-        self, employee_id: int, status: str | None = None,
+        self, employee_id: uuid.UUID, status: str | None = None,
         page: int = 1, page_size: int = 20
     ) -> dict:
         """Get appeals for a specific employee only (M-008 fix)."""

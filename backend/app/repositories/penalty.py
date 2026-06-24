@@ -1,6 +1,7 @@
 """
 处罚通知 Repository — 数据访问层
 """
+import uuid
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.penalty_notice import PenaltyNotice
@@ -8,7 +9,7 @@ from app.utils.pagination import PageParams
 
 
 class PenaltyRepository:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -32,7 +33,7 @@ class PenaltyRepository:
         self,
         penalty_type: str | None = None,
         status: str | None = None,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         page: PageParams | None = None,
     ) -> tuple[list[PenaltyNotice], int]:
         conditions = [PenaltyNotice.store_id == self.store_id]

@@ -125,7 +125,7 @@ Crush 酒吧知识库:
 
 async def get_ai_config(
     db: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
 ) -> dict[str, Any]:
     """获取门店的 AI 配置，解密 API Key。"""
     stmt = select(StoreSettings).where(StoreSettings.store_id == store_id)
@@ -157,7 +157,7 @@ async def get_ai_config(
 
 async def update_ai_config(
     db: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     ai_api_url: str | None = None,
     ai_api_key: str | None = None,
     ai_model: str | None = None,
@@ -195,7 +195,7 @@ def _mask_key(key: str) -> str:
     return key[:4] + "****" + key[-4:]
 
 
-async def get_ai_config_masked(db: AsyncSession, store_id: int) -> dict[str, Any]:
+async def get_ai_config_masked(db: AsyncSession, store_id: uuid.UUID) -> dict[str, Any]:
     """获取 AI 配置（Key 脱敏），供管理端展示。"""
     config = await get_ai_config(db, store_id)
     key = config.get("ai_api_key")
@@ -246,7 +246,7 @@ async def _call_llm(
 
 async def _execute_sql(
     db: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     sql: str,
 ) -> list[dict[str, Any]]:
     """安全执行只读 SQL，返回 dict 列表。
@@ -299,7 +299,7 @@ async def _execute_sql(
 
 async def process_chat(
     db: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     user_message: str,
     conversation_id: str | None = None,
 ) -> dict[str, Any]:
@@ -469,7 +469,7 @@ async def _format_result(
 
 async def ai_analyze(
     db: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     prompt: str,
     context: str = "",
 ) -> str:

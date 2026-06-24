@@ -142,6 +142,12 @@ export function updateRule(rule_code: string, rule_value: number) {
   })
 }
 
+export function toggleRule(rule_code: string, is_active: boolean) {
+  return client.put<ApiResponse<null>>(`/payroll-config/rules/${rule_code}/toggle`, {
+    is_active,
+  })
+}
+
 export function initConfig() {
   return client.post<ApiResponse<null>>('/payroll-config/init')
 }

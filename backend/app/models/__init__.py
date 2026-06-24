@@ -107,6 +107,7 @@ __all__ = [
     "SalaryMatrix",
     "Contract",
     "ApprovalRequest",
+    "LeaveBalance",
     "Notification",
     "NotificationSetting",
     "SignTask",
@@ -146,4 +147,5 @@ __all__ = [
     "Printer",
     "PrintRoute",
     "PrintQueue",
+    "ModulePrintConfig",
 ]

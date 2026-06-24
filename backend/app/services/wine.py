@@ -39,7 +39,7 @@ async def generate_unique_label(repo: WineRepository) -> str:
 
 async def store_wine(
     session: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     customer_name: str,
     phone: str,
     wine_name: str,
@@ -89,7 +89,7 @@ async def store_wine(
 
 
 async def _safe_print_label(bottle_label: str, customer_name: str, wine_name: str,
-                            remaining_ml: int, date_stored: str, cabinet_no: str, store_id: int):
+                            remaining_ml: int, date_stored: str, cabinet_no: str, store_id: uuid.UUID):
     try:
         from app.database import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
@@ -124,11 +124,11 @@ async def _safe_send_sms(phone: str, customer_name: str, wine_name: str,
 
 async def staff_retrieve(
     session: AsyncSession,
-    store_id: int,
+    store_id: uuid.UUID,
     bottle_label: str,
     retrieve_ml: int,
     table_no: str | None = None,
-    user_id: int | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> WineStorage:
     """服务员取酒：查瓶身码 → 扣减 → 短信通知"""
     repo = WineRepository(session, store_id)
@@ -156,7 +156,7 @@ async def staff_retrieve(
 
 
 async def _safe_print_receipt(bottle_label: str, customer_name: str, wine_name: str,
-                              retrieve_ml: int, table_no: str, store_id: int):
+                              retrieve_ml: int, table_no: str, store_id: uuid.UUID):
     try:
         from app.database import AsyncSessionLocal
         async with AsyncSessionLocal() as session:

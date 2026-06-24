@@ -75,6 +75,19 @@ class PayrollItemConfig(TimestampMixin, Base):
         Integer, default=0, comment="计算顺序（从小到大）"
     )
 
+    # ---- 兼容旧代码的属性（DB 无对应列，返回默认值）----
+    @property
+    def is_system(self) -> bool:
+        return False
+
+    @property
+    def note(self) -> str | None:
+        return None
+
+    @property
+    def default_value(self) -> float:
+        return 0.0
+
 
 class SalaryRule(TimestampMixin, Base):
     """薪资规则表（wage_salary_rules，替代硬编码常量）
@@ -112,3 +125,34 @@ class SalaryRule(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, comment="是否启用"
     )
+
+    # ---- 兼容旧代码的属性（读写 rule_config 中的 value/unit/note）----
+    @property
+    def rule_value(self):
+        return self.rule_config.get("value", 0)
+
+    @rule_value.setter
+    def rule_value(self, val):
+        cfg = dict(self.rule_config or {})
+        cfg["value"] = val
+        self.rule_config = cfg
+
+    @property
+    def rule_unit(self):
+        return self.rule_config.get("unit", "")
+
+    @rule_unit.setter
+    def rule_unit(self, val):
+        cfg = dict(self.rule_config or {})
+        cfg["unit"] = val
+        self.rule_config = cfg
+
+    @property
+    def note(self):
+        return self.rule_config.get("note", "")
+
+    @note.setter
+    def note(self, val):
+        cfg = dict(self.rule_config or {})
+        cfg["note"] = val
+        self.rule_config = cfg

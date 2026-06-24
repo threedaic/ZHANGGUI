@@ -29,7 +29,7 @@ async def send_to_group(webhook_url: str, content: str) -> bool:
         return False
 
 
-async def notify_alert(store_id: int, title: str, detail: str):
+async def notify_alert(store_id: uuid.UUID, title: str, detail: str):
     """
     统一异常告警入口。
     从 StoreSettings 读 wecom_bot_enabled + wecom_webhook_url，老板关闭开关则不推送。

@@ -12,13 +12,15 @@ from app.utils.security import verify_password, create_access_token, create_refr
 from app.utils.exceptions import UnauthorizedError, ForbiddenError
 from app.utils.redis_client import get_redis
 from app.utils.deps import make_response
+from app.config import get_settings
 import secrets
 
 router = APIRouter()
 
-# 登录失败锁定配置
-MAX_LOGIN_ATTEMPTS = 5  # 最大失败次数
-LOCK_DURATION = 900  # 锁定时长（秒）= 15分钟
+# 登录失败锁定配置（从 config 读取）
+settings = get_settings()
+MAX_LOGIN_ATTEMPTS = settings.MAX_LOGIN_ATTEMPTS
+LOCK_DURATION = settings.LOGIN_LOCKOUT_MINUTES * 60  # 转换为秒
 
 
 def _to_str(val) -> str | None:

@@ -1,6 +1,7 @@
 """
 考勤与排班一体化数据访问层
 """
+import uuid
 from datetime import date
 from sqlalchemy import select, func, and_, update, text, case
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from app.utils.pagination import PageParams, paginate
 class AttendanceRepository:
     """考勤 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -20,7 +21,7 @@ class AttendanceRepository:
 
     async def get_records(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
         status: str | None = None,
@@ -51,7 +52,7 @@ class AttendanceRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_record_by_id(self, record_id: int) -> AttendanceRecord | None:
+    async def get_record_by_id(self, record_id: uuid.UUID) -> AttendanceRecord | None:
         stmt = select(AttendanceRecord).where(
             and_(AttendanceRecord.id == record_id, AttendanceRecord.store_id == self.store_id)
         )
@@ -59,7 +60,7 @@ class AttendanceRepository:
         return result.scalar_one_or_none()
 
     async def get_record_by_employee_date(
-        self, employee_id: int, date_str: str | date
+        self, employee_id: uuid.UUID, date_str: str | date
     ) -> AttendanceRecord | None:
         # 确保 date 比较使用 Python date 对象，避免 PG date vs varchar 报错
         if isinstance(date_str, str):
@@ -78,7 +79,7 @@ class AttendanceRepository:
         self,
         date_from: date,
         date_to: date,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
     ) -> list[AttendanceRecord]:
         """按日期范围查询考勤记录，用于排班表"""
         stmt = (
@@ -165,7 +166,7 @@ class AttendanceRepository:
 
     async def upsert_schedule(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         record_date: date,
         scheduled_shift: str,
         shift_start_time: str | None,
@@ -196,7 +197,7 @@ class AttendanceRepository:
         await self.session.flush()
         return new_record
 
-    async def update_record(self, record_id: int, **kwargs) -> AttendanceRecord | None:
+    async def update_record(self, record_id: uuid.UUID, **kwargs) -> AttendanceRecord | None:
         record = await self.get_record_by_id(record_id)
         if not record:
             return None
@@ -209,7 +210,7 @@ class AttendanceRepository:
     # ==================== 月度汇总 ====================
 
     async def get_monthly_summary(
-        self, period: str, employee_id: int | None = None
+        self, period: str, employee_id: uuid.UUID | None = None
     ) -> list[dict]:
         """
         按月聚合考勤数据。
@@ -283,7 +284,7 @@ class AttendanceRepository:
             for row in rows
         ]
 
-    async def get_monthly_makeup_count(self, employee_id: int, period: str) -> int:
+    async def get_monthly_makeup_count(self, employee_id: uuid.UUID, period: str) -> int:
         """查询某员工当月补卡次数"""
         year, month = int(period[:4]), int(period[5:7])
         import calendar
@@ -340,7 +341,7 @@ class AttendanceRepository:
 
     # ==================== 员工信息 ====================
 
-    async def _get_employee_info(self, employee_ids: list[int]) -> dict[int, dict]:
+    async def _get_employee_info(self, employee_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
         """批量获取员工信息"""
         if not employee_ids:
             return {}
@@ -393,7 +394,7 @@ class AttendanceRepository:
         return count
 
     async def get_monthly_attendance_stats(
-        self, employee_id: int, year: int, month: int
+        self, employee_id: uuid.UUID, year: int, month: int
     ) -> dict:
         """获取员工月度考勤统计，供 KPI/工资模块调用。"""
         from datetime import datetime

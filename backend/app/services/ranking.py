@@ -14,6 +14,7 @@
   - 考勤排名: 全勤天数优先，迟到次数倒序（次数少排前）
 """
 import json
+import uuid
 from datetime import datetime
 from sqlalchemy import select, and_, delete, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,7 @@ RANK_TYPES = ("performance", "kpi", "attendance", "rating")
 class RankingService:
     """员工排名 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -328,7 +329,7 @@ class RankingService:
         }
 
     async def get_my_rankings(
-        self, employee_id: int, period: str
+        self, employee_id: uuid.UUID, period: str
     ) -> list[dict]:
         """员工查看自己的四维排名"""
         stmt = select(EmployeeRanking).where(
@@ -377,7 +378,7 @@ class RankingService:
         result = await self.session.execute(stmt)
         return {row.rank_type: int(row.cnt) for row in result.all()}
 
-    async def _get_employee_names(self, employee_ids: list[int]) -> dict[int, str]:
+    async def _get_employee_names(self, employee_ids: list[uuid.UUID]) -> dict[int, str]:
         """批量获取员工姓名"""
         if not employee_ids:
             return {}

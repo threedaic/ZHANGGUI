@@ -9,6 +9,7 @@
 
 所有违规统一抛 ConflictError（code=40900）。
 """
+import uuid
 from datetime import date, timedelta
 from collections import defaultdict
 from app.repositories.schedule import ScheduleRepository
@@ -26,7 +27,7 @@ class ScheduleChecker:
         self.repo = repo
 
     async def check_create(
-        self, employee_id: int, schedule_date: date, shift_type: str
+        self, employee_id: uuid.UUID, schedule_date: date, shift_type: str
     ) -> None:
         """校验单条排班创建，不通过抛 ConflictError。"""
         # 1. 重复排班

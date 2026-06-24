@@ -2,6 +2,7 @@
 工资计算数据访问层
 封装 SQL 查询，返回 ORM 对象。
 """
+import uuid
 from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.payroll import PayrollRecord
@@ -12,7 +13,7 @@ from app.utils.pagination import PageParams
 class PayrollRepository:
     """工资计算 Repository。每个请求创建新实例。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -20,7 +21,7 @@ class PayrollRepository:
 
     async def get_records(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         period: str | None = None,
         status: str | None = None,
         page: PageParams | None = None,
@@ -44,14 +45,14 @@ class PayrollRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_record_by_id(self, record_id: int) -> PayrollRecord | None:
+    async def get_record_by_id(self, record_id: uuid.UUID) -> PayrollRecord | None:
         stmt = select(PayrollRecord).where(
             and_(PayrollRecord.id == record_id, PayrollRecord.store_id == self.store_id)
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_records_by_ids(self, record_ids: list[int]) -> list[PayrollRecord]:
+    async def get_records_by_ids(self, record_ids: list[uuid.UUID]) -> list[PayrollRecord]:
         stmt = select(PayrollRecord).where(
             and_(
                 PayrollRecord.id.in_(record_ids),
@@ -62,7 +63,7 @@ class PayrollRepository:
         return list(result.scalars().all())
 
     async def get_record_by_employee_period(
-        self, employee_id: int, period: str
+        self, employee_id: uuid.UUID, period: str
     ) -> PayrollRecord | None:
         stmt = select(PayrollRecord).where(
             and_(
@@ -99,7 +100,7 @@ class PayrollRepository:
             return record
 
     async def batch_update_status(
-        self, record_ids: list[int], status: str, **kwargs
+        self, record_ids: list[uuid.UUID], status: str, **kwargs
     ) -> int:
         """批量更新状态，返回影响行数"""
         stmt = (
@@ -128,7 +129,7 @@ class PayrollRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_employee_info(self, employee_ids: list[int]) -> dict[int, dict]:
+    async def get_employee_info(self, employee_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
         """批量获取员工信息 {employee_id: {name, role, base_salary}}"""
         stmt = select(Employee).where(
             and_(
@@ -147,7 +148,7 @@ class PayrollRepository:
         }
 
     async def get_monthly_attendance_summary(
-        self, employee_id: int, period: str
+        self, employee_id: uuid.UUID, period: str
     ) -> dict:
         """
         获取员工月度考勤扣款汇总。
@@ -176,7 +177,7 @@ class PayrollRepository:
         return dict(row) if row else {"late_count": 0, "total_late_minutes": 0, "absent_count": 0, "early_count": 0}
 
     async def get_monthly_kpi_coefficient(
-        self, employee_id: int, period: str
+        self, employee_id: uuid.UUID, period: str
     ) -> float:
         """
         获取员工月度 KPI 系数。

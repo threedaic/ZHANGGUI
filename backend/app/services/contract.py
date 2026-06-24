@@ -6,6 +6,7 @@
 - 腾讯电子签：占位，对接 API 时替换 TODO 标记
 - 模板自动填充 20+ 字段
 """
+import uuid
 from datetime import date, datetime
 from typing import Optional
 from loguru import logger
@@ -74,7 +75,7 @@ def compute_allowance(monthly_salary: float) -> float:
     return max(0.0, monthly_salary - BASE_SALARY - MEAL_ALLOWANCE)
 
 
-def generate_contract_no(store_id: int, employee_id: int, seq: int) -> str:
+def generate_contract_no(store_id: uuid.UUID, employee_id: uuid.UUID, seq: int) -> str:
     """生成合同编号: CT-{store_id}-{employee_id}-{seq:04d}"""
     return f"CT-{store_id}-{employee_id}-{seq:04d}"
 

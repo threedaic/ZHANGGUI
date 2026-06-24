@@ -4,6 +4,7 @@
 - 考勤状态判定（基于班次配置和打卡时间）
 - 企微打卡同步
 """
+import uuid
 from datetime import date, datetime, timedelta
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +57,7 @@ def parse_clock(clock: str | None) -> datetime | None:
 class AttendanceService:
     """考勤 Service。每个请求创建新实例。"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.repo = AttendanceRepository(session, store_id)
         self.session = session
         self.store_id = store_id
@@ -130,7 +131,7 @@ class AttendanceService:
 
     async def get_my_schedule(
         self,
-        employee_id: int,
+        employee_id: uuid.UUID,
         date_from: date,
         date_to: date,
     ) -> dict[str, Any]:
@@ -182,7 +183,7 @@ class AttendanceService:
     async def batch_save_schedules(
         self,
         schedules: list[dict[str, Any]],
-        user_id: int | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> dict[str, Any]:
         """批量保存排班"""
         # 获取所有班次配置
@@ -382,7 +383,7 @@ class AttendanceService:
 
     # ==================== 今日打卡状态 ====================
 
-    async def get_today_status(self, employee_id: int | None = None) -> list[dict[str, Any]]:
+    async def get_today_status(self, employee_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
         """获取今日打卡状态"""
         today = date.today().isoformat()
         records = await self.repo.get_today_records(today)

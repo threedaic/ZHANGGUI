@@ -1,6 +1,7 @@
 """
 桌面评分码业务逻辑
 """
+import uuid
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.rating import GuestRating
@@ -67,7 +68,7 @@ class RatingService:
 
         return RatingItem.model_validate(rating)
 
-    async def get_summary(self, store_id: int) -> RatingSummary:
+    async def get_summary(self, store_id: uuid.UUID) -> RatingSummary:
         data = await self.repo.get_summary(store_id)
         if not data:
             return RatingSummary(
@@ -83,12 +84,12 @@ class RatingService:
             )
         return RatingSummary(**data)
 
-    async def get_alerts(self, store_id: int) -> list[RatingAlert]:
+    async def get_alerts(self, store_id: uuid.UUID) -> list[RatingAlert]:
         alerts = await self.repo.get_alerts(store_id)
         return [RatingAlert.model_validate(a) for a in alerts]
 
     async def list_ratings(
-        self, store_id: int, page: int = 1, page_size: int = 20
+        self, store_id: uuid.UUID, page: int = 1, page_size: int = 20
     ) -> PageResult[RatingItem]:
         result = await self.repo.list_by_store(store_id, PageParams(page=page, page_size=page_size))
         return PageResult(
@@ -100,7 +101,7 @@ class RatingService:
         )
 
     async def respond_to_rating(
-        self, store_id: int, rating_id: int, response_text: str, user_id: int
+        self, store_id: uuid.UUID, rating_id: uuid.UUID, response_text: str, user_id: uuid.UUID
     ) -> RatingItem | None:
         rating = await self.repo.update_response(rating_id, store_id, response_text, user_id)
         if not rating:

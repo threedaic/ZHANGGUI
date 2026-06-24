@@ -13,7 +13,7 @@ from app.utils.pagination import PageParams, paginate
 class WineRepository:
     """存酒管理 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -22,7 +22,7 @@ class WineRepository:
         await self.session.flush()
         return wine
 
-    async def get_by_id(self, wine_id: int) -> WineStorage | None:
+    async def get_by_id(self, wine_id: uuid.UUID) -> WineStorage | None:
         stmt = select(WineStorage).where(
             and_(WineStorage.id == wine_id, WineStorage.store_id == self.store_id)
         )
@@ -121,7 +121,7 @@ class WineRepository:
 
     async def partial_retrieve(
         self, wine: WineStorage, retrieve_ml: int, table_no: str | None = None,
-        user_id: int | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> WineStorage:
         """
         分批取酒：remaining_ml -= retrieve_ml。

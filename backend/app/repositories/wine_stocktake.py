@@ -1,6 +1,7 @@
 """
 存酒盘点单数据访问层
 """
+import uuid
 from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.wine_stocktake import WineStocktake, WineStocktakeItem
@@ -10,7 +11,7 @@ from datetime import datetime
 
 
 class WineStocktakeRepository:
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -42,7 +43,7 @@ class WineStocktakeRepository:
         await self.session.flush()
         return len(items)
 
-    async def get_by_id(self, stocktake_id: int) -> WineStocktake | None:
+    async def get_by_id(self, stocktake_id: uuid.UUID) -> WineStocktake | None:
         stmt = select(WineStocktake).where(
             and_(WineStocktake.id == stocktake_id, WineStocktake.store_id == self.store_id)
         )
@@ -74,7 +75,7 @@ class WineStocktakeRepository:
         return list(result.scalars().all()), total
 
     async def list_items(
-        self, stocktake_id: int, check_status: str | None = None,
+        self, stocktake_id: uuid.UUID, check_status: str | None = None,
         params: PageParams | None = None,
     ) -> tuple[list[WineStocktakeItem], int]:
         stmt = select(WineStocktakeItem).where(WineStocktakeItem.stocktake_id == stocktake_id)
@@ -91,7 +92,7 @@ class WineStocktakeRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def find_item_by_label(self, stocktake_id: int, bottle_label: str) -> WineStocktakeItem | None:
+    async def find_item_by_label(self, stocktake_id: uuid.UUID, bottle_label: str) -> WineStocktakeItem | None:
         """在盘点单中按瓶身码查找明细"""
         stmt = select(WineStocktakeItem).where(
             and_(
@@ -103,7 +104,7 @@ class WineStocktakeRepository:
         return result.scalar_one_or_none()
 
     async def update_item_check(
-        self, item_id: int, check_status: str, actual_ml: int | None, user_id: int | None,
+        self, item_id: uuid.UUID, check_status: str, actual_ml: int | None, user_id: uuid.UUID | None,
     ) -> None:
         """更新明细核对状态"""
         now = datetime.now()
@@ -120,7 +121,7 @@ class WineStocktakeRepository:
         await self.session.execute(stmt)
         await self.session.flush()
 
-    async def update_stocktake_counts(self, stocktake_id: int) -> WineStocktake:
+    async def update_stocktake_counts(self, stocktake_id: uuid.UUID) -> WineStocktake:
         """重新统计盘点单的核对数量"""
         base = select(WineStocktakeItem).where(WineStocktakeItem.stocktake_id == stocktake_id)
 
@@ -156,7 +157,7 @@ class WineStocktakeRepository:
             await self.session.flush()
         return stocktake
 
-    async def mark_started(self, stocktake_id: int) -> None:
+    async def mark_started(self, stocktake_id: uuid.UUID) -> None:
         stmt = (
             update(WineStocktake)
             .where(WineStocktake.id == stocktake_id)
@@ -165,7 +166,7 @@ class WineStocktakeRepository:
         await self.session.execute(stmt)
         await self.session.flush()
 
-    async def mark_completed(self, stocktake_id: int, notes: str | None = None) -> None:
+    async def mark_completed(self, stocktake_id: uuid.UUID, notes: str | None = None) -> None:
         values = {
             "status": "completed",
             "completed_at": datetime.now(),

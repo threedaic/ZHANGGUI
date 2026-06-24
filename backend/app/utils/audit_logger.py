@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session, object_mapper
 from loguru import logger
 
 # 用户上下文（由 RLS 中间件设置）
-_audit_user_id: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+_audit_user_id: contextvars.ContextVar[uuid.UUID | None] = contextvars.ContextVar(
     "audit_user_id", default=None
 )
-_audit_store_id: contextvars.ContextVar[int | None] = contextvars.ContextVar(
+_audit_store_id: contextvars.ContextVar[uuid.UUID | None] = contextvars.ContextVar(
     "audit_store_id", default=None
 )
 _audit_request_id: contextvars.ContextVar[str] = contextvars.ContextVar(
@@ -41,8 +41,8 @@ SKIP_COLUMNS = {"password_hash", "token", "secret"}
 
 
 def set_audit_context(
-    user_id: int | None = None,
-    store_id: int | None = None,
+    user_id: uuid.UUID | None = None,
+    store_id: uuid.UUID | None = None,
     request_id: str = "",
     ip_address: str = "",
     user_agent: str = "",

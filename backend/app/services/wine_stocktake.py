@@ -1,6 +1,7 @@
 """
 存酒盘点单业务逻辑层
 """
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 from loguru import logger
@@ -12,7 +13,7 @@ from app.utils.exceptions import NotFoundError, ValidationError
 
 
 async def generate_monthly_stocktake(
-    session: AsyncSession, store_id: int, period: str | None = None,
+    session: AsyncSession, store_id: uuid.UUID, period: str | None = None,
     assigned_to: str | None = None,
 ) -> int:
     """生成月度盘点单：拉取当前在库酒 → 创建盘点单 + 明细。
@@ -64,8 +65,8 @@ async def generate_monthly_stocktake(
 
 
 async def scan_bottle(
-    session: AsyncSession, store_id: int, stocktake_id: int,
-    bottle_label: str, actual_ml: int | None, user_id: int | None,
+    session: AsyncSession, store_id: uuid.UUID, stocktake_id: uuid.UUID,
+    bottle_label: str, actual_ml: int | None, user_id: uuid.UUID | None,
 ) -> dict:
     """扫码核对单瓶酒。
 
@@ -163,7 +164,7 @@ async def scan_bottle(
 
 
 async def complete_stocktake(
-    session: AsyncSession, store_id: int, stocktake_id: int, notes: str | None,
+    session: AsyncSession, store_id: uuid.UUID, stocktake_id: uuid.UUID, notes: str | None,
 ) -> dict:
     """完成盘点：将未核对的明细标记为 missing"""
     repo = WineStocktakeRepository(session, store_id)

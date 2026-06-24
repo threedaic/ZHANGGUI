@@ -1,6 +1,7 @@
 """
 消息通知数据访问层
 """
+import uuid
 from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.notification import Notification, NotificationSetting
@@ -10,7 +11,7 @@ from app.utils.pagination import PageParams
 class NotificationRepository:
     """消息 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -22,7 +23,7 @@ class NotificationRepository:
 
     async def list_notifications(
         self,
-        user_id: int,
+        user_id: uuid.UUID,
         page: PageParams | None = None,
     ) -> tuple[list[Notification], int]:
         stmt = (
@@ -45,7 +46,7 @@ class NotificationRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_unread_count(self, user_id: int) -> int:
+    async def get_unread_count(self, user_id: uuid.UUID) -> int:
         stmt = (
             select(func.count())
             .select_from(Notification)
@@ -60,7 +61,7 @@ class NotificationRepository:
         result = await self.session.execute(stmt)
         return result.scalar() or 0
 
-    async def mark_read(self, notification_id: int, user_id: int) -> bool:
+    async def mark_read(self, notification_id: int, user_id: uuid.UUID) -> bool:
         stmt = (
             update(Notification)
             .where(
@@ -75,7 +76,7 @@ class NotificationRepository:
         result = await self.session.execute(stmt)
         return result.rowcount > 0
 
-    async def mark_all_read(self, user_id: int) -> int:
+    async def mark_all_read(self, user_id: uuid.UUID) -> int:
         stmt = (
             update(Notification)
             .where(

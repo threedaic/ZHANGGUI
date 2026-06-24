@@ -2,6 +2,7 @@
 KPI 考核数据访问层
 封装 SQL 查询，返回 ORM 对象。
 """
+import uuid
 from sqlalchemy import select, func, and_, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.kpi import KPITemplate, KPIScore, KPIResult, KPIAppeal
@@ -12,7 +13,7 @@ from app.utils.pagination import PageParams, paginate
 class KPIRepository:
     """KPI 考核 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -37,7 +38,7 @@ class KPIRepository:
 
     async def get_scores(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         period: str | None = None,
         dimension: str | None = None,
     ) -> list[KPIScore]:
@@ -83,7 +84,7 @@ class KPIRepository:
 
     async def get_results(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         period: str | None = None,
         status: str | None = None,
         page: PageParams | None = None,
@@ -107,7 +108,7 @@ class KPIRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_result_by_id(self, result_id: int) -> KPIResult | None:
+    async def get_result_by_id(self, result_id: uuid.UUID) -> KPIResult | None:
         stmt = select(KPIResult).where(
             and_(KPIResult.id == result_id, KPIResult.store_id == self.store_id)
         )
@@ -135,7 +136,7 @@ class KPIRepository:
         await self.session.flush()
         return result
 
-    async def update_result(self, result_id: int, **kwargs) -> KPIResult | None:
+    async def update_result(self, result_id: uuid.UUID, **kwargs) -> KPIResult | None:
         result = await self.get_result_by_id(result_id)
         if not result:
             return None
@@ -162,9 +163,9 @@ class KPIRepository:
 
     async def get_appeals(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         status: str | None = None,
-        result_id: int | None = None,
+        result_id: uuid.UUID | None = None,
         page: PageParams | None = None,
     ) -> tuple[list[KPIAppeal], int]:
         stmt = select(KPIAppeal).where(KPIAppeal.store_id == self.store_id)
@@ -206,8 +207,8 @@ class KPIRepository:
     # ==================== 辅助 ====================
 
     async def get_employee_info(
-        self, employee_ids: list[int]
-    ) -> dict[int, dict]:
+        self, employee_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict]:
         """批量获取员工信息，返回 {employee_id: {name, role}}"""
         stmt = select(Employee).where(
             and_(

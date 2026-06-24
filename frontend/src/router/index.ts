@@ -121,6 +121,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/management/PayrollDetail.vue'),
       },
       {
+        path: 'disputes',
+        name: 'DisputeInbox',
+        component: () => import('@/views/management/DisputeInbox.vue'),
+      },
+      {
         path: 'period',
         name: 'PeriodManage',
         component: () => import('@/views/management/PeriodManage.vue'),
@@ -377,6 +382,11 @@ const routes: RouteRecordRaw[] = [
         path: 'my-payroll/:id',
         name: 'MyPayrollDetail',
         component: () => import('@/views/profile/MyPayrollDetail.vue'),
+      },
+      {
+        path: 'my-disputes',
+        name: 'MyDisputes',
+        component: () => import('@/views/profile/MyDisputes.vue'),
       },
       {
         path: 'my-schedule',

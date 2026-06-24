@@ -1,5 +1,6 @@
 """订桌预约业务逻辑层。"""
 
+import uuid
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +14,7 @@ from app.utils.exceptions import NotFoundError, ConflictError, ValidationError
 from app.utils.pagination import PageParams, PageResult, paginate
 
 
-async def _get_employee_name(db: AsyncSession, employee_id: int | None) -> str | None:
+async def _get_employee_name(db: AsyncSession, employee_id: uuid.UUID | None) -> str | None:
     """根据员工ID查询姓名。"""
     if not employee_id:
         return None
@@ -28,7 +29,7 @@ class TableService:
         self.repo = TableRepo(db)
         self.db = db
 
-    async def create(self, store_id: int, data: TableCreate) -> TableResponse:
+    async def create(self, store_id: uuid.UUID, data: TableCreate) -> TableResponse:
         try:
             table = await self.repo.create(store_id, data.model_dump())
             return TableResponse.model_validate(table)
@@ -36,14 +37,14 @@ class TableService:
             await self.db.rollback()
             raise ConflictError(f"桌号 {data.table_no} 已存在，每个区域/桌号只能有一个")
 
-    async def get(self, table_id: int, store_id: int) -> TableResponse:
+    async def get(self, table_id: uuid.UUID, store_id: uuid.UUID) -> TableResponse:
         table = await self.repo.get_by_id(table_id, store_id)
         if not table:
             raise NotFoundError("桌位不存在")
         return TableResponse.model_validate(table)
 
     async def list(
-        self, store_id: int, *, area: str | None = None, params: PageParams | None = None
+        self, store_id: uuid.UUID, *, area: str | None = None, params: PageParams | None = None
     ) -> PageResult[TableResponse]:
         items, total = await self.repo.list_by_store(store_id, area=area, params=params)
         return paginate(
@@ -52,14 +53,14 @@ class TableService:
             params or PageParams(),
         )
 
-    async def update(self, table_id: int, store_id: int, data: TableUpdate) -> TableResponse:
+    async def update(self, table_id: uuid.UUID, store_id: uuid.UUID, data: TableUpdate) -> TableResponse:
         table = await self.repo.get_by_id(table_id, store_id)
         if not table:
             raise NotFoundError("桌位不存在")
         table = await self.repo.update(table, data.model_dump(exclude_none=True))
         return TableResponse.model_validate(table)
 
-    async def delete(self, table_id: int, store_id: int) -> None:
+    async def delete(self, table_id: uuid.UUID, store_id: uuid.UUID) -> None:
         table = await self.repo.get_by_id(table_id, store_id)
         if not table:
             raise NotFoundError("桌位不存在")
@@ -74,7 +75,7 @@ class BookingService:
         self.table_repo = TableRepo(db)
         self.db = db
 
-    async def _resolve_table(self, store_id: int, table_id: int | None, guests_count: int) -> tuple[int, str]:
+    async def _resolve_table(self, store_id: uuid.UUID, table_id: uuid.UUID | None, guests_count: int) -> tuple[int, str]:
         if table_id:
             table = await self.table_repo.get_by_id(table_id, store_id)
             if not table or table.status != "active":
@@ -90,7 +91,7 @@ class BookingService:
             available.sort(key=lambda t: t.capacity)
             return available[0].id, available[0].table_no
 
-    async def create(self, store_id: int, data: BookingCreate, created_by: int | None = None) -> BookingResponse:
+    async def create(self, store_id: uuid.UUID, data: BookingCreate, created_by: uuid.UUID | None = None) -> BookingResponse:
         table_id, table_no = await self._resolve_table(store_id, data.table_id, data.guests_count)
 
         conflict = await self.booking_repo.find_conflict(store_id, data.date, table_id, data.time_slot)
@@ -112,7 +113,7 @@ class BookingService:
             resp.table_area = table.area
         return resp
 
-    async def get(self, booking_id: int, store_id: int) -> BookingResponse:
+    async def get(self, booking_id: uuid.UUID, store_id: uuid.UUID) -> BookingResponse:
         booking = await self.booking_repo.get_by_id(booking_id, store_id)
         if not booking:
             raise NotFoundError("预约不存在")
@@ -125,7 +126,7 @@ class BookingService:
         return resp
 
     async def list(
-        self, store_id: int, *, date: str | None = None, status: str | None = None,
+        self, store_id: uuid.UUID, *, date: str | None = None, status: str | None = None,
         params: PageParams | None = None,
     ) -> PageResult[BookingResponse]:
         items, total = await self.booking_repo.list_by_date(store_id, date=date, status=status, params=params)
@@ -155,7 +156,7 @@ class BookingService:
             responses.append(resp)
         return paginate(responses, total, params or PageParams())
 
-    async def update(self, booking_id: int, store_id: int, data: BookingUpdate) -> BookingResponse:
+    async def update(self, booking_id: uuid.UUID, store_id: uuid.UUID, data: BookingUpdate) -> BookingResponse:
         booking = await self.booking_repo.get_by_id(booking_id, store_id)
         if not booking:
             raise NotFoundError("预约不存在")
@@ -181,14 +182,14 @@ class BookingService:
                 resp.table_area = table.area
         return resp
 
-    async def cancel(self, booking_id: int, store_id: int) -> BookingResponse:
+    async def cancel(self, booking_id: uuid.UUID, store_id: uuid.UUID) -> BookingResponse:
         booking = await self.booking_repo.get_by_id(booking_id, store_id)
         if not booking:
             raise NotFoundError("预约不存在")
         booking = await self.booking_repo.update(booking, {"status": "cancelled"})
         return BookingResponse.model_validate(booking)
 
-    async def stats(self, store_id: int, date: str) -> BookingStats:
+    async def stats(self, store_id: uuid.UUID, date: str) -> BookingStats:
         total = await self.table_repo.count_active(store_id)
         booked = await self.booking_repo.count_by_date_status(store_id, date, "confirmed")
         return BookingStats(

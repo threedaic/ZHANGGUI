@@ -174,6 +174,29 @@ async def update_rule(
     return make_response(message=f"规则 {rule_code} 已更新", request=request)
 
 
+@router.put("/rules/{rule_code}/toggle", summary="启用/禁用规则(老板)")
+async def toggle_rule(
+    request: Request,
+    rule_code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """启用或禁用薪资规则（用于屏蔽流程步骤，如KPI）"""
+    require_role(request, ["boss"])
+    store_id = get_store_id(request)
+    body = await request.json()
+    is_active = body.get("is_active", True)
+
+    service = PayrollConfigService(db, store_id)
+    rule = await service.toggle_rule_active(rule_code, is_active)
+    if not rule:
+        from app.utils.exceptions import NotFoundError
+        raise NotFoundError("薪资规则不存在")
+    await db.commit()
+
+    action = "启用" if is_active else "已关闭"
+    return make_response(message=f"步骤「{rule.rule_name}」{action}", request=request)
+
+
 @router.post("/init", summary="初始化默认配置(老板)")
 async def init_config(
     request: Request,

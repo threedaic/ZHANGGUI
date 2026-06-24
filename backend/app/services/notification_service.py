@@ -6,6 +6,7 @@
 """
 import base64
 import hashlib
+import uuid
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -25,7 +26,7 @@ WECOM_API = "https://qyapi.weixin.qq.com/cgi-bin"
 class NotificationService:
     """通知 Service"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
         self.repo = NotificationRepository(session, store_id)

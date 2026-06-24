@@ -1,6 +1,7 @@
 """
 智能管家模块数据访问层
 """
+import uuid
 from datetime import datetime
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ from app.utils.pagination import PageParams
 class ButlerRepository:
     """智能管家 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: str):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
@@ -45,7 +46,7 @@ class ButlerRepository:
             .order_by(ClosingChecklistItem.template_id, ClosingChecklistItem.sort_order)
         )
         items_result = await self.session.execute(items_stmt)
-        items_by_tpl: dict[int, list[ClosingChecklistItem]] = {}
+        items_by_tpl: dict[uuid.UUID, list[ClosingChecklistItem]] = {}
         for item in items_result.scalars().all():
             items_by_tpl.setdefault(item.template_id, []).append(item)
 
@@ -78,7 +79,7 @@ class ButlerRepository:
             output.append(d)
         return output
 
-    async def get_template(self, template_id: int) -> ClosingChecklistTemplate | None:
+    async def get_template(self, template_id: uuid.UUID) -> ClosingChecklistTemplate | None:
         stmt = select(ClosingChecklistTemplate).where(
             and_(
                 ClosingChecklistTemplate.id == template_id,
@@ -107,7 +108,7 @@ class ButlerRepository:
 
     # ==================== 清单项 ====================
 
-    async def replace_items(self, template_id: int, items: list[dict]) -> list[ClosingChecklistItem]:
+    async def replace_items(self, template_id: uuid.UUID, items: list[dict]) -> list[ClosingChecklistItem]:
         """全量替换模板下的清单项"""
         # 删除旧项
         old = await self.session.execute(
@@ -125,7 +126,7 @@ class ButlerRepository:
         await self.session.flush()
         return new_items
 
-    async def get_items_by_ids(self, item_ids: list[int]) -> list[ClosingChecklistItem]:
+    async def get_items_by_ids(self, item_ids: list[uuid.UUID]) -> list[ClosingChecklistItem]:
         stmt = select(ClosingChecklistItem).where(ClosingChecklistItem.id.in_(item_ids))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -138,7 +139,7 @@ class ButlerRepository:
         await self.session.flush()
         return obj
 
-    async def get_session(self, session_id: int) -> ClosingSession | None:
+    async def get_session(self, session_id: uuid.UUID) -> ClosingSession | None:
         stmt = select(ClosingSession).where(
             and_(
                 ClosingSession.id == session_id,
@@ -189,14 +190,14 @@ class ButlerRepository:
         await self.session.flush()
         return objs
 
-    async def get_results_by_session(self, session_id: int) -> list[ClosingItemResult]:
+    async def get_results_by_session(self, session_id: uuid.UUID) -> list[ClosingItemResult]:
         stmt = select(ClosingItemResult).where(
             ClosingItemResult.session_id == session_id
         ).order_by(ClosingItemResult.id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_result(self, result_id: int, session_id: int) -> ClosingItemResult | None:
+    async def get_result(self, result_id: uuid.UUID, session_id: uuid.UUID) -> ClosingItemResult | None:
         stmt = select(ClosingItemResult).where(
             and_(
                 ClosingItemResult.id == result_id,
@@ -245,7 +246,7 @@ class ButlerRepository:
             .order_by(ClosingSession.store_id, ClosingSession.started_at.desc())
         )
         active_result = await self.session.execute(active_stmt)
-        active_by_store: dict[int, ClosingSession] = {}
+        active_by_store: dict[uuid.UUID, ClosingSession] = {}
         for s in active_result.scalars().all():
             # 已按 started_at desc 排序，首条即最新
             if s.store_id not in active_by_store:
@@ -263,7 +264,7 @@ class ButlerRepository:
             .order_by(ClosingSession.store_id, ClosingSession.completed_at.desc())
         )
         completed_result = await self.session.execute(completed_stmt)
-        completed_by_store: dict[int, ClosingSession] = {}
+        completed_by_store: dict[uuid.UUID, ClosingSession] = {}
         for s in completed_result.scalars().all():
             if s.store_id not in completed_by_store:
                 completed_by_store[s.store_id] = s

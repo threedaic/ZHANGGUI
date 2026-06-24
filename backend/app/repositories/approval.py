@@ -1,6 +1,7 @@
 """
 统一审批数据访问层
 """
+import uuid
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.approval import ApprovalRequest
@@ -11,11 +12,11 @@ from app.utils.pagination import PageParams
 class ApprovalRepository:
     """审批 Repository"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
 
-    async def get_approval_by_id(self, approval_id: int) -> ApprovalRequest | None:
+    async def get_approval_by_id(self, approval_id: uuid.UUID) -> ApprovalRequest | None:
         stmt = select(ApprovalRequest).where(
             and_(
                 ApprovalRequest.id == approval_id,
@@ -27,11 +28,11 @@ class ApprovalRepository:
 
     async def list_approvals(
         self,
-        employee_id: int | None = None,
+        employee_id: uuid.UUID | None = None,
         status: str | None = None,
         approval_type: str | None = None,
         page: PageParams | None = None,
-        approver_id: int | None = None,
+        approver_id: uuid.UUID | None = None,
         include_assigned: bool = False,
     ) -> tuple[list[ApprovalRequest], int]:
         stmt = select(ApprovalRequest).where(ApprovalRequest.store_id == self.store_id)
@@ -78,7 +79,7 @@ class ApprovalRepository:
         await self.session.refresh(approval)
         return approval
 
-    async def get_employee_name_map(self, employee_ids: list[int]) -> dict[int, str]:
+    async def get_employee_name_map(self, employee_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
         if not employee_ids:
             return {}
         stmt = select(Employee.id, Employee.name).where(

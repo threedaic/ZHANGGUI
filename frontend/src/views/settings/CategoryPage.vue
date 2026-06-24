@@ -64,7 +64,7 @@ const categories: Record<string, Category> = {
       {
         name: '排班规则',
         desc: '休息天数、节假日策略、自动排班',
-        path: '/settings/schedule-rules',
+        path: '/settings/schedule-rule',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="18" height="16" rx="2"/><line x1="2" y1="8" x2="20" y2="8"/><line x1="8" y1="8" x2="8" y2="19"/></svg>',
         built: true,
       },
@@ -78,7 +78,7 @@ const categories: Record<string, Category> = {
       {
         name: '合同默认值',
         desc: '公司信息、薪资制度、合同发起权限',
-        path: '/settings/contract',
+        path: '/settings/contract-default',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><path d="M4 2h9l5 5v12a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z"/><path d="M13 2v5h5"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="7" y1="15" x2="15" y2="15"/></svg>',
         built: true,
       },
@@ -91,14 +91,14 @@ const categories: Record<string, Category> = {
       {
         name: '角色管理',
         desc: '员工角色分配与权限设置',
-        path: '/settings/roles',
+        path: '/settings/role-manager',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="8" r="3"/><path d="M5 19c0-4 3-7 6-7s6 3 6 7"/></svg>',
         built: true,
       },
       {
         name: '班次定义',
         desc: '白班、夜班等班次时间段设置',
-        path: '/settings/shift',
+        path: '/settings/shift-setting',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="18" height="16" rx="2"/><line x1="2" y1="8" x2="20" y2="8"/><line x1="8" y1="8" x2="8" y2="19"/></svg>',
         built: true,
       },
@@ -180,7 +180,7 @@ const categories: Record<string, Category> = {
       {
         name: 'AI 配置',
         desc: '小C模型、API地址、温度参数',
-        path: '/settings/ai',
+        path: '/settings/ai-config',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>',
         built: true,
       },
@@ -194,7 +194,7 @@ const categories: Record<string, Category> = {
       {
         name: '操作日志',
         desc: '所有数据修改记录',
-        path: '/settings/audit',
+        path: '/management/audit',
         icon: '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="2" width="14" height="18" rx="1"/><line x1="7" y1="6" x2="13" y2="6"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="14" x2="10" y2="14"/></svg>',
         built: true,
       },

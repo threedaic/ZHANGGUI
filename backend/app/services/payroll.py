@@ -17,6 +17,7 @@
 公式: 实发 = 收入项合计 - 扣款项合计
 """
 import calendar
+import uuid
 from datetime import datetime
 from sqlalchemy import select, and_, text, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +40,7 @@ from app.utils.exceptions import (
 class PayrollService:
     """工资计算 Service（配置驱动版）"""
 
-    def __init__(self, session: AsyncSession, store_id: int):
+    def __init__(self, session: AsyncSession, store_id: uuid.UUID):
         self.session = session
         self.store_id = store_id
         self.engine = FormulaEngine()
@@ -52,8 +53,8 @@ class PayrollService:
     async def generate(
         self,
         period: str,
-        employee_ids: list[int] | None = None,
-        user_id: int | None = None,
+        employee_ids: list[uuid.UUID] | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> list[PayrollRecord]:
         """
         为指定员工生成月度工资记录。
@@ -116,7 +117,7 @@ class PayrollService:
         return records
 
     async def _get_employees(
-        self, employee_ids: list[int] | None
+        self, employee_ids: list[uuid.UUID] | None
     ) -> list[Employee]:
         """获取在职员工列表"""
         stmt = select(Employee).where(
@@ -228,7 +229,7 @@ class PayrollService:
             "rule": salary_rules,
         }
 
-    async def _get_contract_data(self, employee_id: int) -> dict:
+    async def _get_contract_data(self, employee_id: uuid.UUID) -> dict:
         """获取员工合同数据（取最新生效合同）"""
         stmt = (
             select(Contract)
@@ -254,7 +255,7 @@ class PayrollService:
             "allowance": float(contract.allowance or 0),
         }
 
-    async def _get_attendance_data(self, employee_id: int, period: str) -> dict:
+    async def _get_attendance_data(self, employee_id: uuid.UUID, period: str) -> dict:
         """获取员工月度考勤汇总"""
         year, month = int(period[:4]), int(period[5:7])
         month_str = f"{year}-{month:02d}"
@@ -284,8 +285,14 @@ class PayrollService:
             }
         return {k: (int(v) if v is not None else 0) for k, v in dict(row).items()}
 
-    async def _get_kpi_data(self, employee_id: int, period: str) -> dict:
-        """获取员工月度 KPI 数据"""
+    async def _get_kpi_data(self, employee_id: uuid.UUID, period: str) -> dict:
+        """获取员工月度 KPI 数据（KPI 关闭时返回默认系数1.0）"""
+        # 检查 KPI 模块是否启用
+        active_modules = await self.config_service.get_active_modules()
+        if not active_modules.get("kpi_enabled", True):
+            logger.info(f"[Payroll] KPI 模块已关闭，员工 {employee_id} 系数默认 1.0")
+            return {"coefficient": 1.0, "total_score": 0.0}
+
         stmt = select(KPIResult).where(
             and_(
                 KPIResult.employee_id == employee_id,
@@ -443,7 +450,7 @@ class PayrollService:
             "status_summary": status_summary,
         }
 
-    async def get_detail(self, record_id: int) -> dict:
+    async def get_detail(self, record_id: uuid.UUID) -> dict:
         """单条工资详情，含明细项和数据源快照"""
         stmt = select(PayrollRecord).where(
             and_(
@@ -490,7 +497,7 @@ class PayrollService:
             "snapshot": record.snapshot,
         }
 
-    async def _get_employee_info(self, employee_ids: list[int]) -> dict[int, dict]:
+    async def _get_employee_info(self, employee_ids: list[uuid.UUID]) -> dict[int, dict]:
         """批量获取员工信息"""
         if not employee_ids:
             return {}
@@ -510,8 +517,8 @@ class PayrollService:
 
     async def finalize(
         self,
-        record_ids: list[int],
-        user_id: int,
+        record_ids: list[uuid.UUID],
+        user_id: uuid.UUID,
         notes: str | None = None,
     ) -> int:
         """确认工资条，状态 draft -> confirmed"""
@@ -542,7 +549,7 @@ class PayrollService:
         return len(records)
 
     async def mark_paid(
-        self, record_ids: list[int], user_id: int, paid_at: str | None = None
+        self, record_ids: list[uuid.UUID], user_id: uuid.UUID, paid_at: str | None = None
     ) -> int:
         """标记已发放，状态 confirmed -> paid"""
         records = await self._get_records_by_ids(record_ids)
@@ -568,7 +575,7 @@ class PayrollService:
         logger.info(f"[Payroll] 标记 {len(records)} 条工资已发放")
         return len(records)
 
-    async def _get_records_by_ids(self, record_ids: list[int]) -> list[PayrollRecord]:
+    async def _get_records_by_ids(self, record_ids: list[uuid.UUID]) -> list[PayrollRecord]:
         stmt = select(PayrollRecord).where(
             and_(
                 PayrollRecord.id.in_(record_ids),
