@@ -29,6 +29,19 @@ export function getCurrentUser() {
   return client.get<ApiResponse<UserInfo>>('/auth/me')
 }
 
+export interface SwitchStoreResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  store_id: string
+  store_name: string
+}
+
+/** 管理员切换当前门店（重新签发 token） */
+export function switchStore(storeId: string) {
+  return client.post<ApiResponse<SwitchStoreResponse>>('/auth/switch-store', { store_id: storeId })
+}
+
 export interface WeworkOAuthConfig {
   corp_id: string
   agent_id: string

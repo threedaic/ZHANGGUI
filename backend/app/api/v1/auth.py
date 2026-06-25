@@ -164,6 +164,68 @@ async def get_me(request: Request):
     }, request=request)
 
 
+@router.post("/switch-store", response_model=dict)
+async def switch_store(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员切换当前门店（重新签发带新 store_id 的 token）。
+
+    仅 admin / boss 角色可用。其他角色调用返回 403。
+    请求体: {"store_id": "<uuid>"}
+    """
+    from app.utils.deps import get_user_id, require_role, make_response as _make
+    import json as _json
+
+    # 鉴权：必须是 admin 或 boss
+    role = getattr(request.state, "role", None)
+    if role not in ("admin", "boss"):
+        raise ForbiddenError("仅管理员可切换门店")
+
+    user_id = get_user_id(request)
+
+    # 解析请求体拿 store_id
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    new_store_id = body.get("store_id")
+    if not new_store_id:
+        raise UnauthorizedError("缺少 store_id 参数")
+
+    # 校验门店存在且启用
+    store_result = await db.execute(
+        select(Store).where(Store.id == new_store_id, Store.is_active == True)  # noqa: E712
+    )
+    store = store_result.scalar_one_or_none()
+    if not store:
+        raise ForbiddenError("门店不存在或已停用")
+
+    # 重新签发 token（保留原 user/role/employee，只换 store_id）
+    auth_header = request.headers.get("Authorization", "")
+    payload = decode_token(auth_header[7:]) if auth_header.startswith("Bearer ") else {}
+
+    token_data = {
+        "user_id": payload.get("user_id") or user_id,
+        "username": payload.get("username"),
+        "role": payload.get("role") or role,
+        "employee_id": payload.get("employee_id"),
+        "store_id": _to_str(store.id),
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    logger.info(f"[SWITCH-STORE] user={user_id} role={role} → store={store.id} ({store.name})")
+
+    return make_response(data={
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "store_id": _to_str(store.id),
+        "store_name": store.name,
+    }, request=request)
+
+
 # ==================== 企微 OAuth 免登录 ====================
 
 @router.get("/wework/config")

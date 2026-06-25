@@ -59,6 +59,34 @@ async def get_store_info(
     }, request=request)
 
 
+@router.get("/all")
+async def list_all_stores(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """列出所有门店（仅 admin/boss 可用，用于切换门店下拉）。"""
+    role = getattr(request.state, "role", None)
+    if role not in ("admin", "boss"):
+        from app.utils.exceptions import ForbiddenError
+        raise ForbiddenError("仅管理员可查看所有门店")
+
+    stmt = select(Store).where(Store.is_active == True).order_by(Store.created_at.asc())  # noqa: E712
+    result = await db.execute(stmt)
+    stores = result.scalars().all()
+
+    current_store_id = getattr(request.state, "store_id", None)
+    return make_response(data=[
+        {
+            "id": str(s.id),
+            "name": s.name,
+            "store_code": s.store_code,
+            "city": s.city,
+            "is_current": str(s.id) == str(current_store_id) if current_store_id else False,
+        }
+        for s in stores
+    ], request=request)
+
+
 @router.get("/settings")
 async def get_store_settings(
     request: Request,

@@ -53,10 +53,23 @@ export interface StoreSettingsData {
   extra_config?: Record<string, any>
 }
 
+export interface StoreBrief {
+  id: string
+  name: string
+  store_code: string
+  city: string | null
+  is_current: boolean
+}
+
 export const storeAPI = {
   /** 获取门店基本信息 */
   getInfo() {
     return apiClient.get<ApiResponse<StoreInfo>>('/stores')
+  },
+
+  /** 列出所有门店（仅 admin/boss，用于切换门店下拉） */
+  listAll() {
+    return apiClient.get<ApiResponse<StoreBrief[]>>('/stores/all')
   },
 
   /** 获取门店设置 */
