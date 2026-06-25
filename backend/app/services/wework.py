@@ -152,13 +152,36 @@ def _auto_detect_store_dept(
 ) -> int | None:
     """根据门店名称自动识别对应的企微部门 ID。
 
-    策略：部门名与门店名完全一致 → 直接匹配。
-    老板按店建部门名，如「北京三里屯店」，店名与之对齐即可。
+    匹配策略（按优先级）：
+    1. 精确匹配：部门名 == 门店名
+    2. 包含匹配：门店名包含部门名，或部门名包含门店名
+       （例如 门店"北京三里屯店" ↔ 部门"北京店"）
+    3. store_code 精确匹配部门名
     """
-    # 精确匹配
+    # 1. 精确匹配
     if store_name in dept_id_by_name:
-        logger.info(f"自动匹配部门: {store_name} → {dept_id_by_name[store_name]}")
+        logger.info(f"自动匹配部门(精确): {store_name} → {dept_id_by_name[store_name]}")
         return dept_id_by_name[store_name]
+
+    # 2. 包含匹配（排除根部门和管理部门）
+    for dept_name, did in dept_id_by_name.items():
+        if did in admin_dept_ids:
+            continue
+        if not dept_name:
+            continue
+        if dept_name in store_name or store_name in dept_name:
+            logger.info(f"自动匹配部门(包含): 门店={store_name} ↔ 部门={dept_name} → {did}")
+            return did
+
+    # 3. store_code 匹配
+    if store_code and store_code in dept_id_by_name:
+        logger.info(f"自动匹配部门(store_code): {store_code} → {dept_id_by_name[store_code]}")
+        return dept_id_by_name[store_code]
+
+    logger.warning(
+        f"门店自动匹配部门失败: store_name={store_name} store_code={store_code} "
+        f"可用部门={list(dept_id_by_name.keys())}"
+    )
     return None
 
 
@@ -229,8 +252,15 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
             f"含子部门共 {len(sync_dept_ids)} 个"
         )
     else:
-        sync_dept_ids: set[int] = set(dept_id_by_name.values())
-        logger.info(f"门店 {store_id} 未匹配到部门，同步全公司 {len(sync_dept_ids)} 个部门")
+        # 安全策略：匹配失败时拒绝同步，避免误拉管理群等全公司成员
+        raise ExternalServiceError(
+            f"门店未匹配到企微部门，已中止同步以防误拉全公司成员。"
+            f"请在门店配置中手动设置 wework_department_id，"
+            f"或将门店名改为与企微部门名一致。"
+            f"门店={store.name if store else store_id}, "
+            f"store_code={store.store_code if store else 'N/A'}, "
+            f"可用部门={list(dept_id_by_name.keys())}"
+        )
 
     # Step 2: 获取 BOSS 白名单
     settings = get_settings()
@@ -271,6 +301,9 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
             existing_map[emp.wework_userid] = emp
 
     # Step 5: 应用规则 + 批量创建/更新
+    # 反向映射：部门ID → 部门名（用于存到员工 department 字段）
+    dept_name_by_id: dict[int, str] = {did: name for name, did in dept_id_by_name.items()}
+
     result = {
         "synced": 0,
         "created": 0,
@@ -297,6 +330,16 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
 
             role = _resolve_role(userid, dept_ids, is_leader, admin_dept_ids, boss_userids)
 
+            # 部门名称：取第一个同步范围内的部门名（员工可能属于多个部门）
+            dept_name = ""
+            for did in dept_ids:
+                if did in sync_dept_ids and did in dept_name_by_id:
+                    dept_name = dept_name_by_id[did]
+                    break
+            if not dept_name and dept_ids:
+                # fallback：取第一个任意部门名
+                dept_name = dept_name_by_id.get(dept_ids[0], "")
+
             # 统计
             if boss_userids and userid in boss_userids:
                 result["boss_from_env"] += 1
@@ -320,6 +363,9 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                     changed = True
                     result["role_changed"] += 1
                     logger.info(f"角色变更: {userid} {old_role} → {role}")
+                if emp.department != dept_name:
+                    emp.department = dept_name
+                    changed = True
                 if changed:
                     result["updated"] += 1
                 else:
@@ -333,6 +379,7 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                     base_salary=0,
                     hire_date=date.today(),
                     wework_userid=userid,
+                    department=dept_name,
                     status="active",
                 )
                 db.add(new_emp)
@@ -342,6 +389,7 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                 "userid": userid,
                 "name": name,
                 "role": role,
+                "department": dept_name,
                 "dept_ids": dept_ids,
                 "is_leader": is_leader,
             })
