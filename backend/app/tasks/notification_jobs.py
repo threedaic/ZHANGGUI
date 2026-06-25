@@ -81,6 +81,33 @@ async def auto_sync_wework_contacts_job() -> None:
             logger.error(f"自动同步通讯录任务失败: {e}")
 
 
+async def auto_push_workbench_job() -> None:
+    """每小时推送工作台数据到所有员工（今日业绩/打卡状态）。
+
+    遍历所有启用的门店，推送每个员工的业绩和打卡状态到企微工作台。
+    """
+    from app.models.store import Store
+    from app.services.wework_workbench import push_workbench_to_all
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        try:
+            store_result = await session.execute(
+                select(Store).where(Store.status == "active")
+            )
+            stores = store_result.scalars().all()
+            for store in stores:
+                if not store.wework_corp_id:
+                    continue
+                try:
+                    result = await push_workbench_to_all(session, store.id)
+                    logger.info(f"工作台推送: 门店={store.name} 成功={result['pushed']}/{result['total']}")
+                except Exception as e:
+                    logger.error(f"工作台推送失败 门店={store.name}: {e}")
+        except Exception as e:
+            logger.error(f"工作台推送任务失败: {e}")
+
+
 async def daily_attendance_report_job() -> None:
     """每日考勤日报 — 改为 10:05 发送（跟 auto_sync 之后，数据完整）"""
     async with AsyncSessionLocal() as session:

@@ -45,6 +45,7 @@ from app.api.v1.disputes import router as disputes_router
 from app.api.v1.auto_payroll import router as auto_payroll_router
 from app.api.v1.wework_payments import router as wework_payments_router
 from app.api.v1.wework_callback import router as wework_callback_router
+from app.api.v1.wework_workbench import router as wework_workbench_router
 from app.middleware.rls import RLSMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -359,6 +360,7 @@ app.include_router(payroll_config_router, prefix="/api/v1/payroll-config", tags=
 app.include_router(auto_payroll_router, prefix="/api/v1/auto-payroll", tags=["自动发薪"])
 app.include_router(wework_payments_router, prefix="/api/v1/wework-payments", tags=["企微收款"])
 app.include_router(wework_callback_router, prefix="/api/v1/wework", tags=["企微回调"])
+app.include_router(wework_workbench_router, prefix="/api/v1/wework", tags=["企微工作台"])
 app.include_router(period_router, prefix="/api/v1/periods", tags=["账期管理"])
 app.include_router(ranking_router, prefix="/api/v1/rankings", tags=["员工排名"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["数据看板"])

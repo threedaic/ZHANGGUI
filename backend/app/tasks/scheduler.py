@@ -45,6 +45,7 @@ async def init_scheduler():
         daily_attendance_report_job,
         auto_sync_checkin_job,
         auto_sync_wework_contacts_job,
+        auto_push_workbench_job,
         monthly_attendance_confirm_job,
         cleanup_checkin_photos_job,
     )
@@ -55,6 +56,8 @@ async def init_scheduler():
     scheduler.add_job(auto_sync_checkin_job, 'cron', hour=10, minute=0, id='auto_sync_checkin_job', replace_existing=True)
     scheduler.add_job(auto_sync_wework_contacts_job, 'cron', hour=10, minute=3, id='auto_sync_wework_contacts_job', replace_existing=True)
     scheduler.add_job(daily_attendance_report_job, 'cron', hour=10, minute=5, id='daily_attendance_report_job', replace_existing=True)
+    # 每小时推送工作台数据（今日业绩/打卡状态）到所有员工
+    scheduler.add_job(auto_push_workbench_job, 'interval', hours=1, id='auto_push_workbench_job', replace_existing=True)
     scheduler.add_job(run_daily_antifraud_scan, 'cron', hour=4, minute=0, id='run_daily_antifraud_scan', replace_existing=True)
     scheduler.add_job(monthly_attendance_confirm_job, 'cron', day=1, hour=2, minute=0, id='monthly_attendance_confirm_job', replace_existing=True)
     # 每天 04:00 清理过期打卡照片（保留WiFi/时间元数据，仅删照片文件）
