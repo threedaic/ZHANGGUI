@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     WECOM_AGENT_ID: str = ""
     WECOM_SECRET: str = ""
 
+    # WeCom contact change callback (通讯录变更回调)
+    # 企微后台"接收事件"配置的 Token 和 EncodingAESKey
+    WECOM_CALLBACK_TOKEN: str = ""
+    WECOM_CALLBACK_AES_KEY: str = ""
+
     # External service base URLs (configurable for env switching / proxies)
     WECOM_API_BASE: str = "https://qyapi.weixin.qq.com/cgi-bin"
     FRONTEND_BASE_URL: str = "https://zhanggui.crushserver.cloud"

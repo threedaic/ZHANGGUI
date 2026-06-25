@@ -20,6 +20,7 @@ RLS_WHITELIST = {
     "/api/v1/ratings",             # Guest QR code rating (POST submit, no auth)
     "/api/v1/wine-storage/h5/",    # Guest wine status + retrieve via H5 (prefix match)
     "/api/v1/wine-storage/guest",  # Guest list wines by phone
+    "/api/v1/wework/callback",     # WeCom contact change callback (企微通讯录变更回调, prefix match)
     "/api/v1/health",
     "/docs", "/openapi.json",       # Swagger UI（生产环境已通过 docs_url=None 关闭）
     "/redoc",
