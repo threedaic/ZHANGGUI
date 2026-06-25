@@ -30,7 +30,10 @@ RLS_WHITELIST = {
 def _is_whitelisted(path: str) -> bool:
     """Check if path is in the RLS whitelist (supports prefix matching)."""
     for pattern in RLS_WHITELIST:
-        if path == pattern or (pattern.endswith("/") and path.startswith(pattern)):
+        if path == pattern:
+            return True
+        # 前缀匹配: pattern 以 / 结尾，或 pattern 是 path 的某一段前缀
+        if path.startswith(pattern + "/") or (pattern.endswith("/") and path.startswith(pattern)):
             return True
     return False
 
