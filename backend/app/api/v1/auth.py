@@ -195,7 +195,7 @@ async def switch_store(
 
     # 校验门店存在且启用
     store_result = await db.execute(
-        select(Store).where(Store.id == new_store_id, Store.is_active == True)  # noqa: E712
+        select(Store).where(Store.id == new_store_id, Store.status == "active")
     )
     store = store_result.scalar_one_or_none()
     if not store:

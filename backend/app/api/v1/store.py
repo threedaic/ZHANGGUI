@@ -70,7 +70,7 @@ async def list_all_stores(
         from app.utils.exceptions import ForbiddenError
         raise ForbiddenError("仅管理员可查看所有门店")
 
-    stmt = select(Store).where(Store.is_active == True).order_by(Store.created_at.asc())  # noqa: E712
+    stmt = select(Store).where(Store.status == "active").order_by(Store.opened_at.asc().nullslast())
     result = await db.execute(stmt)
     stores = result.scalars().all()
 
