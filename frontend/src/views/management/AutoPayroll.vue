@@ -32,13 +32,50 @@
         <button class="month-btn" @click="changeMonth(1)">›</button>
       </div>
       <div class="top-actions">
-        <button class="calc-btn" :disabled="loading" @click="recalculate">
+        <button class="calc-btn" :disabled="loading || !canEdit" @click="recalculate">
           {{ loading ? '计算中...' : '重新计算' }}
         </button>
-        <button class="finalize-btn" :disabled="finalizing" @click="finalizePayroll">
+        <button class="finalize-btn" :disabled="finalizing || !canEdit" @click="finalizePayroll">
           {{ finalizing ? '发薪中...' : '一键发薪' }}
         </button>
       </div>
+    </div>
+
+    <!-- ============================================================
+         会计权限设置（仅老板可见）
+         ============================================================ -->
+    <div v-if="(auth.isBoss || auth.role === 'admin') && isInSettings" class="permission-card">
+      <div class="perm-header">
+        <span class="perm-title">会计权限</span>
+        <span class="perm-hint">控制会计能否使用自动发薪</span>
+      </div>
+      <div class="perm-options">
+        <button
+          class="perm-btn"
+          :class="{ active: accountantAccess === 'none' }"
+          @click="saveAccountantAccess('none')"
+        >不允许访问</button>
+        <button
+          class="perm-btn"
+          :class="{ active: accountantAccess === 'readonly' }"
+          @click="saveAccountantAccess('readonly')"
+        >只读</button>
+        <button
+          class="perm-btn"
+          :class="{ active: accountantAccess === 'editable' }"
+          @click="saveAccountantAccess('editable')"
+        >可编辑</button>
+      </div>
+    </div>
+
+    <!-- 会计无权限提示 -->
+    <div v-if="!canEdit && auth.role === 'accountant' && accountantAccess === 'none'" class="no-access">
+      老板未开放自动发薪权限，请联系老板开启
+    </div>
+
+    <!-- 会计只读提示 -->
+    <div v-if="!canEdit && accountantAccess === 'readonly'" class="readonly-banner">
+      当前为只读模式，仅查看不可修改
     </div>
 
     <!-- ============================================================
@@ -220,7 +257,7 @@
         <!-- 发送工资单: 无输入框，只有开关 -->
         <span v-if="!step.is_active" class="step-closed">已关闭</span>
       </div>
-      <button class="save-flow-btn" :disabled="savingFlow" @click="saveFlowRules">
+      <button class="save-flow-btn" :disabled="savingFlow || !canEdit" @click="saveFlowRules">
         {{ savingFlow ? '保存中...' : '保存流程设置' }}
       </button>
     </div>
@@ -314,13 +351,43 @@
  * ============================================================================
  */
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { autoPayrollAPI, type PayrollTable } from '@/api/autoPayroll'
 import { storeAPI } from '@/api/store'
 import { listRules, toggleRule, updateRule, type SalaryRule } from '@/api/payrollConfig'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
+const auth = useAuthStore()
+
+// 判断当前在设置端还是管理端（设置端才显示权限卡片）
+const isInSettings = computed(() => route.path.startsWith('/settings'))
+
+// ============================================================================
+// 会计权限：老板控制会计能否访问 / 只读 / 可编辑
+// ============================================================================
+const accountantAccess = ref<'none' | 'readonly' | 'editable'>('none')
+const extraConfigCache = ref<Record<string, any>>({})
+
+const canEdit = computed(() => {
+  if (auth.role === 'boss' || auth.role === 'admin') return true
+  if (auth.role === 'accountant') return accountantAccess.value === 'editable'
+  return false
+})
+
+async function saveAccountantAccess(val: 'none' | 'readonly' | 'editable') {
+  try {
+    const merged = { ...extraConfigCache.value, accountant_payroll_access: val }
+    await storeAPI.updateSettings({ extra_config: merged })
+    accountantAccess.value = val
+    extraConfigCache.value = merged
+    ElMessage.success('权限已更新')
+  } catch {
+    ElMessage.error('权限更新失败')
+  }
+}
 
 // ============================================================================
 // 1. 状态
@@ -412,7 +479,8 @@ function changeMonth(_delta: number) {
  * 跳转到模块二级页面
  */
 function goToModule(code: string) {
-  router.push(`/management/auto-payroll/${code}`)
+  const prefix = isInSettings.value ? '/settings' : '/management'
+  router.push(`${prefix}/auto-payroll/${code}`)
 }
 
 /**
@@ -420,6 +488,7 @@ function goToModule(code: string) {
  * 注意：modules 是 computed（只读），要改 tableData.value.modules
  */
 async function toggleModule(code: string) {
+  if (!canEdit.value) return
   const newVal = !tableData.value.modules[code]
   try {
     await autoPayrollAPI.setModules({ [code]: newVal })
@@ -446,6 +515,7 @@ function hasMoreAfter(code: string): boolean {
 // ============================================================================
 
 function startEdit(emp: PayrollTable['employees'][0], code: string) {
+  if (!canEdit.value) return
   editing.value = { employeeId: emp.employee_id, module: code }
   const moduleData = emp.modules[code as keyof typeof emp.modules]
   editValue.value = String(moduleData?.total || 0)
@@ -571,6 +641,7 @@ const flowSteps = computed(() => {
 })
 
 async function toggleStep(step: SalaryRule & { title: string }) {
+  if (!canEdit.value) return
   const newActive = !step.is_active
   step.is_active = newActive
   try {
@@ -611,6 +682,9 @@ async function loadFlowData() {
     const s = settingsRes.data.data
     flowForm.payroll_day_of_month = s.payroll_day_of_month
     salaryRules.value = rulesRes.data.data
+    // 加载会计权限
+    extraConfigCache.value = s.extra_config || {}
+    accountantAccess.value = (extraConfigCache.value.accountant_payroll_access as string) || 'none'
   } catch { /* silent */ }
 }
 
@@ -628,6 +702,74 @@ onMounted(() => {
 .auto-payroll {
   padding: 16px;
   padding-bottom: calc(64px + 24px);
+}
+
+/* ==================== 会计权限卡片 ==================== */
+.permission-card {
+  background: #111111;
+  border: 1px solid #333333;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.perm-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.perm-title {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.perm-hint {
+  font-size: 11px;
+  color: #7A7C80;
+}
+.perm-options {
+  display: flex;
+  gap: 8px;
+}
+.perm-btn {
+  flex: 1;
+  padding: 10px;
+  background: #1a1a1a;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 13px;
+  color: #C8C8C8;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.perm-btn:hover { border-color: #555; }
+.perm-btn.active {
+  border-color: #FB0079;
+  background: rgba(251, 0, 121, 0.08);
+  color: #FB0079;
+  font-weight: 600;
+}
+
+.no-access {
+  text-align: center;
+  padding: 48px 16px;
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 14px;
+  color: #7A7C80;
+}
+
+.readonly-banner {
+  text-align: center;
+  padding: 8px;
+  background: rgba(251, 0, 121, 0.08);
+  border: 1px solid rgba(251, 0, 121, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #FB0079;
+  margin-bottom: 16px;
 }
 
 /* ==================== 顶部栏 ==================== */

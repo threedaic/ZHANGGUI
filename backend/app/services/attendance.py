@@ -75,10 +75,11 @@ class AttendanceService:
     ) -> dict[str, Any]:
         """获取指定日期范围内的全员排班考勤表（仅显示需要排班的人员）"""
         records = await self.repo.get_records_by_date_range(date_from, date_to)
-        # 排班表仅显示需要排班的角色：员工、店长，排除老板/加盟商/区域经理
+        # 排班表显示所有需要排班的一线角色：店长/吧台/服务员/厨师/员工
+        # 排除不需要排班的管理层：老板/加盟商/区域经理/会计/admin
         # 同时兼容历史数据中可能存在的角色中文值
         employees = await self.repo.get_active_employees(
-            roles=["staff", "store_manager", "店长", "员工"]
+            roles=["staff", "store_manager", "bartender", "server", "chef", "店长", "员工"]
         )
         shifts = await self.repo.get_shift_configs(active_only=True)
 

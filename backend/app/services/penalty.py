@@ -179,5 +179,10 @@ class PenaltyService:
                 "penalty_type_name": NOTICE_TYPES.get(n.penalty_type, n.penalty_type),
                 "sign_task_id": sign_task.id if sign_task else None,
                 "sign_task_status": sign_task.status if sign_task else None,
+                "signature_data": sign_task.signature_data if sign_task else None,
+                "signed_at": sign_task.signed_at.isoformat() if (sign_task and sign_task.signed_at) else None,
+                "dispute_reason": sign_task.dispute_reason if sign_task else None,
+                "disputed_at": sign_task.disputed_at.isoformat() if (sign_task and sign_task.disputed_at) else None,
+                "sign_notes": sign_task.notes if sign_task else None,
             })
         return items

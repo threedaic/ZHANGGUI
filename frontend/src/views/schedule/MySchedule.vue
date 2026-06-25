@@ -191,6 +191,26 @@ function nextPeriod() {
   loadData()
 }
 
+// 班次名称映射：英文code → 中文
+const SHIFT_NAME_MAP: Record<string, string> = {
+  day: '白班',
+  night: '晚班',
+  rest: '休息',
+  leave: '请假',
+  EVENNING: '晚班',
+  EVENING: '晚班',
+  evening: '晚班',
+  EVENing: '晚班',
+  morning: '早班',
+  afternoon: '午班',
+}
+
+function getShiftDisplayName(shift?: string | null): string {
+  if (!shift) return ''
+  // 先精确匹配，再小写匹配
+  return SHIFT_NAME_MAP[shift] || SHIFT_NAME_MAP[shift.toLowerCase()] || shift
+}
+
 function getCell(dateStr: string): MyScheduleCell {
   return cells.value.find((c: MyScheduleCell) => c.date === dateStr) || {
     date: dateStr,
@@ -208,7 +228,7 @@ function getCell(dateStr: string): MyScheduleCell {
 
 function getShiftLabel(dateStr: string): string {
   const cell = getCell(dateStr)
-  return cell.scheduled_shift || '—'
+  return getShiftDisplayName(cell.scheduled_shift) || '—'
 }
 
 function getShiftStyle(dateStr: string) {

@@ -25,6 +25,9 @@ from app.utils.http_client import http_client
 class PrinterService:
     """打印机路由引擎"""
 
+    # access_token 缓存（类级别共享）
+    _token_cache: Dict[str, Dict[str, Any]] = {}
+
     def __init__(self, db: AsyncSession):
         self.db = db
 
@@ -298,14 +301,18 @@ class PrinterService:
         store_id: uuid.UUID,
         printer: Printer,
         content: str,
+        is_test: bool = False,
     ) -> Dict[str, Any]:
         """发送打印任务
 
         优先直接发送，失败则加入队列
+        is_test: 是否为测试打印，测试打印失败时直接返回错误信息，不加入队列
         """
         try:
             # 尝试直接发送
-            success = await self._call_cloud_printer(printer, content)
+            result = await self._call_cloud_printer(printer, content)
+            success = result.get("success", False)
+            err_msg = result.get("message", "")
 
             if success:
                 # 更新打印机状态
@@ -319,6 +326,15 @@ class PrinterService:
                     "printer_id": str(printer.printer_id),
                 }
             else:
+                # 测试打印失败，直接返回错误信息
+                if is_test:
+                    return {
+                        "status": "failed",
+                        "printer": printer.name,
+                        "printer_id": str(printer.printer_id),
+                        "message": err_msg or "打印失败，请检查打印机配置和网络连接",
+                    }
+
                 # 发送失败，加入队列
                 queue_id = await self._enqueue(store_id, printer.printer_id, content)
                 return {
@@ -331,6 +347,16 @@ class PrinterService:
 
         except Exception as e:
             logger.error(f"打印失败: {e}")
+
+            # 测试打印失败，直接返回错误信息
+            if is_test:
+                return {
+                    "status": "failed",
+                    "printer": printer.name,
+                    "printer_id": str(printer.printer_id),
+                    "message": f"打印异常: {str(e)}",
+                }
+
             # 异常时加入队列
             queue_id = await self._enqueue(store_id, printer.printer_id, content)
             return {
@@ -341,17 +367,172 @@ class PrinterService:
                 "message": f"打印异常: {str(e)}",
             }
 
-    async def _call_cloud_printer(self, printer: Printer, content: str) -> bool:
+    async def _get_yilianyun_access_token(self, printer: Printer) -> Optional[str]:
+        import hashlib
+        import time
+
+        client_id = printer.api_user or ""
+        client_secret = printer.api_secret or ""
+
+        if not client_id or not client_secret:
+            logger.error(f"易联云 client_id 或 client_secret 未配置: {printer.name}")
+            return None
+
+        # 检查缓存
+        cache_key = f"{client_id}_{printer.device_sn}"
+        cached = self._token_cache.get(cache_key)
+        if cached and cached.get("expires_at", 0) > time.time():
+            logger.debug(f"使用缓存的 access_token: {printer.name}")
+            return cached.get("access_token")
+
+        # 构建获取 access_token 的请求参数
+        timestamp = str(int(time.time()))
+        sign = hashlib.md5(f"{client_id}{timestamp}{client_secret}".encode()).hexdigest()
+
+        token_url = "https://open-api.10ss.net/oauth/oauth"
+        payload = {
+            "client_id": client_id,
+            "grant_type": "client_credentials",
+            "sign": sign,
+            "scope": "all",
+            "id": str(uuid.uuid4()),
+            "timestamp": int(timestamp),
+        }
+
+        try:
+            response = await http_client.post(token_url, json_body=payload, raise_on_error=False)
+            resp_data = response.json()
+
+            if resp_data.get("error") == "0":
+                body = resp_data.get("body", {})
+                access_token = body.get("access_token")
+                expires_in = body.get("expires_in", 2592000)  # 默认30天
+
+                # 更新缓存
+                self._token_cache[cache_key] = {
+                    "access_token": access_token,
+                    "expires_at": time.time() + expires_in - 3600,  # 提前1小时过期
+                }
+
+                logger.info(f"获取易联云 access_token 成功: {printer.name}")
+                return access_token
+            else:
+                logger.error(f"获取易联云 access_token 失败: {printer.name}, 响应: {resp_data}")
+                return None
+        except Exception as e:
+            logger.error(f"获取易联云 access_token 异常: {printer.name}, 错误: {e}")
+            return None
+
+    async def _get_jolimark_access_token(self, printer: Printer) -> Optional[str]:
+        """获取映美云 access_token（带缓存）"""
+        import time
+
+        app_id = printer.api_user or ""
+        app_key = printer.api_secret or ""
+
+        if not app_id or not app_key:
+            logger.error(f"映美云 app_id 或 app_key 未配置: {printer.name}")
+            return None
+
+        # 检查缓存
+        cache_key = f"jolimark_{app_id}"
+        cached = self._token_cache.get(cache_key)
+        if cached and cached.get("expires_at", 0) > time.time():
+            return cached.get("access_token")
+
+        token_url = "https://mcp.jolimark.com/mcp/v3/auth_token"
+        payload = {
+            "app_id": app_id,
+            "app_key": app_key,
+        }
+
+        try:
+            response = await http_client.post(token_url, json_body=payload, raise_on_error=False)
+            resp_data = response.json()
+
+            if resp_data.get("code") == 0:
+                access_token = resp_data.get("data", {}).get("access_token")
+                expires_in = resp_data.get("data", {}).get("expires_in", 7200)
+
+                self._token_cache[cache_key] = {
+                    "access_token": access_token,
+                    "expires_at": time.time() + expires_in - 300,
+                }
+
+                logger.info(f"获取映美云 access_token 成功: {printer.name}")
+                return access_token
+            else:
+                logger.error(f"获取映美云 access_token 失败: {printer.name}, 响应: {resp_data}")
+                return None
+        except Exception as e:
+            logger.error(f"获取映美云 access_token 异常: {printer.name}, 错误: {e}")
+            return None
+
+    def _format_content_by_paper_width(self, content: str, paper_width: int) -> str:
+        """根据纸宽自适应排版，确保文字不变形、不截断
+
+        不同纸宽对应的每行字符数（中文按2个字符宽计算）：
+        - 58mm: 约16个中文字符（32半角）
+        - 80mm: 约24个中文字符（48半角）
+        - 其他: 按比例计算
+        """
+        # 纸宽 → 每行可容纳的半角字符数
+        width_map = {58: 32, 80: 48, 76: 44, 110: 64}
+        max_chars = width_map.get(paper_width, max(32, paper_width * 24 // 40))
+
+        lines = content.split("\n")
+        formatted_lines = []
+
+        for line in lines:
+            if not line:
+                formatted_lines.append("")
+                continue
+
+            # 计算当前行的显示宽度（中文=2，英文/数字=1）
+            current_width = 0
+            current_line = ""
+
+            for char in line:
+                # 中文字符占2个宽度
+                char_width = 2 if ord(char) > 127 else 1
+
+                if current_width + char_width > max_chars:
+                    # 超过宽度，换行
+                    formatted_lines.append(current_line)
+                    current_line = char
+                    current_width = char_width
+                else:
+                    current_line += char
+                    current_width += char_width
+
+            if current_line:
+                formatted_lines.append(current_line)
+
+        return "\n".join(formatted_lines)
+
+    async def _call_cloud_printer(self, printer: Printer, content: str) -> Dict[str, Any]:
         """调用云打印机API
 
-        支持9种云打印机品牌，根据官方文档实现
+        返回: {"success": bool, "message": str, "response": dict}
         """
         brand = printer.brand or "yilianyun"
         sn = printer.device_sn
 
         if not sn:
-            logger.warning(f"打印机SN未配置: {printer.name}")
-            return False
+            msg = f"打印机SN未配置: {printer.name}"
+            logger.warning(msg)
+            return {"success": False, "message": msg, "response": {}}
+
+        # 前置检查：飞鹅等品牌必须有 api_user 和 api_secret
+        if brand in ("feie", "xpyun", "gainscha", "yilianyun", "jolimark", "zhongwu", "ushengyun"):
+            if not printer.api_user:
+                msg = f"API账号(api_user)未配置: {printer.name}，请在编辑中填写"
+                logger.error(msg)
+                return {"success": False, "message": msg, "response": {}}
+            if not printer.api_secret:
+                msg = f"API密钥(api_secret)未配置: {printer.name}，请重新编辑填写（之前可能被清空了）"
+                logger.error(msg)
+                return {"success": False, "message": msg, "response": {}}
 
         # 获取API地址
         api_url = printer.api_url
@@ -359,41 +540,172 @@ class PrinterService:
             api_url = self._get_default_api_url(brand)
 
         if not api_url:
-            logger.warning(f"打印机API地址未配置: {printer.name}")
-            return False
+            msg = f"打印机API地址未配置: {printer.name}"
+            logger.warning(msg)
+            return {"success": False, "message": msg, "response": {}}
+
+        logger.info(f"[云打印] 品牌={brand}, SN={sn}, API={api_url}, 纸宽={printer.paper_width}")
+
+        # 易联云需要先获取 access_token
+        access_token = None
+        if brand == "yilianyun":
+            access_token = await self._get_yilianyun_access_token(printer)
+            if not access_token:
+                msg = f"无法获取易联云 access_token，请检查应用ID和密钥: {printer.name}"
+                logger.error(msg)
+                return {"success": False, "message": msg, "response": {}}
+
+        # 映美云也需要先获取 access_token
+        if brand == "jolimark":
+            access_token = await self._get_jolimark_access_token(printer)
+            if not access_token:
+                msg = f"无法获取映美云 access_token: {printer.name}"
+                logger.error(msg)
+                return {"success": False, "message": msg, "response": {}}
+
+        # 根据纸宽自适应排版，防止文字变形/截断
+        paper_width = printer.paper_width or 80
+        content = self._format_content_by_paper_width(content, paper_width)
+
+        logger.info(f"[云打印] 打印内容:\n{content}")
 
         # 根据品牌构建请求参数
-        payload = self._build_payload(brand, printer, content)
+        payload = self._build_payload(brand, printer, content, access_token)
+
+        # 记录请求参数（隐藏敏感信息）
+        safe_payload = {k: ("***" if k in ("sig", "sign", "securityCode", "api_secret", "app_key") else v) for k, v in payload.items()}
+        logger.info(f"[云打印] 请求参数: {safe_payload}")
 
         try:
-            response = await http_client.post(api_url, json_body=payload)
-            logger.info(f"打印成功: {printer.name}")
-            return True
+            # 飞鹅、佳博、芯烨需要用表单方式提交（application/x-www-form-urlencoded）
+            # 使用 httpx 原生 data 参数，自动处理编码和 Content-Type
+            form_brands = {"feie", "gainscha", "xpyun"}
+            if brand in form_brands:
+                response = await http_client.post(
+                    api_url,
+                    data=payload,
+                    raise_on_error=False,
+                )
+            else:
+                response = await http_client.post(api_url, json_body=payload, raise_on_error=False)
+
+            # 解析响应体
+            try:
+                resp_data = response.json()
+            except Exception:
+                resp_data = {"raw": response.text}
+
+            # 根据品牌检查业务状态码
+            success = self._check_response(brand, resp_data)
+
+            # 提取错误信息
+            err_msg = self._extract_error_message(brand, resp_data)
+
+            if success:
+                logger.info(f"打印成功: {printer.name}, 响应: {resp_data}")
+            else:
+                logger.error(f"打印失败: {printer.name}, HTTP状态码: {response.status_code}, 响应: {resp_data}")
+
+            return {"success": success, "message": err_msg, "response": resp_data}
         except Exception as e:
-            logger.error(f"云打印API调用失败: {e}")
+            msg = f"云打印API调用异常: {printer.name}, 错误: {e}"
+            logger.error(msg)
+            return {"success": False, "message": msg, "response": {}}
+
+    def _extract_error_message(self, brand: str, resp_data: dict) -> str:
+        """从响应中提取错误信息"""
+        try:
+            if brand == "feie":
+                # 飞鹅: {"ret": 0, "msg": "ok"} 或 {"ret": -2, "msg": "错误信息"}
+                ret = resp_data.get("ret")
+                if ret == 0:
+                    return "打印成功"
+                return resp_data.get("msg", f"错误码: {ret}")
+            elif brand == "yilianyun":
+                return resp_data.get("error_description") or resp_data.get("msg", "未知错误")
+            elif brand in ("zhongwu", "ushengyun"):
+                # 中午云/优声云: {"errNum": 0, "errMsg": "success"}
+                return resp_data.get("errMsg", "未知错误")
+            else:
+                return resp_data.get("msg", str(resp_data))
+        except Exception:
+            return str(resp_data)
+
+    def _check_response(self, brand: str, resp_data: dict) -> bool:
+        """检查各品牌云打印API的业务响应码"""
+        try:
+            if brand == "yilianyun":
+                # 易联云：{"result": {"code": 0, "msg": "成功"}}
+                # 或者 {"error": "0", "error_description": "success", "body": {...}}
+                result = resp_data.get("result", {})
+                if result:
+                    return result.get("code") == 0
+                # 兼容其他响应格式
+                return resp_data.get("error") == "0"
+            elif brand == "feie":
+                # 飞鹅云：{"ret": 0, "msg": "ok", "data": "..."}
+                return resp_data.get("ret") == 0
+            elif brand == "xpyun":
+                # 芯烨：{"code": 0, "msg": "成功", "data": {...}}
+                return resp_data.get("code") == 0
+            elif brand == "gainscha":
+                # 佳博：{"code": 0, "msg": "成功"}
+                return resp_data.get("code") == 0
+            elif brand == "jolimark":
+                # 映美云：{"code": 0, "msg": "ok", "data": {...}}
+                return resp_data.get("code") == 0
+            elif brand == "zhongwu":
+                # 中午云：{"errNum": 0, "errMsg": "success", "retData": {...}}
+                return resp_data.get("errNum") == 0
+            elif brand == "ushengyun":
+                # 优声云：{"errNum": 0, "errMsg": "success", "retData": {...}}
+                return resp_data.get("errNum") == 0
+            elif brand == "kuaidi100":
+                # 快递100：{"code": 0, "msg": "成功"}
+                return resp_data.get("code") == 0
+            elif brand == "printcenter":
+                # 365智能云：{"code": 0, "msg": "成功"}
+                return resp_data.get("code") == 0
+            else:
+                # 未知品牌，假设成功
+                return True
+        except Exception as e:
+            logger.error(f"解析响应失败: {brand}, 数据: {resp_data}, 错误: {e}")
             return False
 
-    def _build_payload(self, brand: str, printer: Printer, content: str) -> dict:
+    def _build_payload(self, brand: str, printer: Printer, content: str, access_token: str = None) -> dict:
         """根据不同品牌构建打印请求参数"""
         sn = printer.device_sn
 
         if brand == "yilianyun":
-            # 易联云：OAuth2.0，需要先获取access_token
+            # 易联云：需要先获取access_token，然后使用access_token调用打印接口
+            import hashlib
+            import time
+            client_id = printer.api_user or ""
+            client_secret = printer.api_secret or ""
+            timestamp = str(int(time.time()))
+            # 签名：md5(client_id + timestamp + client_secret)
+            sign = hashlib.md5(f"{client_id}{timestamp}{client_secret}".encode()).hexdigest()
             return {
-                "client_id": printer.api_user or "",
-                "client_secret": printer.api_secret or "",
+                "client_id": client_id,
+                "access_token": access_token or "",
                 "machine_code": sn,
+                "origin_id": f"test_{int(time.time())}",
+                "sign": sign,
+                "id": str(uuid.uuid4()),
+                "timestamp": int(timestamp),
                 "content": content,
                 "times": 1,
             }
         elif brand == "feie":
-            # 飞鹅：user + ukey + stime，MD5签名
+            # 飞鹅：user + UKEY + stime，SHA1签名（官方要求）
             import hashlib
             import time
             user = printer.api_user or ""
             ukey = printer.api_secret or ""
             stime = str(int(time.time()))
-            sign = hashlib.md5(f"{user}{ukey}{stime}".encode()).hexdigest()
+            # 飞鹅官方签名：SHA1(user + UKEY + stime)
+            sign = hashlib.sha1(f"{user}{ukey}{stime}".encode()).hexdigest()
             return {
                 "user": user,
                 "stime": stime,
@@ -420,66 +732,80 @@ class PrinterService:
                 "copies": 1,
             }
         elif brand == "gainscha":
-            # 佳博：memberCode + apiKey + msgId + timestamp，MD5签名
+            # 佳博云：MD5(memberCode + deviceID + msgNo + reqTime + apiKey)
             import hashlib
             import time
             member_code = printer.api_user or ""
             api_key = printer.api_secret or ""
-            msg_id = str(uuid.uuid4())
-            timestamp = str(int(time.time()))
-            sign = hashlib.md5(f"{member_code}{api_key}{msg_id}{timestamp}".encode()).hexdigest()
+            msg_no = uuid.uuid4().hex
+            req_time = str(int(time.time() * 1000))  # 13位毫秒级时间戳
+            # 官方签名：MD5(memberCode + deviceID + msgNo + reqTime + apiKey)
+            sign = hashlib.md5(f"{member_code}{sn}{msg_no}{req_time}{api_key}".encode()).hexdigest()
             return {
                 "memberCode": member_code,
-                "msgId": msg_id,
-                "timestamp": timestamp,
-                "sign": sign,
+                "reqTime": req_time,
+                "securityCode": sign,
                 "deviceID": sn,
-                "content": content,
-                "printTimes": 1,
+                "mode": "2",  # 自由格式打印
+                "msgNo": msg_no,
+                "msgDetail": content,
+                "times": 1,
             }
         elif brand == "jolimark":
-            # 映美云：app_id + app_key
+            # 映美云：使用 access_token 调用打印接口，内容需要 HTML 格式
             return {
-                "app_id": printer.api_user or "",
-                "app_key": printer.api_secret or "",
+                "access_token": access_token or "",
                 "device_no": sn,
-                "content": content,
-                "copies": 1,
+                "paper_type": 1,  # 热敏纸
+                "paper_width": printer.paper_width or 80,
+                "pdata": f"<html><body>{content}</body></html>",
             }
         elif brand == "zhongwu":
-            # 中午云：appid + appsecret + deviceid + devicesecret，MD5签名
+            # 中午云：参数按键字典序排序 + appsecret，MD5签名
             import hashlib
             import time
             appid = printer.api_user or ""
             appsecret = printer.api_secret or ""
             deviceid = sn
+            # devicesecret 从 extra_config 获取
+            extra = printer.extra_config if isinstance(printer.extra_config, dict) else {}
+            devicesecret = extra.get("devicesecret", "")
             timestamp = str(int(time.time()))
-            sign = hashlib.md5(f"{appid}{deviceid}{timestamp}{appsecret}".encode()).hexdigest()
-            return {
+            # 所有参数（除sign外）按键字典序排序后拼接
+            params = {
                 "appid": appid,
-                "sign": sign,
-                "timestamp": timestamp,
                 "deviceid": deviceid,
-                "content": content,
-                "times": 1,
+                "devicesecret": devicesecret,
+                "printdata": content,
+                "timestamp": timestamp,
             }
+            sorted_keys = sorted(params.keys())
+            sign_str = "".join(f"{k}{params[k]}" for k in sorted_keys) + appsecret
+            sign = hashlib.md5(sign_str.encode()).hexdigest()
+            params["sign"] = sign
+            return params
         elif brand == "ushengyun":
-            # 优声云：appId + appSecret + deviceid + devicesecret，MD5签名
+            # 优声云：参数按键字典序排序 + appsecret，MD5签名（和中午云算法一致）
             import hashlib
             import time
-            app_id = printer.api_user or ""
-            app_secret = printer.api_secret or ""
-            device_id = sn
+            appid = printer.api_user or ""
+            appsecret = printer.api_secret or ""
+            deviceid = sn
+            extra = printer.extra_config if isinstance(printer.extra_config, dict) else {}
+            devicesecret = extra.get("devicesecret", "")
             timestamp = str(int(time.time()))
-            sign = hashlib.md5(f"{app_id}{device_id}{timestamp}{app_secret}".encode()).hexdigest()
-            return {
-                "appId": app_id,
-                "sign": sign,
+            params = {
+                "appid": appid,
+                "deviceid": deviceid,
+                "devicesecret": devicesecret,
+                "printdata": content,
                 "timestamp": timestamp,
-                "deviceId": device_id,
-                "content": content,
-                "times": 1,
             }
+            sorted_keys = sorted(params.keys())
+            sign_str = "".join(f"{k}{params[k]}" for k in sorted_keys) + appsecret
+            sign = hashlib.md5(sign_str.encode()).hexdigest()
+            params["sign"] = sign
+            return params
         elif brand == "kuaidi100":
             # 快递100：key + secret，MD5签名
             import hashlib
@@ -516,12 +842,12 @@ class PrinterService:
         """获取品牌默认API地址"""
         brand_urls = {
             "yilianyun": "https://open-api.10ss.net/printer/print",
-            "feie": "http://api.feieyun.com/FeieServer/printOrderAction",
+            "feie": "http://api.feieyun.cn/Api/Open/",
             "xpyun": "https://open.xpyun.net/api/openapi/xprinter/print",
             "gainscha": "https://api.poscom.cn/apisc/sendMsg",
-            "jolimark": "https://cloud.jolimark.com/api/print",
-            "zhongwu": "http://api.zhongwuyun.com/sendprint",
-            "ushengyun": "https://api.ushengyun.com/print/send",
+            "jolimark": "https://mcp.jolimark.com/mcp/v3/print",
+            "zhongwu": "http://apis.zhongwu.co/",
+            "ushengyun": "https://open-api.ushengyun.com/printer/print",
             "kuaidi100": "https://api.kuaidi100.com/printer/send",
             "printcenter": "http://open.printcenter.cn:8080/addOrder",
         }
@@ -583,8 +909,8 @@ class PrinterService:
 
             # 尝试发送
             try:
-                send_success = await self._call_cloud_printer(printer, item.content)
-                if send_success:
+                send_result = await self._call_cloud_printer(printer, item.content)
+                if send_result.get("success"):
                     item.status = "completed"
                     item.printed_at = datetime.utcnow()
                     success += 1
@@ -592,7 +918,7 @@ class PrinterService:
                     item.retry_count += 1
                     if item.retry_count >= item.max_retries:
                         item.status = "failed"
-                        item.error_message = "重试次数超限"
+                        item.error_message = send_result.get("message", "重试次数超限")
                         failed += 1
                     else:
                         # 尝试备用打印机
@@ -650,6 +976,7 @@ class PrinterService:
                 "printer_type": p.printer_type,
                 "brand": p.brand,
                 "device_sn": p.device_sn,
+                "api_user": p.api_user,
                 "online_status": p.online_status,
                 "last_heartbeat": p.last_heartbeat.isoformat() if p.last_heartbeat else None,
                 "paper_width": p.paper_width,
@@ -663,8 +990,8 @@ class PrinterService:
         if not printer:
             return {"status": "failed", "message": "打印机不存在"}
 
-        test_content = f"测试打印 - {printer.name}\n时间: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作"
-        return await self._send_print(store_id, printer, test_content)
+        test_content = f"测试打印\n{printer.name}\n{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作\n\n\n"
+        return await self._send_print(store_id, printer, test_content, is_test=True)
 
     # ==================== CRUD 操作（供API层调用） ====================
 

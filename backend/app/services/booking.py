@@ -1,6 +1,7 @@
 """订桌预约业务逻辑层。"""
 
 import uuid
+from datetime import date as date_type, time as time_type
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,19 @@ async def _get_employee_name(db: AsyncSession, employee_id: uuid.UUID | None) ->
         return None
     result = await db.execute(select(Employee.name).where(Employee.id == employee_id))
     return result.scalar_one_or_none()
+
+
+def _build_time_slot(booking) -> str | None:
+    """从 Booking ORM 的 start_time / end_time 构建 time_slot 字符串。"""
+    st = getattr(booking, 'start_time', None)
+    et = getattr(booking, 'end_time', None)
+    def _fmt(t):
+        if hasattr(t, 'strftime'):
+            return t.strftime("%H:%M")
+        return str(t) if t else None
+    if st and et:
+        return f"{_fmt(st)}-{_fmt(et)}"
+    return _fmt(st)
 
 
 class TableService:
@@ -99,13 +113,30 @@ class BookingService:
             raise ConflictError(f"桌位{table_no}在{data.date} {data.time_slot or '全天'}已被预约")
 
         create_dict = data.model_dump()
+        # time_slot → start_time / end_time（Booking 模型无 time_slot 字段）
+        time_slot = create_dict.pop("time_slot", None)
+        if time_slot and "-" in time_slot:
+            parts = time_slot.split("-", 1)
+            create_dict["start_time"] = parts[0].strip()
+            create_dict["end_time"] = parts[1].strip()
+        elif time_slot:
+            create_dict["start_time"] = time_slot.strip()
+        # table_no / source 不是 Booking 模型字段，移除
+        create_dict.pop("table_no", None)
+        create_dict.pop("source", None)
+        # date 字符串转 date 对象（数据库列是 DATE 类型）
+        if isinstance(create_dict.get("date"), str):
+            create_dict["date"] = date_type.fromisoformat(create_dict["date"])
+        # start_time / end_time 字符串转 time 对象（数据库列是 TIME 类型）
+        for _k in ("start_time", "end_time"):
+            if isinstance(create_dict.get(_k), str):
+                create_dict[_k] = time_type.fromisoformat(create_dict[_k])
         create_dict["table_id"] = table_id
-        create_dict["table_no"] = table_no
-        create_dict["source"] = "staff"
         create_dict["created_by"] = created_by
 
         booking = await self.booking_repo.create(store_id, create_dict)
         resp = BookingResponse.model_validate(booking)
+        resp.time_slot = resp.time_slot or _build_time_slot(booking)
         resp.created_by_name = await _get_employee_name(self.db, booking.created_by)
 
         table = await self.table_repo.get_by_id(table_id, store_id)
@@ -118,6 +149,7 @@ class BookingService:
         if not booking:
             raise NotFoundError("预约不存在")
         resp = BookingResponse.model_validate(booking)
+        resp.time_slot = resp.time_slot or _build_time_slot(booking)
         resp.created_by_name = await _get_employee_name(self.db, booking.created_by)
         if booking.table_id:
             table = await self.table_repo.get_by_id(booking.table_id, store_id)
@@ -148,6 +180,7 @@ class BookingService:
         responses = []
         for b in items:
             resp = BookingResponse.model_validate(b)
+            resp.time_slot = resp.time_slot or _build_time_slot(b)
             resp.created_by_name = name_map.get(b.created_by) if b.created_by else None
             if b.table_id:
                 table = table_map.get(b.table_id)
@@ -168,7 +201,6 @@ class BookingService:
             table = await self.table_repo.get_by_id(new_table_id, store_id)
             if not table or table.status != "active":
                 raise ValidationError("指定桌位不存在或已停用")
-            update_dict["table_no"] = table.table_no
 
             guests = update_dict.get("guests_count", booking.guests_count)
             if guests > table.capacity:
@@ -176,6 +208,7 @@ class BookingService:
 
         booking = await self.booking_repo.update(booking, update_dict)
         resp = BookingResponse.model_validate(booking)
+        resp.time_slot = resp.time_slot or _build_time_slot(booking)
         if booking.table_id:
             table = await self.table_repo.get_by_id(booking.table_id, store_id)
             if table:
@@ -187,7 +220,9 @@ class BookingService:
         if not booking:
             raise NotFoundError("预约不存在")
         booking = await self.booking_repo.update(booking, {"status": "cancelled"})
-        return BookingResponse.model_validate(booking)
+        resp = BookingResponse.model_validate(booking)
+        resp.time_slot = resp.time_slot or _build_time_slot(booking)
+        return resp
 
     async def stats(self, store_id: uuid.UUID, date: str) -> BookingStats:
         total = await self.table_repo.count_active(store_id)

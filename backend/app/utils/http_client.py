@@ -32,15 +32,27 @@ class HTTPClient:
         *,
         headers: dict | None = None,
         json_body: dict | None = None,
+        data: dict | None = None,
         content: bytes | None = None,
         params: dict | None = None,
+        raise_on_error: bool = True,
     ) -> httpx.Response:
         client = await self._get_client()
         logger.info(f"[HTTP] {method} {url}")
         resp = await client.request(
-            method, url, headers=headers, json=json_body, content=content, params=params
+            method, url, headers=headers, json=json_body, data=data, content=content, params=params
         )
-        resp.raise_for_status()
+
+        # 对于云打印等外部服务，不自动抛出异常，让调用方自行检查响应
+        if raise_on_error:
+            resp.raise_for_status()
+
+        # 记录非200响应的日志
+        if resp.status_code != 200:
+            logger.warning(f"[HTTP] {method} {url} 返回状态码 {resp.status_code}, 响应体: {resp.text[:500]}")
+        else:
+            logger.info(f"[HTTP] {method} {url} 响应: {resp.text[:500]}")
+
         return resp
 
     async def get(self, url: str, **kwargs) -> httpx.Response:

@@ -1,7 +1,7 @@
 import uuid
-from datetime import date
+from datetime import date, time
 
-from sqlalchemy import String, Integer, Numeric, Text, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, Numeric, Text, Date, Time, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
@@ -23,8 +23,8 @@ class Booking(TimestampMixin, Base):
     customer_name: Mapped[str] = mapped_column(String(50))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     date: Mapped[date | None] = mapped_column("booking_date", Date)
-    start_time: Mapped[str | None] = mapped_column(String(8))
-    end_time: Mapped[str | None] = mapped_column(String(8))
+    start_time: Mapped[time | None] = mapped_column("start_time", Time)
+    end_time: Mapped[time | None] = mapped_column("end_time", Time)
     guests_count: Mapped[int] = mapped_column("party_size", Integer, default=1)
     status: Mapped[str] = mapped_column(String(20), default="confirmed")
     created_by: Mapped[uuid.UUID | None] = mapped_column(

@@ -274,7 +274,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">应用密钥 (client_secret)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="易联云开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '易联云开放平台获取'" />
           </div>
         </template>
         <!-- 飞鹅：user + ukey -->
@@ -285,7 +285,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">密钥 (ukey)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="飞鹅云后台生成的UKEY" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '飞鹅云后台生成的UKEY'" />
           </div>
         </template>
         <!-- 芯烨：user + userKey -->
@@ -296,7 +296,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">开发者密钥 (userKey)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="芯烨云开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '芯烨云开放平台获取'" />
           </div>
         </template>
         <!-- 佳博：memberCode + apiKey -->
@@ -307,7 +307,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">API密钥 (apiKey)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="佳博云平台API密钥" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '佳博云平台API密钥'" />
           </div>
         </template>
         <!-- 映美云：app_id + app_key -->
@@ -318,7 +318,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">应用密钥 (app_key)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="映美云开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '映美云开放平台获取'" />
           </div>
         </template>
         <!-- 中午云：appid + appsecret + deviceid + devicesecret -->
@@ -329,7 +329,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">应用密钥 (appsecret)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="中午云开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '中午云开放平台获取'" />
           </div>
           <div class="form-group">
             <label class="form-label">设备编号 (deviceid)</label>
@@ -348,7 +348,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">应用密钥 (appSecret)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="优声云开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '优声云开放平台获取'" />
           </div>
           <div class="form-group">
             <label class="form-label">设备编号 (deviceid)</label>
@@ -367,7 +367,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">应用Secret</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="快递100开放平台获取" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '快递100开放平台获取'" />
           </div>
         </template>
         <!-- 365智能云：deviceNo + key -->
@@ -378,14 +378,16 @@
           </div>
           <div class="form-group">
             <label class="form-label">密钥 (key)</label>
-            <input v-model="printerForm.api_secret" class="form-input" type="password" placeholder="365智能云打印机密钥" />
+            <input v-model="printerForm.api_secret" class="form-input" type="password" :placeholder="editingPrinter ? '留空表示不修改' : '365智能云打印机密钥'" />
           </div>
         </template>
         <div class="form-group">
           <label class="form-label">纸宽 (mm)</label>
           <select v-model.number="printerForm.paper_width" class="form-input">
-            <option :value="58">58mm</option>
-            <option :value="80">80mm</option>
+            <option :value="58">58mm（窄纸/标签机）</option>
+            <option :value="76">76mm</option>
+            <option :value="80">80mm（标准/出单机）</option>
+            <option :value="110">110mm（宽纸）</option>
           </select>
         </div>
         <div class="modal-actions">
@@ -616,7 +618,12 @@ async function savePrinter() {
   saving.value = true
   try {
     if (editingPrinter.value) {
-      const { data: res } = await printersAPI.update(editingPrinter.value.printer_id, printerForm)
+      // 编辑模式：空密码不发送，避免覆盖原值
+      const updateData: Record<string, any> = { ...printerForm }
+      if (!updateData.api_secret) {
+        delete updateData.api_secret
+      }
+      const { data: res } = await printersAPI.update(editingPrinter.value.printer_id, updateData as any)
       if (res.code === 0) {
         ElMessage.success('打印机更新成功')
         closePrinterModal()
@@ -662,12 +669,20 @@ async function testPrint(printer: PrinterInfo) {
   try {
     const { data: res } = await printersAPI.test(printer.printer_id)
     if (res.code === 0) {
-      ElMessage.success('测试打印已发送')
+      const result = res.data || {}
+      if (result.status === 'sent') {
+        ElMessage.success('测试打印已发送，请检查打印机是否出纸')
+      } else if (result.status === 'failed') {
+        // 显示具体的失败原因
+        ElMessage.error(result.message || '测试打印失败')
+      } else {
+        ElMessage.success('测试打印已发送')
+      }
     } else {
       ElMessage.error(res.message || '测试打印失败')
     }
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || '测试打印失败')
+    ElMessage.error(e?.response?.data?.message || e?.response?.data?.detail || '测试打印失败')
   }
 }
 

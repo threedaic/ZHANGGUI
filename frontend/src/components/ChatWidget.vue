@@ -167,7 +167,9 @@ watch(() => props.visible, (val) => {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
 }
@@ -177,11 +179,15 @@ watch(() => props.visible, (val) => {
   max-width: 480px;
   height: 85vh;
   margin: 0 auto;
-  background: #000000;
+  background: rgba(17, 17, 17, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 /* Header */
@@ -190,7 +196,8 @@ watch(() => props.visible, (val) => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #222222;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
 }
 
@@ -206,6 +213,7 @@ watch(() => props.visible, (val) => {
   border-radius: 999px;
   object-fit: cover;
   flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(251, 0, 121, 0.3);
 }
 
 .chat-header-text {
@@ -235,10 +243,11 @@ watch(() => props.visible, (val) => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
 .chat-close:hover {
-  background: #111111;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* Messages */
@@ -274,17 +283,20 @@ watch(() => props.visible, (val) => {
 
 .chat-suggestion-btn {
   padding: 8px 14px;
-  background: #111111;
-  border: 1px solid #333333;
+  background: rgba(17, 17, 17, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   color: #C8C8C8;
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .chat-suggestion-btn:hover {
   border-color: #FB0079;
+  background: rgba(251, 0, 121, 0.1);
+  box-shadow: 0 4px 12px rgba(251, 0, 121, 0.15);
 }
 
 /* Bubbles */
@@ -309,6 +321,7 @@ watch(() => props.visible, (val) => {
   border-radius: 999px;
   object-fit: cover;
   flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(251, 0, 121, 0.2);
 }
 
 .chat-bubble {
@@ -320,15 +333,18 @@ watch(() => props.visible, (val) => {
 }
 
 .chat-bubble.user {
-  background: #FB0079;
+  background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
   color: #FFFFFF;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(251, 0, 121, 0.3);
 }
 
 .chat-bubble.assistant {
-  background: #111111;
+  background: rgba(34, 34, 34, 0.6);
+  backdrop-filter: blur(10px);
   color: #C8C8C8;
   border-bottom-left-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .chat-bubble.loading {
@@ -342,8 +358,9 @@ watch(() => props.visible, (val) => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #7A7C80;
+  background: #FB0079;
   animation: dotPulse 1.4s infinite ease-in-out both;
+  box-shadow: 0 0 6px rgba(251, 0, 121, 0.4);
 }
 
 .dot:nth-child(1) { animation-delay: -0.32s; }
@@ -361,8 +378,9 @@ watch(() => props.visible, (val) => {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid #222222;
-  background: #000000;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
   flex-shrink: 0;
 }
 
@@ -370,17 +388,19 @@ watch(() => props.visible, (val) => {
   flex: 1;
   height: 40px;
   padding: 0 14px;
-  background: #111111;
-  border: 1px solid #333333;
+  background: rgba(17, 17, 17, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   color: #FFFFFF;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .chat-input:focus {
   border-color: #FB0079;
+  box-shadow: 0 0 12px rgba(251, 0, 121, 0.2);
 }
 
 .chat-input::placeholder {
@@ -392,22 +412,29 @@ watch(() => props.visible, (val) => {
   height: 40px;
   border: none;
   border-radius: 8px;
-  background: #FB0079;
+  background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(251, 0, 121, 0.3);
 }
 
 .chat-send-btn:disabled {
-  background: #333333;
+  background: rgba(51, 51, 51, 0.6);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
 .chat-send-btn:not(:disabled):hover {
-  opacity: 0.9;
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(251, 0, 121, 0.4);
+}
+
+.chat-send-btn:not(:disabled):active {
+  transform: scale(0.95);
 }
 
 /* Transition */

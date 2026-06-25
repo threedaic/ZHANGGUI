@@ -240,21 +240,24 @@ const riskCards: FuncCard[] = [
   justify-content: center;
   gap: 8px;
   padding: 24px 12px;
-  background: #111111;
+  background: linear-gradient(145deg, #111111 0%, #161616 100%);
   border: 1px solid #333333;
   border-radius: 12px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .func-card:hover {
   border-color: #FB0079;
+  box-shadow: 0 4px 12px rgba(251, 0, 121, 0.1);
+  transform: translateY(-2px);
 }
 
 .func-card:active {
-  transform: scale(0.96);
+  transform: scale(0.96) translateY(0);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -264,6 +267,11 @@ const riskCards: FuncCard[] = [
   justify-content: center;
   width: 28px;
   height: 28px;
+  transition: transform 0.2s ease;
+}
+
+.func-card:hover .card-icon {
+  transform: scale(1.1);
 }
 
 .card-label {

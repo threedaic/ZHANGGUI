@@ -5,7 +5,7 @@
       <div class="shift-date">{{ formatDate(status?.date) }}</div>
       <div class="shift-info" v-if="status?.scheduled_shift">
         <span class="shift-tag" :class="{ overnight: status?.is_overnight }">
-          {{ status?.scheduled_shift }}
+          {{ getShiftDisplayName(status?.scheduled_shift) }}
         </span>
         <span class="shift-time" v-if="status?.shift_start_time">
           {{ formatTime(status.shift_start_time) }} - {{ formatTime(status?.shift_end_time) }}
@@ -124,6 +124,26 @@ const photoInput = ref<HTMLInputElement | null>(null)
 const pendingPhotoBlob = ref<Blob | null>(null)
 const lastPhotoUrl = ref<string | null>(null)
 const wifiConnected = ref(false)
+
+// 班次名称映射：英文code → 中文
+const SHIFT_NAME_MAP: Record<string, string> = {
+  day: '白班',
+  night: '晚班',
+  rest: '休息',
+  leave: '请假',
+  EVENNING: '晚班',
+  EVENING: '晚班',
+  evening: '晚班',
+  EVENing: '晚班',
+  morning: '早班',
+  afternoon: '午班',
+}
+
+function getShiftDisplayName(shift?: string | null): string {
+  if (!shift) return ''
+  // 先精确匹配，再小写匹配
+  return SHIFT_NAME_MAP[shift] || SHIFT_NAME_MAP[shift.toLowerCase()] || shift
+}
 
 const btnText = computed(() => {
   if (loading.value) return ''

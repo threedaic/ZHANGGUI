@@ -119,22 +119,26 @@ const categories: CategoryDef[] = [
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  background: #111111;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
   border: 1px solid #333333;
   border-radius: 12px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
   width: 100%;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .category-card:hover {
   border-color: #FB0079;
+  box-shadow: 0 4px 16px rgba(251, 0, 121, 0.15);
+  transform: translateY(-1px);
 }
 
 .category-card:active {
-  transform: scale(0.98);
+  transform: scale(0.98) translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .cat-left {
@@ -151,6 +155,11 @@ const categories: CategoryDef[] = [
   height: 36px;
   background: rgba(251, 0, 121, 0.08);
   border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+
+.category-card:hover .cat-icon {
+  transform: scale(1.1);
 }
 
 .cat-text {

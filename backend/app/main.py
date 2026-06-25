@@ -77,6 +77,25 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("生产环境：跳过 create_all/seed，schema 由 alembic 迁移管理")
 
+    # 生产+开发都执行：安全补齐 sys_printers 缺失列（IF NOT EXISTS 不报错）
+    try:
+        async with engine.begin() as conn:
+            alter_sqls = [
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS printer_type VARCHAR(20) DEFAULT 'order'",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS api_user VARCHAR(100)",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS api_secret TEXT",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS paper_width INTEGER DEFAULT 80",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS online_status BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMPTZ",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS extra_config JSONB DEFAULT '{}'::jsonb",
+                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()",
+            ]
+            for sql in alter_sqls:
+                await conn.execute(text(sql))
+            logger.info("sys_printers 表结构检查完成")
+    except Exception as e:
+        logger.warning(f"sys_printers 补列跳过: {e}")
+
     await init_redis()
     await init_scheduler()
     from app.utils.audit_logger import init_audit_logger

@@ -70,13 +70,6 @@
       <p class="empty-text">暂无桌位数据</p>
     </div>
 
-    <!-- FAB 新增预约 -->
-    <button class="fab" @click="openBookingForm(null)">
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path d="M11 5v12M5 11h12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
-      </svg>
-    </button>
-
     <!-- 新增预约弹窗 -->
     <div v-if="showBookingForm" class="modal-overlay" @click.self="closeBookingForm">
       <div class="modal">
@@ -720,27 +713,6 @@ onActivated(() => {
   font-family: 'Source Han Sans SC', '思源黑体', sans-serif;
   font-size: 13px;
   color: #FFFFFF;
-}
-
-/* FAB */
-.fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: #FB0079;
-  border: none;
-  box-shadow: 0 4px 12px rgba(251, 0, 121, 0.4);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-.fab:active {
-  background: #FB0079;
 }
 
 /* Modal */

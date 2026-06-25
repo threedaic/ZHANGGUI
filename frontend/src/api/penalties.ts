@@ -18,6 +18,11 @@ export interface PenaltyItem {
   penalty_type_name: string | null
   sign_task_id: string | null
   sign_task_status: string | null
+  signature_data: string | null
+  signed_at: string | null
+  dispute_reason: string | null
+  disputed_at: string | null
+  sign_notes: string | null
 }
 
 export interface PenaltyTypeOption {

@@ -125,8 +125,10 @@ async def generate_schedule(
     store_id = get_store_id(request)
     repo = AttendanceRepository(db, store_id)
 
-    # 获取员工（仅排班人员：员工+店长，排除老板）
-    employees = await repo.get_active_employees(roles=["staff", "store_manager"])
+    # 获取员工（所有需要排班的一线人员：店长/吧台/服务员/厨师/员工，排除老板等管理层）
+    employees = await repo.get_active_employees(
+        roles=["staff", "store_manager", "bartender", "server", "chef"]
+    )
     # 完善员工信息（管理标志、班组）
     from sqlalchemy import select
     from app.models.employee import Employee

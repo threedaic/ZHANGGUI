@@ -68,6 +68,8 @@ function handleLogout() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 16px;
+  padding-bottom: calc(64px + 24px);
 }
 
 .user-card {
@@ -75,21 +77,24 @@ function handleLogout() {
   align-items: center;
   gap: 12px;
   padding: 20px 16px;
-  background-color: $color-bg;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
+  border: 1px solid #333333;
   border-radius: $radius-md;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .avatar {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background-color: $brand-primary;
+  background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
   color: $brand-white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   font-weight: 600;
+  box-shadow: 0 0 16px rgba(251, 0, 121, 0.4);
 }
 
 .info {
@@ -128,18 +133,23 @@ function handleLogout() {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  background-color: $color-bg;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
+  border: 1px solid #333333;
   border-radius: $radius-md;
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
   &:hover {
-    background-color: $color-divider;
+    border-color: #FB0079;
+    box-shadow: 0 4px 16px rgba(251, 0, 121, 0.15);
+    transform: translateY(-1px);
   }
 
   &:active {
-    transform: scale(0.98);
+    transform: scale(0.98) translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
   .menu-left {
@@ -157,6 +167,11 @@ function handleLogout() {
     background: rgba(251, 0, 121, 0.08);
     border-radius: 10px;
     flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover .menu-icon {
+    transform: scale(1.1);
   }
 
   .label {
@@ -179,16 +194,25 @@ function handleLogout() {
 .logout-btn {
   margin-top: 8px;
   padding: 14px 16px;
-  background-color: $color-bg;
-  border: none;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
+  border: 1px solid #333333;
   border-radius: $radius-md;
   color: $brand-primary;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
   &:hover {
-    background-color: $color-divider;
+    border-color: #FB0079;
+    box-shadow: 0 4px 16px rgba(251, 0, 121, 0.15);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: scale(0.98) translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 }
 </style>

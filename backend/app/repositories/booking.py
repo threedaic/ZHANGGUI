@@ -3,7 +3,7 @@
 所有查询通过 store_id 过滤（RLS），boss 角色传入 store_id=None 查全部。
 """
 import uuid
-from datetime import date as date_type
+from datetime import date as date_type, time as time_type
 
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -179,10 +179,11 @@ class BookingRepo:
         )
         if time_slot:
             # 冲突条件：已有预约(同时段 或 全天) → 都视为冲突
-            start_time = time_slot.split("-")[0] if "-" in time_slot else time_slot
+            start_time_str = time_slot.split("-")[0] if "-" in time_slot else time_slot
+            start_time_obj = time_type.fromisoformat(start_time_str.strip())
             stmt = stmt.where(
                 or_(
-                    Booking.start_time == start_time,
+                    Booking.start_time == start_time_obj,
                     Booking.start_time.is_(None),
                 )
             )

@@ -27,7 +27,7 @@
       <div class="legend-items">
         <span v-for="s in shifts" :key="s.shift_code" class="legend-item">
           <span class="legend-dot" :style="{ background: s.color }"></span>
-          {{ s.shift_name }}
+          {{ getShiftDisplayName(s.shift_name) }}
         </span>
         <span class="legend-item"><span class="legend-dot legend-rest"></span>休息</span>
         <span class="legend-item"><span class="legend-dot legend-leave"></span>请假</span>
@@ -68,15 +68,6 @@
               >
                 {{ getShiftLabel(emp.employee_id, d) }}
               </span>
-              <div v-if="!isRestOrLeave(emp.employee_id, d) && formatShiftTime(getCell(emp.employee_id, d))" class="shift-time">
-                {{ formatShiftTime(getCell(emp.employee_id, d)) }}
-              </div>
-              <div v-if="getCell(emp.employee_id, d)?.clock_in" class="clock-info">
-                上 {{ formatClock(getCell(emp.employee_id, d)?.clock_in) }}
-              </div>
-              <div v-if="getCell(emp.employee_id, d)?.clock_out" class="clock-info">
-                下 {{ formatClock(getCell(emp.employee_id, d)?.clock_out) }}
-              </div>
             </td>
           </tr>
         </tbody>
@@ -216,7 +207,7 @@ const selectorEmployeeName = ref('')
 const shiftOptions = computed(() =>
   shifts.value.map(s => ({
     value: s.shift_code,
-    label: s.shift_name,
+    label: getShiftDisplayName(s.shift_name),
     color: s.shift_code === 'day' ? '#FB0079' : s.shift_code === 'night' ? '#FB0079' : '#333333',
   }))
 )
@@ -308,6 +299,26 @@ function nextPeriod() {
 
 // ---- 班次操作 ----
 
+// 班次名称映射：英文code → 中文
+const SHIFT_NAME_MAP: Record<string, string> = {
+  day: '白班',
+  night: '晚班',
+  rest: '休息',
+  leave: '请假',
+  EVENNING: '晚班',
+  EVENING: '晚班',
+  evening: '晚班',
+  EVENing: '晚班',
+  morning: '早班',
+  afternoon: '午班',
+}
+
+function getShiftDisplayName(shift?: string | null): string {
+  if (!shift) return ''
+  // 先精确匹配，再小写匹配
+  return SHIFT_NAME_MAP[shift] || SHIFT_NAME_MAP[shift.toLowerCase()] || shift
+}
+
 function getShift(empId: string, dateStr: string): string {
   return scheduleMap.value[`${empId}_${dateStr}`] || ''
 }
@@ -315,10 +326,10 @@ function getShift(empId: string, dateStr: string): string {
 function getShiftLabel(empId: string, dateStr: string): string {
   const s = getShift(empId, dateStr)
   const config = shifts.value.find((x) => x.shift_code === s || x.shift_name === s)
-  if (config) return config.shift_name
+  if (config) return getShiftDisplayName(config.shift_name)
   if (s === '休息') return '休'
   if (s === '请假') return '假'
-  return s || '—'
+  return getShiftDisplayName(s) || '—'
 }
 
 function getShiftStyle(empId: string, dateStr: string) {
