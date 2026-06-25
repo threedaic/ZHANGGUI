@@ -32,9 +32,9 @@
         </div>
       </div>
       <div class="cd-row">
-        <div class="cd-item cd-pink" @click="router.push('/profile/my-data')">
-          <span class="cd-value revenue">{{ fmtMoney(dashboard?.my_performance?.total_wework_pay || 0) }}</span>
-          <span class="cd-label">我的业绩</span>
+        <div class="cd-item cd-pink" @click="router.push('/daily/my-payroll-preview')">
+          <span class="cd-value revenue">{{ fmtMoney(myPayrollNet) }}</span>
+          <span class="cd-label">我的工资</span>
         </div>
         <div class="cd-div"></div>
         <div class="cd-item cd-white" @click="router.push('/daily/booking')">
@@ -77,11 +77,13 @@ import { dashboardAPI } from '@/api/dashboard'
 import type { DashboardData } from '@/api/dashboard'
 import { signTaskAPI } from '@/api/sign-tasks'
 import { approvalAPI } from '@/api/approval'
+import { getMyPayrollPreview } from '@/api/payroll'
 
 const router = useRouter()
 const showChat = ref(false)
 
 const dashboard = ref<DashboardData | null>(null)
+const myPayrollNet = ref<number>(0)
 
 // 老C滚动提示
 const hints = [
@@ -110,6 +112,15 @@ async function loadDashboard() {
   } catch { /* silent */ }
 }
 
+async function loadMyPayroll() {
+  try {
+    const res = await getMyPayrollPreview()
+    if (res.data.code === 0) {
+      myPayrollNet.value = res.data.data.net_pay || 0
+    }
+  } catch { /* silent */ }
+}
+
 function fmtMoney(n: number | undefined) {
   if (n == null) return '0'
   if (n >= 10000) return (n / 10000).toFixed(1) + 'w'
@@ -118,6 +129,7 @@ function fmtMoney(n: number | undefined) {
 
 onMounted(() => {
   loadDashboard()
+  loadMyPayroll()
   loadInboxCount()
   loadApprovalCount()
   startHintRotation()
@@ -222,21 +234,25 @@ const cards: FuncCard[] = [
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: #111111;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
   border: 1px solid #333333;
   border-radius: 12px;
   margin-bottom: 16px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .xiao-c-entry:hover {
   border-color: #FB0079;
+  box-shadow: 0 4px 16px rgba(251, 0, 121, 0.15);
+  transform: translateY(-1px);
 }
 
 .xiao-c-entry:active {
-  transform: scale(0.98);
+  transform: scale(0.98) translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .xiao-c-avatar {
@@ -245,6 +261,7 @@ const cards: FuncCard[] = [
   border-radius: 999px;
   object-fit: cover;
   flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(251, 0, 121, 0.3);
 }
 
 .xiao-c-text {
@@ -300,22 +317,35 @@ const cards: FuncCard[] = [
   justify-content: center;
   gap: 8px;
   padding: 24px 12px;
-  background: #111111;
-  border: 1px solid #333333;
+  background: 
+    linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%),
+    linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .func-card:hover {
-  border-color: #FB0079;
+  border-color: rgba(251, 0, 121, 0.4);
+  box-shadow: 
+    0 4px 16px rgba(251, 0, 121, 0.15),
+    0 0 0 1px rgba(251, 0, 121, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
 }
 
 .func-card:active {
-  transform: scale(0.96);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transform: scale(0.96) translateY(0);
+  box-shadow: 
+    0 1px 4px rgba(0, 0, 0, 0.3),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .card-icon {
@@ -324,6 +354,11 @@ const cards: FuncCard[] = [
   justify-content: center;
   width: 28px;
   height: 28px;
+  transition: transform 0.2s ease;
+}
+
+.func-card:hover .card-icon {
+  transform: scale(1.1);
 }
 
 .card-label {
@@ -345,7 +380,7 @@ const cards: FuncCard[] = [
   position: absolute;
   top: 8px;
   right: 28px;
-  background: #FB0079;
+  background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
   color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;
@@ -354,16 +389,30 @@ const cards: FuncCard[] = [
   min-width: 18px;
   text-align: center;
   line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(251, 0, 121, 0.4);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 /* 浓缩看板 */
 .compact-dashboard {
-  background: #111111;
+  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
   border: 1px solid #333333;
   border-radius: 12px;
   padding: 12px 16px;
   margin-bottom: 12px;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.compact-dashboard:hover {
+  border-color: #444444;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .cd-row {
@@ -390,10 +439,13 @@ const cards: FuncCard[] = [
   font-size: 16px;
   font-weight: 700;
   color: #FFFFFF;
+  font-family: 'Poppins', sans-serif;
+  letter-spacing: 0.5px;
 }
 
 .cd-pink .cd-value {
   color: #FB0079;
+  text-shadow: 0 0 8px rgba(251, 0, 121, 0.3);
 }
 
 .cd-white .cd-value {
@@ -408,6 +460,6 @@ const cards: FuncCard[] = [
 .cd-div {
   width: 1px;
   height: 24px;
-  background: #222222;
+  background: linear-gradient(to bottom, transparent 0%, #333333 50%, transparent 100%);
 }
 </style>

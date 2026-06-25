@@ -3,6 +3,7 @@
 所有模块统一调用此服务发送异常/提醒到企微群。
 """
 import json
+import uuid
 from app.utils.http_client import http_client
 from loguru import logger
 

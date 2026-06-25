@@ -42,9 +42,9 @@ async def set_session_context(
 
     依据 SPEC 2.0 §3.3：
     - 使用 SET LOCAL（事务内生效）
-    - 变量名：app.current_store_id / app.current_user_id / app.current_role
+    - 变量名：app.current_store_id / app.current_user_id / app.current_user_role
     - RLS 策略：current_setting('app.current_store_id', true)::uuid
-    - admin 角色豁免：current_setting('app.current_role', true) = 'admin'
+    - admin 角色豁免：current_setting('app.current_user_role', true) = 'admin'
 
     支持 UUID（Crush 2.0 新表）和 int（旧表）两种 store_id 格式。
     """

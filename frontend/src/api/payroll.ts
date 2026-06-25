@@ -127,3 +127,33 @@ export function markPaidPayroll(record_ids: string[], paid_at?: string) {
     paid_at,
   })
 }
+
+// ====== 当月工资预览（每日同步）======
+
+export interface PayrollPreviewItem {
+  code: string
+  name: string
+  type: 'income' | 'deduction'
+  amount: number
+  source: string
+  detail: Record<string, unknown>
+}
+
+export interface PayrollPreviewData {
+  period: string
+  employee_id: string
+  employee_name: string
+  position: string
+  net_pay: number
+  items: PayrollPreviewItem[]
+  modules_enabled: Record<string, boolean>
+  pay_day: number
+  is_finalized: boolean
+  notice: string
+}
+
+export function getMyPayrollPreview(period?: string) {
+  return client.get<ApiResponse<PayrollPreviewData>>('/payroll/my-preview', {
+    params: { period },
+  })
+}

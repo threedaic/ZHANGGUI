@@ -4,6 +4,8 @@
 
 GET    /monthly        月度工资汇总
 GET    /records/{id}   工资详情
+GET    /my             员工查看自己的历史工资
+GET    /my-preview     员工当月工资预览（每日同步，未结算）
 POST   /generate       生成工资
 POST   /review         会计复核
 POST   /finalize       老板确认
@@ -20,6 +22,7 @@ from app.schemas.payroll import (
     PayrollMarkPaidRequest,
 )
 from app.services.payroll import PayrollService
+from app.services.auto_payroll import AutoPayrollService
 from app.utils.deps import get_store_id, require_role, get_employee_id, require_employee_id, make_response
 
 router = APIRouter()
@@ -27,13 +30,13 @@ router = APIRouter()
 
 # ==================== 工资生成 ====================
 
-@router.post("/generate", summary="生成月度工资(店长)")
+@router.post("/generate", summary="生成月度工资(老板/会计)")
 async def generate_payroll(
     request: Request,
     body: PayrollGenerateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "accountant"])
     store_id = get_store_id(request)
     user_id = getattr(request.state, "user_id", None)
     service = PayrollService(db, store_id)
@@ -146,6 +149,28 @@ async def my_payroll(
     return make_response(data=items, request=request)
 
 
+# ==================== 员工当月预览（每日同步） ====================
+
+@router.get("/my-preview", summary="员工当月工资预览（每日同步）")
+async def my_payroll_preview(
+    request: Request,
+    period: str | None = Query(None, description="账期 YYYY-MM，默认当前月"),
+    db: AsyncSession = Depends(get_db),
+):
+    """员工自助查看本月工资预估。
+
+    数据来自 6 张业务表的实时聚合（合同/业绩/考勤/KPI/奖惩/加班），
+    与老板看到的"自动发薪大表格"使用同一套计算逻辑，保证数据一致。
+
+    每日自动更新，员工随时可查，减少月底争议。
+    """
+    employee_id = require_employee_id(request)
+    store_id = get_store_id(request)
+    service = AutoPayrollService(db, uuid.UUID(store_id))
+    data = await service.get_my_preview(uuid.UUID(employee_id), period)
+    return make_response(data=data, request=request)
+
+
 # ==================== 会计复核 ====================
 
 @router.post("/review", summary="会计复核(会计/店长)")
@@ -172,7 +197,7 @@ async def finalize_payroll(
     db: AsyncSession = Depends(get_db),
 ):
     """老板确认工资：reviewed -> confirmed"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss"])
     store_id = get_store_id(request)
     issuer_id = require_employee_id(request)
     service = PayrollService(db, store_id)

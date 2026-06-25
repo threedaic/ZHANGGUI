@@ -48,7 +48,7 @@ async def calculate(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "accountant"])
     service = _get_service(request, db)
     data = await service.calculate(period)
     await db.commit()
@@ -161,7 +161,7 @@ async def update_cell(
     body: CellUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss"])
     service = _get_service(request, db)
     data = await service.update_cell(body.employee_id, body.period, body.module, body.amount)
     await db.commit()

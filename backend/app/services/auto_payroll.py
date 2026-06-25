@@ -783,3 +783,127 @@ class AutoPayrollService:
             "net_pay": round(total_net, 2),
             "employee_count": len(rows),
         }
+
+    # ==================== 员工自助预览 ====================
+
+    async def get_my_preview(self, employee_id: uuid.UUID, period: str | None = None) -> dict:
+        """员工自助工资预览：只算自己，按当前月份聚合 6 张表数据。
+
+        与 get_table() 共用 _calc_employee() 计算逻辑，保证数据一致。
+        返回字段包含：各模块明细、合计、发薪日、是否锁定。
+        """
+        # 默认当前月份（YYYY-MM）
+        if not period:
+            period = datetime.now(timezone.utc).strftime("%Y-%m")
+
+        # 查员工
+        emp_stmt = select(Employee).where(Employee.id == employee_id)
+        emp = (await self.session.execute(emp_stmt)).scalar_one_or_none()
+        if not emp:
+            return {"error": "employee_not_found"}
+
+        modules = await self.get_modules()
+        rules = await self.get_rules()
+
+        # 复用核心计算逻辑
+        calc = await self._calc_employee(emp, period, modules, rules)
+
+        # 转换为面向员工的展示结构
+        m = calc["modules"]
+        items = []
+        # 合同（收入）
+        c = m.get("contract", {})
+        if c.get("monthly_salary", 0) != 0:
+            items.append({
+                "code": "contract", "name": "合同月薪", "type": "income",
+                "amount": c.get("monthly_salary", 0), "source": "合同",
+                "detail": c,
+            })
+        # 业绩（收入）
+        p = m.get("performance", {})
+        if p.get("commission", 0) != 0:
+            items.append({
+                "code": "performance", "name": "业绩提成", "type": "income",
+                "amount": p.get("commission", 0), "source": "业绩表",
+                "detail": {
+                    "total_amount": p.get("total_amount", 0),
+                    "commission_mode": p.get("commission_mode", ""),
+                    "commission_rate": p.get("commission_rate", 0),
+                    "mode_detail": p.get("mode_detail", ""),
+                },
+            })
+        # 考勤（扣款，负数转正数显示）
+        a = m.get("attendance", {})
+        if a.get("total_deduction", 0) != 0:
+            items.append({
+                "code": "attendance", "name": "考勤扣款", "type": "deduction",
+                "amount": abs(a.get("total_deduction", 0)), "source": "考勤表",
+                "detail": {
+                    "late_count": a.get("late_count", 0),
+                    "total_late_minutes": a.get("total_late_minutes", 0),
+                    "absent_count": a.get("absent_count", 0),
+                    "early_count": a.get("early_count", 0),
+                    "late_deduction": a.get("late_deduction", 0),
+                    "absent_deduction": a.get("absent_deduction", 0),
+                    "early_deduction": a.get("early_deduction", 0),
+                },
+            })
+        # KPI（收入或扣款）
+        k = m.get("kpi", {})
+        if k.get("bonus", 0) != 0:
+            items.append({
+                "code": "kpi", "name": "KPI奖金/扣款", "type": "income" if k["bonus"] > 0 else "deduction",
+                "amount": abs(k.get("bonus", 0)), "source": "KPI表",
+                "detail": {
+                    "coefficient": k.get("coefficient", 1.0),
+                    "total_score": k.get("total_score", 0),
+                },
+            })
+        # 奖惩
+        r = m.get("reward_penalty", {})
+        if r.get("reward", 0) > 0:
+            items.append({
+                "code": "reward", "name": "奖励", "type": "income",
+                "amount": r.get("reward", 0), "source": "奖惩表",
+                "detail": {"count": r.get("reward_count", 0)},
+            })
+        if r.get("penalty", 0) > 0:
+            items.append({
+                "code": "penalty", "name": "惩罚", "type": "deduction",
+                "amount": r.get("penalty", 0), "source": "奖惩表",
+                "detail": {"count": r.get("penalty_count", 0)},
+            })
+        # 加班费
+        o = m.get("overtime", {})
+        if o.get("total", 0) > 0:
+            items.append({
+                "code": "overtime", "name": "加班费", "type": "income",
+                "amount": o.get("total", 0), "source": "考勤表",
+                "detail": {
+                    "days": o.get("days", 0),
+                    "daily_wage": o.get("daily_wage", 0),
+                    "multiplier": o.get("multiplier", 3),
+                },
+            })
+
+        # 发薪日（从门店设置读）
+        pay_day = 10
+        try:
+            settings = await self._get_settings()
+            if settings:
+                pay_day = getattr(settings, "payroll_day_of_month", None) or 10
+        except Exception:
+            pass
+
+        return {
+            "period": period,
+            "employee_id": str(emp.id),
+            "employee_name": emp.name,
+            "position": emp.role or "staff",
+            "net_pay": calc["net_pay"],
+            "items": items,
+            "modules_enabled": modules,
+            "pay_day": pay_day,
+            "is_finalized": False,  # 预览模式永远不是最终
+            "notice": "预估数据，最终以月底结算为准",
+        }
