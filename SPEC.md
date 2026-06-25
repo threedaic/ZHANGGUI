@@ -1,9 +1,10 @@
 # Crush 2.0 系统规范文档（SPEC）
 
-> 日期：2026-06-22 | 版本：2.1 | 状态：修正版
+> 日期：2026-06-25 | 版本：2.2 | 状态：修正版
 >
 > 修正说明：基于完整阅读全部12份项目文档后，对比v1.0发现30个矛盾点和13项遗漏，经逐条确认后修正。
 > v2.1 补充：新增att_*/wage_*/hr_*完整表结构（24张表）、工资公式引擎、薪资规则时间线、工资异常处理流程。
+> v2.2 补充：新增收件箱消息系统统一规范、统一模块自查清单（5项待统一）。
 
 ---
 
@@ -215,7 +216,7 @@ CREATE POLICY store_isolation ON {表名}
 CREATE POLICY admin_all_access ON {表名}
     FOR ALL
     USING (
-        current_setting('app.current_role', true) = 'admin'
+        current_setting('app.current_user_role', true) = 'admin'
     );
 ```
 
@@ -223,7 +224,7 @@ CREATE POLICY admin_all_access ON {表名}
 ```python
 # 每个请求开始时设置session变量
 await session.execute(text(f"SET LOCAL app.current_store_id = '{store_id}'"))
-await session.execute(text(f"SET LOCAL app.current_role = '{role}'"))
+await session.execute(text(f"SET LOCAL app.current_user_role = '{role}'"))
 ```
 
 ### 3.4 完整建表脚本
@@ -285,7 +286,7 @@ CREATE POLICY store_isolation ON shared_employees
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON shared_employees
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 会员表
 CREATE TABLE shared_members (
@@ -309,7 +310,7 @@ CREATE POLICY store_isolation ON shared_members
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON shared_members
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 会员等级配置表
 CREATE TABLE shared_member_levels (
@@ -361,7 +362,7 @@ CREATE POLICY store_isolation ON shared_products
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON shared_products
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 桌台表
 CREATE TABLE shared_tables (
@@ -382,7 +383,7 @@ CREATE POLICY store_isolation ON shared_tables
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON shared_tables
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 设备注册表（桌灯/打印机等）
 CREATE TABLE shared_devices (
@@ -491,7 +492,7 @@ CREATE POLICY store_isolation ON pos_orders
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_orders
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 订单明细表
 CREATE TABLE pos_order_items (
@@ -523,7 +524,7 @@ CREATE POLICY store_isolation ON pos_order_items
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_order_items
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 支付记录表（支持拆分支付：一笔订单多条支付记录）
 CREATE TABLE pos_payments (
@@ -544,7 +545,7 @@ CREATE POLICY store_isolation ON pos_payments
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_payments
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 支付方式配置表
 CREATE TABLE pos_payment_methods (
@@ -592,7 +593,7 @@ CREATE POLICY store_isolation ON pos_refunds
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_refunds
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 免单/折扣审批表
 CREATE TABLE pos_discount_approvals (
@@ -613,7 +614,7 @@ CREATE POLICY store_isolation ON pos_discount_approvals
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_discount_approvals
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 会员余额流水表
 CREATE TABLE pos_member_transactions (
@@ -634,7 +635,7 @@ CREATE POLICY store_isolation ON pos_member_transactions
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_member_transactions
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 订单操作日志表
 CREATE TABLE pos_order_logs (
@@ -680,7 +681,7 @@ CREATE POLICY store_isolation ON pos_desk_notes
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON pos_desk_notes
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 ```
 
 #### 3.4.3 游戏模块表（game_*）
@@ -719,7 +720,7 @@ CREATE POLICY store_isolation ON game_sessions
     USING (store_id = current_setting('app.current_store_id')::uuid);
 CREATE POLICY admin_all_access ON game_sessions
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 -- 游戏参与者表
 CREATE TABLE game_participants (
@@ -1509,6 +1510,147 @@ await printersAPI.printByCategory({
 | /ws/desk-lamp | 桌灯端（呼叫服务、订单提醒、游戏报名） |
 | /ws/game | 游戏控台（霸屏推送、游戏状态同步） |
 
+### 4.6 收件箱消息系统（统一推送服务）
+
+> **v2.2 新增**：所有推送到员工首页收件箱的消息，统一走 `send_to_inbox()` 入口。
+
+#### 设计理念
+
+类似打印机路由引擎（4.4），收件箱也是"一次定义，全局调用"。所有需要员工签收的消息（工资单、考勤确认单、处罚通知等）都通过统一入口推送，类型集中在注册表管理。
+
+#### 类型注册表
+
+所有收件箱消息类型在 `backend/app/services/inbox_types.py` 集中定义：
+
+| 类型代码 | 中文名 | 标题模板 | 关联表 | 卡片颜色 |
+|---------|--------|---------|--------|---------|
+| `salary_slip` | 工资单 | `{period}年工资单 - {employee_name}` | wage_record | 粉色 #FB0079 |
+| `attendance_confirm` | 考勤确认单 | `{period}考勤确认单 - {employee_name}` | attendance | 蓝色 #3B82F6 |
+| `penalty_notice` | 处罚通知 | `{category}通知 - {penalty_label}` | penalty_notice | 红色 #EF4444 |
+
+> 新增类型时只需在 `INBOX_TYPES` 字典里加一条，不用改调用代码。
+
+#### 标准调用模板
+
+```python
+from app.services.sign_task import SignTaskService
+from app.services.inbox_types import InboxType
+
+sign_service = SignTaskService(session, store_id)
+
+# 单条推送
+await sign_service.send_to_inbox(
+    employee_id=员工ID,
+    msg_type=InboxType.SALARY_SLIP,   # 类型代码
+    ref_id=关联记录ID,                  # 工资单ID/考勤ID/罚单ID
+    issued_by=发送人员工ID,
+    extra={                            # 填充标题模板 + 详情页展示
+        "period": "2026-07",
+        "employee_name": "张吧员",
+        "net_pay": 3250.00,
+    },
+)
+
+# 批量推送（一个员工一条）
+await sign_service.send_batch_to_inbox(
+    employee_ids=[emp1, emp2, emp3],
+    msg_type=InboxType.ATTENDANCE_CONFIRM,
+    ref_ids=[ref1, ref2, ref3],
+    issued_by=boss_id,
+    extra_list=[
+        {"period": "2026-07", "employee_name": "张吧员"},
+        {"period": "2026-07", "employee_name": "李服务员"},
+        {"period": "2026-07", "employee_name": "王厨师"},
+    ],
+)
+```
+
+#### 已接入的调用点
+
+| 模块 | 文件 | 类型 |
+|------|------|------|
+| 工资单发送 | `api/v1/payroll.py` | salary_slip |
+| 处罚通知发送 | `services/penalty.py` | penalty_notice |
+| 考勤确认单发送 | `tasks/notification_jobs.py` | attendance_confirm |
+
+#### AI开发检查清单
+
+```markdown
+## 收件箱推送检查清单
+
+开发新功能时，如果需要推消息给员工签收，请逐项检查：
+
+- [ ] 消息类型是否已在 inbox_types.py 注册？
+- [ ] 是否调用了 sign_service.send_to_inbox()？
+- [ ] extra 里是否包含标题模板所需的所有占位字段？
+- [ ] ref_id 是否指向正确的业务记录？
+```
+
+---
+
+## 四-B、统一模块自查清单
+
+> **v2.2 新增**：代码库自查发现的重复/散落模式，按优先级排列。
+
+### 4B.1 待统一模块总览
+
+| # | 模块 | 是否统一 | 优先级 | 问题 |
+|---|------|:-------:|:------:|------|
+| 1 | 收件箱消息 | ✅ 已统一 | — | v2.2已完成，见4.6节 |
+| 2 | 打印机路由 | ✅ 已统一 | — | 见4.4节 |
+| 3 | 通知推送 | ❌ 两套并存 | 高 | wecom_notify.py 旧代码未删 |
+| 4 | 审批流 | ❌ 部分统一 | 高 | 退单/申诉未走ApprovalService |
+| 5 | 审计日志 | ❌ 模型重复 | 中 | 两个AuditLog类映射同表 |
+| 6 | 分页 | ❌ 工具有但没人用 | 中 | 10+个Repository手写分页 |
+| 7 | 门店配置读取 | ❌ 无缓存 | 低 | 13+处每次直查数据库 |
+
+### 4B.2 通知推送（优先级：高）
+
+**现状**：`NotificationService` 已建为统一入口，但旧的 `wecom_notify.py` 未删除，`notifications.py` 仍走旧路径。
+
+| 文件 | 状态 |
+|------|------|
+| `services/notification_service.py` | ✅ 统一入口（send/send_alert/send_group_text） |
+| `services/wecom_notify.py` | ❌ 旧实现，应删除 |
+| `api/v1/notifications.py:240` | ❌ 仍调旧 `send_to_group` |
+
+**建议**：删除 `wecom_notify.py`，`notifications.py` 改调 `NotificationService.send_group_text`。
+
+### 4B.3 审批流（优先级：高）
+
+**现状**：请假/补卡/调班/报销已统一走 `ApprovalService`，但退单/免单/工资申诉各自实现审批状态机。
+
+| 文件 | 状态 |
+|------|------|
+| `services/approval_service.py` | ✅ 统一审批引擎（leave/makeup/swap/expense） |
+| `api/v1/disputes.py` | ❌ 自带 confirm/reject/adjust，未走统一引擎 |
+
+**建议**：`disputes` 的审批收敛进 `ApprovalService`，新增 `dispute` 类型。
+
+### 4B.4 审计日志（优先级：中）
+
+**现状**：SQLAlchemy 事件切面已统一，但有两个 `AuditLog` 模型映射同一张表，字段名不一致。
+
+| 文件 | 字段名 |
+|------|--------|
+| `utils/audit_logger.py` | entity_type / entity_id / old_value / new_value |
+| `models/audit.py` | entity_type / entity_id / old_value / new_value |
+| `models/sys.py:33` | resource_type / resource_id / details（❌ 冲突） |
+
+**建议**：删除 `models/audit.py` 或 `models/sys.py` 中的一个 AuditLog，保留与 `audit_logger.py` 一致的那版。
+
+### 4B.5 分页（优先级：中）
+
+**现状**：`utils/pagination.py` 提供了 `paginate_query()` 工具，但只有 `booking.py` 在用，其余 10+ 个 Repository 手写 count + offset + limit。
+
+**建议**：所有 Repository 列表查询统一改调 `paginate_query(session, stmt, params)`。
+
+### 4B.6 门店配置读取（优先级：低）
+
+**现状**：13+ 处各自 `select(StoreSettings).where(store_id==...)` 直查数据库，无缓存，同一请求内可能重复查同一行。
+
+**建议**：增加 `get_store_settings_cached(store_id)`（基于 request-scoped 缓存），所有读取改为调它。
+
 ---
 
 ## 四-A、工资计算流程与公式引擎
@@ -1874,7 +2016,7 @@ feat/xxx (功能分支)
 | 数据迁移 | 先开发后迁移，P0必迁19张表 |
 | 主键 | **全部UUID**（sys_audit_logs 例外用 BIGSERIAL 自增） |
 | 多租户隔离 | **应用层+PostgreSQL RLS双层隔离** |
-| RLS豁免 | **session变量(current_setting('app.current_role'))** |
+| RLS豁免 | **session变量(current_setting('app.current_user_role'))** |
 | 架构 | **模块化单体** |
 | API版本 | **统一/api/v1/** |
 | ORM | **SQLAlchemy async** |

@@ -50,5 +50,5 @@ class Table(TimestampMixin, Base):
     table_no: Mapped[str] = mapped_column(String(16))
     capacity: Mapped[int] = mapped_column(Integer, default=4)
     min_spend: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    status: Mapped[str] = mapped_column(String(20), default="idle")
+    status: Mapped[str] = mapped_column(String(20), default="active")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

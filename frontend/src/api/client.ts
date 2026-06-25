@@ -7,7 +7,7 @@ import router from '@/router'
 
 const client: AxiosInstance = axios.create({
   baseURL: '/api/v1',
-  timeout: 15000,
+  timeout: 30000,
 })
 
 // 请求拦截：注入 JWT

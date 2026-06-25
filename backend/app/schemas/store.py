@@ -1,7 +1,7 @@
 """门店配置 Pydantic Schema"""
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class StoreSettingsUpdate(BaseModel):
@@ -42,6 +42,8 @@ class StoreSettingsUpdate(BaseModel):
     printer_label_height: Optional[int] = Field(None, ge=10, le=200)
     wecom_bot_enabled: Optional[bool] = None
     wecom_webhook_url: Optional[str] = None
+    # 扩展配置：订桌规则/评分码/存酒配置/防飞单规则等，平铺字段放不下的业务配置
+    extra_config: Optional[Dict[str, Any]] = None
 
 
 class WeworkConfigUpdate(BaseModel):
@@ -52,6 +54,7 @@ class WeworkConfigUpdate(BaseModel):
     wework_token: Optional[str] = None
     wework_aes_key: Optional[str] = None
     wework_department_id: Optional[int] = None
+    wework_externalpay_secret: Optional[str] = None
 
 
 class EmployeeRoleUpdate(BaseModel):

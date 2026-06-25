@@ -62,7 +62,21 @@ DEFAULT_SALARY_RULES = [
         "rule_unit": "天",
         "note": "每月固定4天休息",
     },
-    # ====== 自动化流程规则 ======
+    # ====== 自动化流程规则（按流程顺序） ======
+    {
+        "rule_code": "attendance_remind_days_before",
+        "rule_name": "补卡提醒",
+        "rule_value": 1.0,
+        "rule_unit": "天",
+        "note": "考勤锁定前N天提醒员工补卡",
+    },
+    {
+        "rule_code": "attendance_lock_day",
+        "rule_name": "考勤锁定日",
+        "rule_value": 2.0,
+        "rule_unit": "日",
+        "note": "每月N日后锁定上月考勤，发考勤确认单给员工签收",
+    },
     {
         "rule_code": "auto_generate_days_before",
         "rule_name": "提前生成天数",
@@ -71,18 +85,18 @@ DEFAULT_SALARY_RULES = [
         "note": "发薪日前N天自动生成工资草稿（0=发薪日当天）",
     },
     {
-        "rule_code": "attendance_lock_day",
-        "rule_name": "考勤锁定日",
-        "rule_value": 2.0,
-        "rule_unit": "日",
-        "note": "每月N日后锁定上月考勤，不再接受补卡",
-    },
-    {
         "rule_code": "auto_lock_period",
-        "rule_name": "自动锁定账期",
+        "rule_name": "工资审批",
         "rule_value": 1.0,
         "rule_unit": "",
-        "note": "发薪日自动锁定账期（1=是, 0=否）",
+        "note": "老板审批通过后自动锁定账期（1=是, 0=否）",
+    },
+    {
+        "rule_code": "send_payslip_day",
+        "rule_name": "发送工资单",
+        "rule_value": 1.0,
+        "rule_unit": "",
+        "note": "账期锁定后会计可发送工资单给员工（1=是, 0=否）",
     },
     {
         "rule_code": "kpi_deadline_day",
@@ -185,6 +199,8 @@ class PayrollConfigService:
         )
         result = await self.session.execute(stmt)
         if result.scalars().first():
+            # 已有配置，检查是否缺少新规则，缺则补上
+            await self._ensure_new_rules_exist()
             return
 
         # 初始化默认薪资规则
@@ -221,6 +237,45 @@ class PayrollConfigService:
         logger.info(
             f"[PayrollConfig] 门店 {self.store_id} 初始化默认工资配置"
         )
+
+    async def _ensure_new_rules_exist(self) -> None:
+        """检查已有门店是否缺少新规则，缺则补上；同时更新旧规则名称"""
+        stmt = select(SalaryRule).where(
+            SalaryRule.store_id == self.store_id
+        )
+        result = await self.session.execute(stmt)
+        existing_rules = {r.rule_code: r for r in result.scalars()}
+
+        # 补上缺少的规则
+        new_rules = [
+            rule for rule in DEFAULT_SALARY_RULES
+            if rule["rule_code"] not in existing_rules
+        ]
+        for rule in new_rules:
+            self.session.add(
+                SalaryRule(
+                    store_id=self.store_id,
+                    rule_code=rule["rule_code"],
+                    rule_name=rule["rule_name"],
+                    rule_type=rule.get("rule_code", "other"),
+                    rule_config={
+                        "value": rule["rule_value"],
+                        "unit": rule.get("rule_unit", ""),
+                        "note": rule.get("note", ""),
+                    },
+                )
+            )
+
+        # 更新 auto_lock_period 的名称（从"自动锁定账期"改成"工资审批"）
+        auto_lock_rule = existing_rules.get("auto_lock_period")
+        if auto_lock_rule and auto_lock_rule.rule_name == "自动锁定账期":
+            auto_lock_rule.rule_name = "工资审批"
+
+        if new_rules or auto_lock_rule:
+            await self.session.flush()
+            logger.info(
+                f"[PayrollConfig] 门店 {self.store_id} 补充新规则: {[r['rule_code'] for r in new_rules]}"
+            )
 
     async def get_items_config(self) -> list[PayrollItemConfig]:
         """获取门店所有启用的工资项配置（按 sort_order 排序）"""

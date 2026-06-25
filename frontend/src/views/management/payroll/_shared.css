@@ -1,0 +1,282 @@
+/*
+  ============================================================================
+  自动发薪 - 二级页面共享样式
+  ============================================================================
+
+  所有模块二级页面共用这套样式，保持 CRUSH 暗色风格统一
+  #000 背景 / #111 卡片 / #333 边框 / #FB0079 品牌粉
+  ============================================================================
+*/
+
+.module-detail-page {
+  padding: 16px;
+  padding-bottom: calc(64px + 24px);
+}
+
+/* ==================== 顶部栏 ==================== */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid #333333;
+  background: #111111;
+  color: #C8C8C8;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: "Source Han Sans SC", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.back-btn:hover { border-color: #FB0079; color: #FFFFFF; }
+
+.page-title {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #FFFFFF;
+  flex: 1;
+}
+
+.lock-badge {
+  font-size: 11px;
+  color: #7A7C80;
+  padding: 4px 10px;
+  border: 1px solid #333333;
+  border-radius: 4px;
+}
+
+/* ==================== 区块标题 ==================== */
+.section-title {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #7A7C80;
+  margin: 20px 0 8px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-title:first-of-type {
+  margin-top: 0;
+}
+
+/* ==================== 表格 ==================== */
+.table-wrap {
+  overflow-x: auto;
+  background: #111111;
+  border: 1px solid #333333;
+  border-radius: 12px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 13px;
+}
+
+.data-table th {
+  background: #000000;
+  padding: 12px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: #7A7C80;
+  border-bottom: 1px solid #333333;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 12px 8px;
+  text-align: center;
+  color: #FFFFFF;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.cell-name {
+  text-align: left;
+  padding-left: 14px;
+}
+
+.emp-name {
+  font-weight: 600;
+  color: #FFFFFF;
+  font-size: 14px;
+}
+
+.emp-role {
+  font-size: 11px;
+  color: #7A7C80;
+  margin-top: 2px;
+}
+
+.empty {
+  text-align: center;
+  color: #7A7C80;
+  padding: 48px;
+  font-size: 13px;
+}
+
+/* ==================== 参数设置卡片 ==================== */
+.rules-card {
+  background: #111111;
+  border: 1px solid #333333;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.rule-item:last-child {
+  border-bottom: none;
+}
+
+.rule-label {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 14px;
+  color: #C8C8C8;
+  flex: 1;
+}
+
+.rule-input {
+  width: 100px;
+  padding: 8px;
+  background: #000000;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-size: 14px;
+  text-align: right;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.rule-input:focus {
+  border-color: #FB0079;
+}
+
+.rule-unit {
+  font-size: 12px;
+  color: #7A7C80;
+  min-width: 24px;
+}
+
+/* ==================== 启用开关 ==================== */
+.toggle-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #111111;
+  border: 1px solid #333333;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.toggle-label {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 14px;
+  color: #C8C8C8;
+}
+
+/* ==================== 模块说明卡片 ==================== */
+.module-desc-card {
+  background: #111111;
+  border: 1px solid #333333;
+  border-left: 3px solid #FB0079;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.module-desc-card .desc-title {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FB0079;
+  margin-bottom: 6px;
+  margin-top: 8px;
+}
+
+.module-desc-card .desc-title:first-child {
+  margin-top: 0;
+}
+
+.module-desc-card .desc-text {
+  font-family: "Source Han Sans SC", sans-serif;
+  font-size: 13px;
+  color: #C8C8C8;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.module-desc-card .desc-formula {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: #FFFFFF;
+  background: #000000;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #333333;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #333333;
+  border-radius: 20px;
+  transition: 0.3s;
+}
+
+.slider:before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #7A7C80;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.switch input:checked + .slider {
+  background-color: #FB0079;
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(16px);
+  background-color: #FFFFFF;
+}

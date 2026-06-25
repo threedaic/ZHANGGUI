@@ -60,7 +60,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
             # 达到上限，锁定账户
             await redis.set(lock_key, "1", ex=LOCK_DURATION)
             await redis.delete(fail_key)
-            raise ForbiddenError(f"连续失败 {MAX_LOGIN_ATTEMPTS} 次，账户已被锁定 15 分钟")
+            raise ForbiddenError(f"连续失败 {MAX_LOGIN_ATTEMPTS} 次，账户已被锁定 {settings.LOGIN_LOCKOUT_MINUTES} 分钟")
         raise UnauthorizedError(f"用户名或密码错误，剩余尝试次数 {remaining}")
 
     if not user.is_active:

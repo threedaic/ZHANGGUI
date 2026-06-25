@@ -273,6 +273,38 @@ crush-zhanggui/
 - **防 N+1 查询**：Repository 层用 `selectinload`/`joinedload`；批量查询用 `IN` 子句；禁止 `for id in ids: await repo.get(id)` 模式
 - **Pydantic v2 风格统一**：使用 `model_config = {"from_attributes": True}`，禁止旧式 `class Config:`
 
+### 收件箱消息推送规范（铁律）
+> 所有需要推送到员工收件箱签收的消息，**必须**统一走 `sign_service.send_to_inbox()` 入口。
+
+**类型注册表**：`backend/app/services/inbox_types.py`
+- 新增类型只需在 `INBOX_TYPES` 字典加一条，不用改调用代码
+- 当前已注册：`salary_slip`(工资单) / `attendance_confirm`(考勤确认单) / `penalty_notice`(处罚通知)
+
+**标准调用模板**：
+```python
+from app.services.sign_task import SignTaskService
+from app.services.inbox_types import InboxType
+
+sign_service = SignTaskService(session, store_id)
+await sign_service.send_to_inbox(
+    employee_id=员工ID,
+    msg_type=InboxType.PENALTY_NOTICE,   # 用枚举，禁止硬编码字符串
+    ref_id=关联记录ID,
+    issued_by=发送人员工ID,
+    extra={                              # 必须包含标题模板所需字段
+        "category": "处罚",
+        "penalty_label": "服务投诉",
+    },
+)
+```
+
+**标题自动填充**：`send_to_inbox` 会从注册表读取 `title_template`，用 `extra` 里的字段自动替换占位符。
+
+**禁止**：
+- 禁止直接硬编码 `msg_type="penalty_notice"` 字符串，必须用 `InboxType.XXX` 枚举
+- 禁止手写 `title` 变量，标题由注册表模板自动生成
+- 禁止绕过 `send_to_inbox` 直接调用 `create_task`
+
 ---
 
 ## 九、认证与权限
@@ -325,6 +357,7 @@ cd crush-zhanggui/frontend && tar czf - dist/ | ssh root@49.233.181.87 \
 - [ ] **前端 API 类型从 `src/api/types.ts` 导入**（`ApiResponse`/`PageResult`），禁止重复定义
 - [ ] **无 N+1 查询**：批量查询用 `IN` 子句或 `selectinload`
 - [ ] **外部 URL 从 `config.py` 读取**，禁止硬编码
+- [ ] **收件箱推送使用 `send_to_inbox()`**，类型在 `inbox_types.py` 注册，用 `InboxType` 枚举
 - [ ] **已同步更新本文档及 Obsidian 相关文档**
 
 ---

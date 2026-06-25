@@ -5,8 +5,9 @@
 GET    /monthly        月度工资汇总
 GET    /records/{id}   工资详情
 POST   /generate       生成工资
-POST   /finalize       确认工资条
-POST   /mark-paid      标记已发放
+POST   /review         会计复核
+POST   /finalize       老板确认
+POST   /mark-paid      会计发放
 """
 import uuid
 from fastapi import APIRouter, Depends, Query, Request
@@ -145,14 +146,32 @@ async def my_payroll(
     return make_response(data=items, request=request)
 
 
-# ==================== 工资确认 ====================
+# ==================== 会计复核 ====================
 
-@router.post("/finalize", summary="确认工资条(店长)")
+@router.post("/review", summary="会计复核(会计/店长)")
+async def review_payroll(
+    request: Request,
+    body: PayrollFinalizeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """会计复核工资：draft -> reviewed"""
+    require_role(request, ["boss", "store_manager", "accountant"])
+    store_id = get_store_id(request)
+    issuer_id = require_employee_id(request)
+    service = PayrollService(db, store_id)
+    count = await service.review(body.record_ids, issuer_id, body.notes)
+    return make_response(message=f"已复核 {count} 条工资记录，等待老板确认", request=request)
+
+
+# ==================== 老板确认 ====================
+
+@router.post("/finalize", summary="老板确认工资条(老板)")
 async def finalize_payroll(
     request: Request,
     body: PayrollFinalizeRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    """老板确认工资：reviewed -> confirmed"""
     require_role(request, ["boss", "store_manager"])
     store_id = get_store_id(request)
     issuer_id = require_employee_id(request)
@@ -188,15 +207,11 @@ async def finalize_payroll(
             emp_name_map = {row[0]: row[1] for row in emp_result.all()}
 
         for record in records:
-            period_label = record.period.replace("-", "年") + "月"
             emp_name = emp_name_map.get(record.employee_id, f"员工{record.employee_id}")
-            title = f"工资单 - {period_label}"
 
-            await sign_service.create_task(
+            await sign_service.send_to_inbox(
                 employee_id=record.employee_id,
-                task_type="salary_slip",
-                title=title,
-                ref_type="payroll_record",
+                msg_type="salary_slip",
                 ref_id=record.id,
                 issued_by=issuer_id,
                 extra={
@@ -210,16 +225,18 @@ async def finalize_payroll(
         from loguru import logger
         logger.warning(f"工资单签收任务创建部分失败: {e}")
 
+    await db.commit()
     return make_response(message=f"已确认 {count} 条工资记录，{tasks_created} 个签收任务已推送", request=request)
 
 
-@router.post("/mark-paid", summary="标记已发放(店长)")
+@router.post("/mark-paid", summary="会计发放工资(会计/老板)")
 async def mark_paid(
     request: Request,
     body: PayrollMarkPaidRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    """会计操作发放：confirmed -> paid"""
+    require_role(request, ["boss", "store_manager", "accountant"])
     store_id = get_store_id(request)
     user_id = require_employee_id(request)
     service = PayrollService(db, store_id)

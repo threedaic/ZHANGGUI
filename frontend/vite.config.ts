@@ -28,7 +28,7 @@ export default defineConfig({
     strictPort: true, // 端口被占直接报错，不偷偷换端口
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
     },

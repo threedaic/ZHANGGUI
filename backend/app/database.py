@@ -49,12 +49,14 @@ async def set_session_context(
     支持 UUID（Crush 2.0 新表）和 int（旧表）两种 store_id 格式。
     """
     # app.current_store_id — 支持 UUID 或 int
+    # None 时设为零 UUID，避免空字符串 ''::uuid 类型转换报错，
+    # 零 UUID 不会匹配任何真实门店，确保公开端点无数据可见（除非显式关闭 RLS）。
     try:
         if store_id is not None:
             safe_store = _sanitize_session_value(store_id)
             await session.execute(text(f"SET LOCAL app.current_store_id = '{safe_store}'"))
         else:
-            await session.execute(text("SET LOCAL app.current_store_id = ''"))
+            await session.execute(text("SET LOCAL app.current_store_id = '00000000-0000-0000-0000-000000000000'"))
     except Exception as e:
         logger.warning(f"SET LOCAL app.current_store_id failed: {e}")
 

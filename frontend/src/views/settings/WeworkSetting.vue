@@ -22,7 +22,7 @@
           <input v-model="wework.secret" type="password" class="input input-long" placeholder="应用 Secret" />
         </div>
         <div class="form-row">
-          <span>回调 Token</span>
+          <span>回调Token</span>
           <input v-model="wework.token" class="input input-long" placeholder="回调验证 Token" />
         </div>
         <div class="form-row">
@@ -45,11 +45,35 @@
         </button>
       </div>
     </div>
+
+    <!-- 对外收款配置（用于提成计算） -->
+    <div class="section">
+      <div class="section-header">
+        <span>对外收款配置</span>
+        <span class="section-tag">提成数据源</span>
+      </div>
+      <div class="section-body">
+        <div class="form-row hint-row">
+          <span class="hint-text">开通企微「对外收款」后，在这里填 Secret。系统会自动拉取员工个人收款记录，用于计算提成。</span>
+        </div>
+        <div class="form-row">
+          <span>对外收款 Secret</span>
+          <input v-model="wework.externalpay_secret" type="password" class="input input-long" placeholder="对外收款专用 Secret" />
+        </div>
+        <div class="form-row" v-if="externalpayConfigured">
+          <span class="status-tag configured">已配置</span>
+        </div>
+        <button class="save-btn" :disabled="saving" @click="saveExternalpay">
+          {{ saving ? '保存中...' : '保存收款配置' }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { storeAPI, type StoreInfo } from '@/api/store'
 import apiClient from '@/api/client'
 
@@ -60,7 +84,11 @@ const wework = reactive({
   token: '',
   aes_key: '',
   department_id: null as number | null,
+  externalpay_secret: '',
 })
+
+// 后端返回"已配置"表示已存过 Secret（不返回明文）
+const externalpayConfigured = ref(false)
 
 const saving = ref(false)
 const syncing = ref(false)
@@ -72,6 +100,10 @@ async function loadData() {
     if (info.wework_corp_id) wework.corp_id = info.wework_corp_id
     if (info.wework_agent_id) wework.agent_id = info.wework_agent_id
     if (info.wework_department_id) wework.department_id = info.wework_department_id
+    // 后端返回"已配置"字符串表示已存过
+    if (info.wework_externalpay_secret === '已配置') {
+      externalpayConfigured.value = true
+    }
   } catch { /* silent */ }
 }
 
@@ -86,7 +118,29 @@ async function saveWework() {
       wework_aes_key: wework.aes_key || undefined,
       wework_department_id: wework.department_id || undefined,
     })
-  } catch { /* silent */ }
+    ElMessage.success('企微配置已保存')
+  } catch {
+    ElMessage.error('保存失败')
+  }
+  saving.value = false
+}
+
+async function saveExternalpay() {
+  if (!wework.externalpay_secret) {
+    ElMessage.warning('请先填写对外收款 Secret')
+    return
+  }
+  saving.value = true
+  try {
+    await storeAPI.updateWework({
+      wework_externalpay_secret: wework.externalpay_secret,
+    })
+    ElMessage.success('收款配置已保存')
+    externalpayConfigured.value = true
+    wework.externalpay_secret = ''  // 清空输入框，避免重复保存
+  } catch {
+    ElMessage.error('保存失败')
+  }
   saving.value = false
 }
 
@@ -94,7 +148,10 @@ async function syncContacts() {
   syncing.value = true
   try {
     await apiClient.post('/stores/wework/sync-contacts')
-  } catch { /* silent */ }
+    ElMessage.success('通讯录同步完成')
+  } catch {
+    ElMessage.error('同步失败')
+  }
   syncing.value = false
 }
 
@@ -205,4 +262,23 @@ onMounted(loadData)
 }
 .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .sync-btn:active { opacity: 0.7; }
+
+/* 对外收款标签 */
+.section-tag {
+  font-size: 10px;
+  color: #FB0079;
+  background: rgba(251, 0, 121, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.status-tag {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.status-tag.configured {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.15);
+}
 </style>

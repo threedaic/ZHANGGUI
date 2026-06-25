@@ -71,50 +71,6 @@ async def pending_count(
     return make_response(data={"pending": count}, request=request)
 
 
-@router.get("/{task_id}", summary="签收详情")
-async def get_task(
-    request: Request,
-    task_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    employee_id = require_employee_id(request)
-    service = _get_service(request, db)
-    detail = await service.get_detail(task_id, employee_id)
-    if not detail:
-        raise NotFoundError("签收任务不存在")
-    return make_response(data=detail, request=request)
-
-
-@router.post("/{task_id}/sign", summary="签收确认")
-async def sign_task(
-    request: Request,
-    task_id: uuid.UUID,
-    body: SignRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    employee_id = require_employee_id(request)
-    service = _get_service(request, db)
-    ok = await service.sign(task_id, employee_id, body.signature_data, body.notes)
-    if not ok:
-        raise ConflictError("任务不存在或已处理")
-    return make_response(message="签收成功", request=request)
-
-
-@router.post("/{task_id}/dispute", summary="提出异议")
-async def dispute_task(
-    request: Request,
-    task_id: uuid.UUID,
-    body: DisputeRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    employee_id = require_employee_id(request)
-    service = _get_service(request, db)
-    ok = await service.dispute(task_id, employee_id, body.reason)
-    if not ok:
-        raise ConflictError("任务不存在或已处理")
-    return make_response(message="异议已提交，管理员将尽快处理", request=request)
-
-
 @router.post("/batch/sign", summary="批量签收")
 async def batch_sign_tasks(
     request: Request,
@@ -184,6 +140,53 @@ async def list_disputes(
         "page_size": page_size,
         "total_pages": total_pages,
     }, request=request)
+
+
+# ==================== 动态路径（必须放在所有静态路径之后） ====================
+
+
+@router.get("/{task_id}", summary="签收详情")
+async def get_task(
+    request: Request,
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    employee_id = require_employee_id(request)
+    service = _get_service(request, db)
+    detail = await service.get_detail(task_id, employee_id)
+    if not detail:
+        raise NotFoundError("签收任务不存在")
+    return make_response(data=detail, request=request)
+
+
+@router.post("/{task_id}/sign", summary="签收确认")
+async def sign_task(
+    request: Request,
+    task_id: uuid.UUID,
+    body: SignRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    employee_id = require_employee_id(request)
+    service = _get_service(request, db)
+    ok = await service.sign(task_id, employee_id, body.signature_data, body.notes)
+    if not ok:
+        raise ConflictError("任务不存在或已处理")
+    return make_response(message="签收成功", request=request)
+
+
+@router.post("/{task_id}/dispute", summary="提出异议")
+async def dispute_task(
+    request: Request,
+    task_id: uuid.UUID,
+    body: DisputeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    employee_id = require_employee_id(request)
+    service = _get_service(request, db)
+    ok = await service.dispute(task_id, employee_id, body.reason)
+    if not ok:
+        raise ConflictError("任务不存在或已处理")
+    return make_response(message="异议已提交，管理员将尽快处理", request=request)
 
 
 @router.post("/{task_id}/remind", summary="提醒员工签收")

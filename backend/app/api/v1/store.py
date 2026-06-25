@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.database import get_db
 from app.models.store import Store, StoreSettings
 from app.models.employee import Employee
@@ -40,6 +41,7 @@ async def get_store_info(
     if not store:
         raise NotFoundError("门店不存在")
 
+    settings = get_settings()
     return make_response(data={
         "id": store.id,
         "name": store.name,
@@ -52,6 +54,8 @@ async def get_store_info(
         "wework_corp_id": store.wework_corp_id,
         "wework_agent_id": store.wework_agent_id,
         "wework_department_id": store.wework_department_id,
+        "wework_externalpay_secret": "已配置" if store.wework_externalpay_secret else None,
+        "frontend_base_url": settings.FRONTEND_BASE_URL,
     }, request=request)
 
 
@@ -106,6 +110,7 @@ async def get_store_settings(
         "printer_label_height": settings.printer_label_height,
         "wecom_bot_enabled": settings.wecom_bot_enabled,
         "wecom_webhook_url": settings.wecom_webhook_url,
+        "extra_config": settings.extra_config or {},
     }, request=request)
 
 
@@ -121,6 +126,9 @@ async def update_store_settings(
 
     body_dict = body.model_dump(exclude_unset=True, exclude_none=True)
 
+    # extra_config 深合并：保留未传入的子配置，避免覆盖其他模块配置
+    new_extra = body_dict.pop("extra_config", None)
+
     stmt = select(StoreSettings).where(StoreSettings.store_id == store_id)
     result = await db.execute(stmt)
     settings = result.scalar_one_or_none()
@@ -131,6 +139,15 @@ async def update_store_settings(
 
     for key, value in body_dict.items():
         setattr(settings, key, value)
+
+    if new_extra:
+        merged = dict(settings.extra_config or {})
+        for k, v in new_extra.items():
+            if isinstance(v, dict) and isinstance(merged.get(k), dict):
+                merged[k].update(v)
+            else:
+                merged[k] = v
+        settings.extra_config = merged
 
     await db.commit()
     await db.refresh(settings)
@@ -155,11 +172,11 @@ async def update_wework_config(
     if not store:
         raise NotFoundError("门店不存在")
 
-    wework_fields = {"wework_corp_id", "wework_agent_id", "wework_secret", "wework_token", "wework_aes_key", "wework_department_id"}
+    wework_fields = {"wework_corp_id", "wework_agent_id", "wework_secret", "wework_token", "wework_aes_key", "wework_department_id", "wework_externalpay_secret"}
     for key, value in body_dict.items():
         if key in wework_fields:
             # AES 加密 secret 字段
-            if key == "wework_secret" and value:
+            if key in ("wework_secret", "wework_externalpay_secret") and value:
                 from app.utils.security import encrypt_aes
                 value = encrypt_aes(value)
             # 部门 ID 允许传空字符串清空配置

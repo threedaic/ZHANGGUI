@@ -13,6 +13,7 @@ export interface StoreInfo {
   wework_corp_id: string | null
   wework_agent_id: string | null
   wework_department_id: number | null
+  frontend_base_url?: string
 }
 
 export interface StoreSettingsData {
@@ -48,6 +49,8 @@ export interface StoreSettingsData {
   printer_ukey?: string
   printer_label_width?: number
   printer_label_height?: number
+  // 扩展配置：订桌规则/评分码/存酒配置/防飞单规则
+  extra_config?: Record<string, any>
 }
 
 export const storeAPI = {

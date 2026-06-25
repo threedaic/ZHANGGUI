@@ -1,12 +1,12 @@
 <template>
   <div class="penalty-list-page">
     <div class="page-header">
-      <h2 class="page-title">处罚通知</h2>
+      <h2 class="page-title">奖惩通知</h2>
       <button class="btn-create" @click="router.push('/management/penalties/create')">+ 新建</button>
     </div>
 
     <div v-if="loading" class="loading">加载中...</div>
-    <div v-else-if="items.length === 0" class="empty">暂无处罚通知</div>
+    <div v-else-if="items.length === 0" class="empty">暂无奖惩通知</div>
     <div v-else class="penalty-list">
       <div
         v-for="item in items"

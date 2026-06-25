@@ -39,48 +39,73 @@
       </template>
     </div>
 
-    <!-- 推送项列表 -->
-    <div class="section-title">推送项目（{{ list.length }} 项）</div>
-    <div v-if="loading" class="loading">加载中...</div>
-    <div v-else class="setting-list">
-      <div v-for="item in list" :key="item.setting_key" class="setting-card" :class="{ disabled: !item.enabled }">
-        <div class="setting-header">
-          <div class="setting-name-area">
-            <span class="setting-name">{{ settingName(item.setting_key) }}</span>
-            <span class="setting-category">{{ settingCategory(item.setting_key) }}</span>
-          </div>
-          <van-switch v-model="item.enabled" size="18px" />
+    <!-- 自建应用机器人配置（推送给个人） -->
+    <div class="bot-config-card app-config-card">
+      <div class="bot-header">
+        <div class="bot-title-area">
+          <span class="bot-title">企微自建应用</span>
+          <span class="bot-desc">推送到员工个人企微，所有门店共用同一企微主体</span>
         </div>
-        <div class="setting-body">
-          <div class="setting-row">
-            <label class="row-label">应用通知</label>
-            <select v-model="item.channel" class="form-select">
-              <option value="in_app">仅站内信</option>
-              <option value="wecom">仅企微应用</option>
-              <option value="all">站内信+企微应用</option>
-            </select>
+        <label class="switch">
+          <input v-model="appEnabled" type="checkbox" :disabled="!appConfigured" @change="handleAppToggle" />
+          <span class="slider" />
+        </label>
+      </div>
+      <template v-if="appEnabled && appConfigured">
+        <div class="bot-form">
+          <div class="app-configured-tip">
+            <span class="tip-icon">✓</span>
+            <span>已由系统统一配置（企业ID: {{ appCorpId || '***' }}，应用ID: {{ appAgentId || '***' }}）</span>
           </div>
-          <div class="setting-row">
-            <label class="row-label">群机器人</label>
-            <label class="switch-mini">
-              <input v-model="item.push_to_group" type="checkbox" />
-              <span class="slider-mini" />
-            </label>
-            <span class="row-hint">{{ item.push_to_group ? '推送到群' : '不推群' }}</span>
+          <div class="bot-actions">
+            <button class="btn btn-test" :disabled="testingApp" @click="handleTestApp">
+              {{ testingApp ? '测试中...' : '测试发送' }}
+            </button>
           </div>
-          <div class="setting-row">
-            <label class="row-label">接收角色</label>
-            <div class="role-checks">
-              <label><input v-model="item.target_roles" type="checkbox" value="boss" /> 老板</label>
-              <label><input v-model="item.target_roles" type="checkbox" value="store_manager" /> 店长</label>
-              <label><input v-model="item.target_roles" type="checkbox" value="staff" /> 员工</label>
+          <div v-if="appTestResult" class="test-result" :class="appTestResult.ok ? 'success' : 'fail'">
+            {{ appTestResult.msg }}
+          </div>
+        </div>
+      </template>
+      <template v-else-if="!appConfigured">
+        <div class="bot-form">
+          <div class="app-configured-tip app-not-configured">
+            <span class="tip-icon tip-icon-warn">!</span>
+            <span>未配置，请联系运维在服务器配置 WECOM_CORP_ID / WECOM_AGENT_ID / WECOM_SECRET</span>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 推送项按角色分组 -->
+    <div class="section-title">推送项目（{{ list.length }} 项 · 默认全部开启，关掉不想要的）</div>
+    <div v-if="loading" class="loading">加载中...</div>
+    <div v-else>
+      <div v-for="group in roleGroups" :key="group.role" class="role-group">
+        <div class="group-title">{{ group.label }}</div>
+        <div class="setting-list">
+          <div
+            v-for="item in getItemsByGroup(group.role)"
+            :key="item.setting_key"
+            class="setting-card"
+            :class="{ disabled: !item.enabled }"
+          >
+            <div class="setting-header">
+              <span class="setting-name">{{ settingName(item.setting_key) }}</span>
+              <van-switch v-model="item.enabled" size="18px" />
             </div>
-          </div>
-          <div class="setting-row">
-            <label class="row-label">推送时间</label>
-            <input v-model="item.schedule_time" type="time" class="form-input time-input" />
-            <button v-if="item.schedule_time" class="clear-time-btn" @click="item.schedule_time = null">清除</button>
-            <span class="row-hint">{{ item.schedule_time ? '定时触发' : '实时推送' }}</span>
+            <div class="setting-roles">
+              <span class="roles-label">推给：</span>
+              <label class="role-chip"><input v-model="item.target_roles" type="checkbox" value="boss" /> 老板</label>
+              <label class="role-chip"><input v-model="item.target_roles" type="checkbox" value="store_manager" /> 店长</label>
+              <label class="role-chip"><input v-model="item.target_roles" type="checkbox" value="staff" /> 员工</label>
+            </div>
+            <!-- 开闭店检查单保留超时检查时间 -->
+            <div v-if="item.setting_key.startsWith('butler_')" class="setting-row">
+              <label class="row-label">超时检查时间</label>
+              <input v-model="item.schedule_time" type="time" class="form-input time-input" />
+              <button v-if="item.schedule_time" class="clear-time-btn" @click="item.schedule_time = null">清除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -105,6 +130,14 @@ const webhookUrl = ref('')
 const savingWebhook = ref(false)
 const testing = ref(false)
 const testResult = ref<{ ok: boolean; msg: string } | null>(null)
+
+// 自建应用配置（推送给个人）
+const appConfigured = ref(false)
+const appEnabled = ref(false)
+const appCorpId = ref('')
+const appAgentId = ref('')
+const testingApp = ref(false)
+const appTestResult = ref<{ ok: boolean; msg: string } | null>(null)
 
 // 推送项名称映射（补全所有类型）
 const nameMap: Record<string, string> = {
@@ -165,13 +198,50 @@ function settingCategory(key: string) {
   return categoryMap[key] || ''
 }
 
+// 推送项按角色分组（系统预置，老板一眼看到"我该看哪些"）
+const roleGroups = [
+  { role: 'boss', label: '老板该看的' },
+  { role: 'store_manager', label: '店长该处理的' },
+  { role: 'staff', label: '员工该知道的' },
+]
+
+// 每项推送的归属分组（按默认接收角色归类）
+const groupMap: Record<string, string> = {
+  // 老板该看的
+  system_error: 'boss',
+  antifraud_alert: 'boss',
+  rating_alert: 'boss',
+  wine_stocktake_alert: 'boss',
+  penalty_notice: 'boss',
+  butler_manual_review: 'boss',
+  daily_report: 'boss',
+  attendance_alert: 'boss',
+  butler_opening_overdue: 'boss',
+  butler_closing_overdue: 'boss',
+  approval: 'boss',
+  approval_pending: 'boss',
+  approval_result: 'boss',
+  sign_dispute: 'boss',
+  // 店长该处理的
+  shift_status: 'store_manager',
+  shift_change: 'store_manager',
+  sign_remind: 'store_manager',
+  // 员工该知道的
+  reminder: 'staff',
+}
+
+function getItemsByGroup(role: string) {
+  return list.value.filter(item => groupMap[item.setting_key] === role)
+}
+
 async function loadData() {
   loading.value = true
   try {
-    // 并行加载推送设置和群机器人配置
-    const [settingsRes, storeRes] = await Promise.all([
+    // 并行加载推送设置、群机器人配置、自建应用配置状态
+    const [settingsRes, storeRes, appRes] = await Promise.all([
       notificationAPI.getSettings(),
       apiClient.get('/stores/settings').catch(() => null),
+      apiClient.get('/notifications/app-config').catch(() => null),
     ])
     list.value = settingsRes.data.data
 
@@ -179,6 +249,15 @@ async function loadData() {
       const storeData = (storeRes.data as any).data || (storeRes.data as any)
       botEnabled.value = !!storeData?.wecom_bot_enabled
       webhookUrl.value = storeData?.wecom_webhook_url || ''
+    }
+
+    // 加载自建应用配置状态（环境变量统一配置 or 门店表回退）
+    if (appRes) {
+      const appData = (appRes.data as any).data || (appRes.data as any)
+      appConfigured.value = !!appData?.configured
+      appEnabled.value = !!appData?.enabled
+      appCorpId.value = appData?.corp_id || ''
+      appAgentId.value = appData?.agent_id || ''
     }
   } finally {
     loading.value = false
@@ -190,6 +269,14 @@ async function handleBotToggle() {
     await apiClient.put('/stores/settings', { wecom_bot_enabled: botEnabled.value })
   } catch {
     botEnabled.value = !botEnabled.value
+  }
+}
+
+async function handleAppToggle() {
+  try {
+    await apiClient.put('/notifications/app-enabled', { enabled: appEnabled.value })
+  } catch {
+    appEnabled.value = !appEnabled.value
   }
 }
 
@@ -227,10 +314,26 @@ async function handleTest() {
   }
 }
 
+async function handleTestApp() {
+  testingApp.value = true
+  appTestResult.value = null
+  try {
+    await apiClient.post('/notifications/test-app')
+    appTestResult.value = { ok: true, msg: '测试消息已发送到您的企微' }
+  } catch (e: any) {
+    appTestResult.value = { ok: false, msg: e.response?.data?.message || '测试发送失败' }
+  } finally {
+    testingApp.value = false
+  }
+}
+
 async function handleSave() {
   saving.value = true
   try {
     for (const item of list.value) {
+      // 简化配置：渠道固定"站内信+企微应用"，群推跟随群机器人总开关
+      item.channel = 'all'
+      item.push_to_group = true
       await notificationAPI.saveSetting(item)
     }
     alert('保存成功')
@@ -353,6 +456,87 @@ onMounted(loadData)
 .btn-save-webhook {
   background: #FB0079;
   color: #FFFFFF;
+}
+
+.app-configured-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(76, 175, 80, 0.08);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #4CAF50;
+}
+
+.tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #4CAF50;
+  color: #000000;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tip-icon-warn {
+  background: #FB0079;
+  color: #FFFFFF;
+}
+
+.app-not-configured {
+  background: rgba(251, 0, 121, 0.08);
+  border-color: rgba(251, 0, 121, 0.3);
+  color: #FB0079;
+}
+
+/* 角色分组 */
+.role-group {
+  margin-bottom: 16px;
+}
+
+.group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FB0079;
+  margin: 12px 0 8px;
+  padding-left: 4px;
+}
+
+.setting-roles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.roles-label {
+  font-size: 12px;
+  color: #7A7C80;
+}
+
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #B0B3B8;
+  cursor: pointer;
+}
+
+.role-chip input {
+  margin: 0;
 }
 
 .test-result {

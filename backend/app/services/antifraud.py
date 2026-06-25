@@ -14,6 +14,7 @@ from app.models.table_session import TableSession
 from app.repositories.antifraud import AntiFraudRepository
 from app.schemas.antifraud import RuleDetail, SessionRisk
 from app.services.notification_service import NotificationService
+from app.utils.deps import get_extra_config
 from app.utils.exceptions import AppError, NotFoundError, ValidationError
 
 
@@ -24,6 +25,30 @@ class AntiFraudService:
         self.repo = AntiFraudRepository(session, store_id)
         self.session = session
         self.store_id = store_id
+        # 默认阈值，scan_daily 时会从 extra_config 覆盖
+        self.anomaly_threshold: float = 50.0
+        self.critical_threshold: float = 80.0
+        self.alert_push_enabled: bool = True
+        self.enabled_rules: set[str] = set()
+
+    async def _load_config(self) -> None:
+        """从 store_settings.extra_config.antifraud 读取阈值与开关。"""
+        cfg = await get_extra_config(self.session, str(self.store_id), "antifraud")
+        try:
+            self.anomaly_threshold = float(cfg.get("anomaly_threshold", 50))
+        except (TypeError, ValueError):
+            self.anomaly_threshold = 50.0
+        try:
+            self.critical_threshold = float(cfg.get("critical_threshold", 80))
+        except (TypeError, ValueError):
+            self.critical_threshold = 80.0
+        self.alert_push_enabled = bool(cfg.get("alert_push_enabled", True))
+        rules_cfg = cfg.get("rules") or {}
+        # 未显式关闭的规则都启用
+        self.enabled_rules = {
+            code for code in ("cancellation", "account_diff", "amount_deviation", "time_gap", "employee_deviation")
+            if rules_cfg.get(code, True)
+        }
 
     # ==================== 5 规则引擎 ====================
 
@@ -32,6 +57,11 @@ class AntiFraudService:
         扫描指定日期的所有开台会话，逐条打分。
         返回扫描汇总结果。
         """
+        # 读取店铺防飞单配置（阈值/开关）
+        await self._load_config()
+        anomaly_threshold = self.anomaly_threshold
+        critical_threshold = self.critical_threshold
+
         sessions = await self.repo.get_sessions_by_date(scan_date)
         if not sessions:
             return {
@@ -86,7 +116,7 @@ class AntiFraudService:
                 risk_score=round(risk_score, 1),
                 risk_level=risk_level,
                 rules=rules,
-                is_anomaly=risk_score > 50,
+                is_anomaly=risk_score > anomaly_threshold,
                 anomaly_reason=json.dumps({
                     "risk_score": round(risk_score, 1),
                     "risk_level": risk_level,
@@ -99,7 +129,7 @@ class AntiFraudService:
             # 标记异常
             updates.append({
                 "session_id": session.id,
-                "is_anomaly": risk_score > 50,
+                "is_anomaly": risk_score > anomaly_threshold,
                 "anomaly_reason": session_risk.anomaly_reason,
             })
 
@@ -109,11 +139,11 @@ class AntiFraudService:
 
         # 统计
         anomaly_sessions = [r for r in risk_results if r.is_anomaly]
-        high_risk = [r for r in risk_results if r.risk_score > 50]
-        critical = [r for r in risk_results if r.risk_score > 80]
+        high_risk = [r for r in risk_results if r.risk_score > anomaly_threshold]
+        critical = [r for r in risk_results if r.risk_score > critical_threshold]
 
-        # 推送企微预警（>50 分）
-        if push_alert and high_risk:
+        # 推送企微预警（超过异常阈值）
+        if push_alert and self.alert_push_enabled and high_risk:
             await self._push_alerts(scan_date, high_risk)
 
         return {
@@ -133,26 +163,32 @@ class AntiFraudService:
         store_avg_per_guest: float,
         employee_anomaly_cache: dict[int, int],
     ) -> list[RuleDetail]:
-        """对单个会话逐规则打分，返回 5 条规则明细。"""
+        """对单个会话逐规则打分，返回规则明细（跳过被关闭的规则）。"""
 
         rules: list[RuleDetail] = []
+        enabled = self.enabled_rules
 
         # ---- 规则1: 作废异常 (0-20) ----
-        rules.append(self._rule_cancellation(session))
+        if "cancellation" in enabled:
+            rules.append(self._rule_cancellation(session))
 
         # ---- 规则2: 账差 (0-20) ----
-        rules.append(self._rule_account_diff(session))
+        if "account_diff" in enabled:
+            rules.append(self._rule_account_diff(session))
 
         # ---- 规则3: 金额偏离 (0-20) ----
-        rules.append(self._rule_amount_deviation(session, store_avg_per_guest))
+        if "amount_deviation" in enabled:
+            rules.append(self._rule_amount_deviation(session, store_avg_per_guest))
 
         # ---- 规则4: 时间裂隙 (0-20) ----
-        rules.append(self._rule_time_gap(session))
+        if "time_gap" in enabled:
+            rules.append(self._rule_time_gap(session))
 
         # ---- 规则5: 员工偏差 (0-20) ----
-        rules.append(
-            self._rule_employee_deviation(session, employee_anomaly_cache)
-        )
+        if "employee_deviation" in enabled:
+            rules.append(
+                self._rule_employee_deviation(session, employee_anomaly_cache)
+            )
 
         return rules
 

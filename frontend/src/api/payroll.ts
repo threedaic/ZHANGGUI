@@ -12,7 +12,7 @@ export interface PayrollMonthlyItem {
   total_income: number
   total_deduction: number
   net_pay: number
-  status: 'draft' | 'confirmed' | 'paid'
+  status: 'draft' | 'reviewed' | 'confirmed' | 'paid'
 }
 
 export interface PayrollMonthlySummary {
@@ -104,6 +104,13 @@ export function getPayrollDetail(recordId: string) {
 export function getMyPayroll(period?: string) {
   return client.get<ApiResponse<MyPayrollItem[]>>('/payroll/my', {
     params: { period },
+  })
+}
+
+export function reviewPayroll(record_ids: string[], notes?: string) {
+  return client.post<ApiResponse<null>>('/payroll/review', {
+    record_ids,
+    notes,
   })
 }
 

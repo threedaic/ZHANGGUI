@@ -18,6 +18,7 @@ body{background:#000;color:#fff;font-family:'Noto Sans SC',sans-serif;min-height
 .star.active{background:#FB0079;color:#fff}
 .btn{width:100%;max-width:340px;height:48px;background:#FB0079;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:600;margin-top:24px;cursor:pointer}
 .btn:active{background:#FF68A2}
+.btn:disabled{opacity:.5}
 .thanks{text-align:center;margin-top:60px}
 .thanks .emoji{font-size:48px;margin-bottom:12px}
 .thanks h2{font-size:20px;color:#FB0079;margin-bottom:8px}
@@ -27,9 +28,20 @@ body{background:#000;color:#fff;font-family:'Noto Sans SC',sans-serif;min-height
 <body>
 <div id="app"></div>
 <script>
-const DIMS = ['服务态度','出品质量','环境卫生','上酒速度','音乐氛围','性价比','整体体验'];
-const token = new URLSearchParams(location.search).get('t') || '';
-let scores = Array(7).fill(0);
+// 维度与 API 字段映射
+var DIMS=[
+ {label:'出品质量',key:'food_quality'},
+ {label:'出品速度',key:'food_speed'},
+ {label:'酒水质量',key:'drink_quality'},
+ {label:'上酒速度',key:'drink_speed'},
+ {label:'服务态度',key:'service_attitude'},
+ {label:'服务速度',key:'service_speed'},
+ {label:'环境卫生',key:'cleanliness'}
+];
+var params=new URLSearchParams(location.search);
+var storeId=params.get('store_id')||params.get('s')||'';
+var tableNo=params.get('table_no')||params.get('t')||'';
+var scores=DIMS.map(function(){return 0});
 
 function starClick(dim,val){
   scores[dim]=val===scores[dim]?0:val;
@@ -37,21 +49,33 @@ function starClick(dim,val){
 }
 
 function submit(){
-  if(scores.some(s=>s===0)) return alert('请为所有维度评分');
-  const body=JSON.stringify({token,dimensions:DIMS.map((d,i)=>({name:d,score:scores[i]}))});
-  fetch('/api/v1/ratings',{method:'POST',headers:{'Content-Type':'application/json'},body})
-  .then(r=>r.json()).then(d=>{
-    if(d.code===0) document.getElementById('app').innerHTML=
-      `<div class=thanks><div class=emoji>❤️</div><h2>感谢您的评价</h2><p>我们会继续努力</p></div>`;
+  if(!storeId||!tableNo) return alert('评分码无效，请联系服务员');
+  if(scores.some(function(s){return s===0})) return alert('请为所有维度评分');
+  var body=JSON.stringify({
+    store_id:storeId,
+    table_no:tableNo,
+    food_quality:scores[0],food_speed:scores[1],
+    drink_quality:scores[2],drink_speed:scores[3],
+    service_attitude:scores[4],service_speed:scores[5],
+    cleanliness:scores[6]
   });
+  var btn=document.querySelector('.btn');if(btn)btn.disabled=true;
+  fetch('/api/v1/ratings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.code===0) document.getElementById('app').innerHTML=
+      '<div class=thanks><div class=emoji>❤️</div><h2>感谢您的评价</h2><p>我们会继续努力</p></div>';
+    else {alert(d.message||'提交失败');if(btn)btn.disabled=false;}
+  })
+  .catch(function(){alert('网络异常，请重试');if(btn)btn.disabled=false;});
 }
 
 function render(){
-  let h='<div class=logo>CRUSH</div><div class=sub>为本次体验打分</div>';
-  DIMS.forEach((d,i)=>{
-    h+=`<div class=dimension><div class=dim-label>${d}</div><div class=stars>`;
-    for(let s=1;s<=5;s++)
-      h+=`<button class="star${s<=scores[i]?' active':''}" onclick="starClick(${i},${s})">★</button>`;
+  var h='<div class=logo>CRUSH</div><div class=sub>'+(tableNo?(tableNo+'桌 '):'')+'为本次体验打分</div>';
+  DIMS.forEach(function(d,i){
+    h+='<div class=dimension><div class=dim-label>'+d.label+'</div><div class=stars>';
+    for(var s=1;s<=5;s++)
+      h+='<button class="star'+(s<=scores[i]?' active':'')+'" onclick="starClick('+i+','+s+')">★</button>';
     h+='</div></div>';
   });
   h+='<button class=btn onclick=submit()>提交评分</button>';

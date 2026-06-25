@@ -1,6 +1,11 @@
 <template>
   <div class="sign-detail-page">
     <div v-if="loading" class="loading">加载中...</div>
+    <div v-else-if="loadError" class="error-state">
+      <div class="error-icon">!</div>
+      <div class="error-text">{{ loadError }}</div>
+      <button class="btn-retry" @click="loadDetail">重试</button>
+    </div>
     <template v-else-if="detail">
       <!-- 标题区域 -->
       <div class="detail-header">
@@ -31,7 +36,7 @@
           <div class="penalty-section">
             <div class="info-row">
               <span class="info-label">处罚类型</span>
-              <span class="info-value">{{ detail.extra?.penalty_type_name || penaltyTypeNames[extraData?.penalty_type] || detail.extra?.penalty_type }}</span>
+              <span class="info-value">{{ detail.extra?.penalty_label || detail.extra?.penalty_type_name || penaltyTypeNames[extraData?.penalty_type] || detail.extra?.penalty_type }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">罚款金额</span>
@@ -115,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { signTaskAPI, type SignTaskItem } from '@/api/sign-tasks'
 import SignaturePad from '@/components/SignaturePad.vue'
@@ -125,6 +130,7 @@ const router = useRouter()
 
 const detail = ref<SignTaskItem | null>(null)
 const loading = ref(false)
+const loadError = ref('')
 const signing = ref(false)
 const disputing = ref(false)
 const showDispute = ref(false)
@@ -141,12 +147,9 @@ const typeLabels: Record<string, string> = {
 }
 
 const penaltyTypeNames: Record<string, string> = {
-  late_fine: '迟到罚款',
-  absent_fine: '旷工罚款',
-  early_fine: '早退罚款',
-  complaint: '服务投诉',
-  antifraud: '飞单处罚',
-  other: '其他违规',
+  penalty_complaint: '服务投诉',
+  penalty_antifraud: '飞单处罚',
+  penalty_other: '严重违纪',
 }
 
 function typeLabel(type: string): string {
@@ -166,41 +169,66 @@ function formatDate(iso: string | null): string {
 
 async function loadDetail() {
   const id = String(route.params.id || '')
-  if (!id) return
+  if (!id) {
+    loadError.value = '缺少任务ID'
+    return
+  }
   loading.value = true
+  loadError.value = ''
   try {
     const res = await signTaskAPI.getDetail(id)
     detail.value = res.data.data
-  } catch { /* */ }
-  loading.value = false
+    if (!detail.value) {
+      loadError.value = '未找到该签收任务'
+    }
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '加载失败'
+    loadError.value = msg
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleSign() {
   const pad = signatureRef.value
   if (!pad || pad.isEmpty()) {
+    loadError.value = '请先手写签名'
     return
   }
   signing.value = true
+  loadError.value = ''
   try {
     const dataURL = pad.getDataURL()
     await signTaskAPI.sign(detail.value!.id, dataURL)
     await loadDetail()
-  } catch { /* */ }
-  signing.value = false
+  } catch (e: any) {
+    loadError.value = '签收失败: ' + (e?.response?.data?.message || e?.message || '未知错误')
+  } finally {
+    signing.value = false
+  }
 }
 
 async function handleDispute() {
   if (!disputeReason.value.trim()) return
   disputing.value = true
+  loadError.value = ''
   try {
     await signTaskAPI.dispute(detail.value!.id, disputeReason.value.trim())
     showDispute.value = false
     await loadDetail()
-  } catch { /* */ }
-  disputing.value = false
+  } catch (e: any) {
+    loadError.value = '提交异议失败: ' + (e?.response?.data?.message || e?.message || '未知错误')
+  } finally {
+    disputing.value = false
+  }
 }
 
 onMounted(loadDetail)
+
+// 路由参数变化时重新加载（同组件跳转场景）
+watch(() => route.params.id, (newId) => {
+  if (newId) loadDetail()
+})
 </script>
 
 <style scoped>
@@ -213,6 +241,43 @@ onMounted(loadDetail)
   text-align: center;
   color: #7A7C80;
   padding: 48px;
+}
+
+.error-state {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(251, 0, 121, 0.15);
+  color: #FB0079;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.error-text {
+  font-size: 14px;
+  color: #C8C8C8;
+  margin-bottom: 16px;
+  word-break: break-all;
+}
+
+.btn-retry {
+  background: #FB0079;
+  color: #FFFFFF;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .detail-header {

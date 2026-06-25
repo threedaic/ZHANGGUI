@@ -148,15 +148,12 @@ async def monthly_attendance_confirm_job() -> None:
                 try:
                     # 按员工所属门店创建签收服务
                     sign_service = SignTaskService(session, store_id=emp.store_id)
-                    title = f"考勤确认单 - {period}"
-                    task = await sign_service.create_task(
+                    task = await sign_service.send_to_inbox(
                         employee_id=emp.id,
-                        task_type="attendance_confirm",
-                        title=title,
-                        ref_type="attendance_summary",
+                        msg_type="attendance_confirm",
                         ref_id=emp.id,  # 用 employee_id 作为 ref
                         issued_by=boss_emp_id,
-                        extra={"period": period},
+                        extra={"period": period, "employee_name": emp.name},
                     )
                     created += 1
                 except Exception as e:
@@ -166,4 +163,68 @@ async def monthly_attendance_confirm_job() -> None:
             logger.info(f"考勤确认任务完成: 为 {created}/{len(employees)} 名员工创建签收任务")
         except Exception as e:
             logger.error(f"考勤确认任务总失败: {e}")
+            await session.rollback()
+
+
+async def cleanup_checkin_photos_job() -> None:
+    """每天 04:00 清理过期打卡照片文件。
+
+    策略：按各门店配置的 checkin_photo_retention_days（默认90天），
+    删除过期的照片文件，但保留 att_records 中的 wifi_bssid/wifi_ssid/photo_taken_at 元数据。
+    photo_url 置空表示照片已清理。
+    """
+    import os
+    from datetime import datetime, timedelta
+    from sqlalchemy import select, and_, update
+    from app.models.attendance import AttendanceRecord
+    from app.models.store import StoreSettings
+
+    async with AsyncSessionLocal() as session:
+        try:
+            # 获取所有门店的保留天数配置
+            settings_result = await session.execute(select(StoreSettings))
+            all_settings = settings_result.scalars().all()
+            if not all_settings:
+                return
+
+            total_deleted = 0
+            now = datetime.utcnow()
+
+            for settings in all_settings:
+                retention_days = settings.checkin_photo_retention_days or 90
+                cutoff = now - timedelta(days=retention_days)
+
+                # 查询过期且有照片的记录
+                result = await session.execute(
+                    select(AttendanceRecord).where(
+                        and_(
+                            AttendanceRecord.store_id == settings.store_id,
+                            AttendanceRecord.photo_url.isnot(None),
+                            AttendanceRecord.photo_taken_at < cutoff,
+                        )
+                    )
+                )
+                records = result.scalars().all()
+
+                for record in records:
+                    if record.photo_url:
+                        # 照片文件路径：/uploads/checkin/xxx.jpg → uploads/checkin/xxx.jpg
+                        rel_path = record.photo_url.lstrip("/")
+                        backend_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                        filepath = os.path.join(backend_root, rel_path)
+                        try:
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                                total_deleted += 1
+                        except OSError as e:
+                            logger.warning(f"删除打卡照片失败 {filepath}: {e}")
+                        # 清空 photo_url，保留其他元数据
+                        record.photo_url = None
+
+                await session.commit()
+
+            if total_deleted > 0:
+                logger.info(f"打卡照片清理完成: 删除 {total_deleted} 张过期照片")
+        except Exception as e:
+            logger.error(f"打卡照片清理任务失败: {e}")
             await session.rollback()

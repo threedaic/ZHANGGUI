@@ -236,9 +236,10 @@ class DashboardRepository:
         """获取今日订桌概况。今日无 confirmed 预订时回退到最近有预订的日期。"""
         today = date.today()
 
-        # 总桌数（所有桌台）
+        # 总桌数（仅启用中的桌台，与订桌预约页口径一致）
         table_stmt = select(func.count()).select_from(Table).where(
-            Table.store_id == self.store_id
+            Table.store_id == self.store_id,
+            Table.status == "active",
         )
         table_result = await self.session.execute(table_stmt)
         total_tables = table_result.scalar() or 0
@@ -286,10 +287,15 @@ class DashboardRepository:
     # ==================== 今日考勤 ====================
 
     async def get_attendance_summary(self) -> AttendanceSummary:
-        """获取今日考勤汇总。今日无数据时回退到最近有考勤的日期。"""
+        """获取今日考勤汇总。
+
+        统一数据源：全部从 att_records 表读取（与排班页/名单页一致）。
+        att_records.scheduled_shift 字段即排班信息，clock_in 为空即未打卡=旷工。
+        今日无记录时回退到最近有记录的日期。
+        """
         today = date.today()
 
-        # 查询今日考勤记录
+        # 1. 查今日考勤记录（排班+打卡都在这一张表）
         stmt = select(AttendanceRecord).where(
             and_(
                 AttendanceRecord.store_id == self.store_id,
@@ -297,10 +303,10 @@ class DashboardRepository:
             )
         )
         result = await self.session.execute(stmt)
-        rows = list(result.scalars().all())
+        records = list(result.scalars().all())
 
-        # 今日无数据 → 回退到最近有考勤的日期
-        if not rows:
+        # 今日无记录 → 回退到最近有记录的日期
+        if not records:
             latest_stmt = select(func.max(AttendanceRecord.date)).where(
                 AttendanceRecord.store_id == self.store_id
             )
@@ -314,34 +320,38 @@ class DashboardRepository:
                     )
                 )
                 result2 = await self.session.execute(stmt2)
-                rows = list(result2.scalars().all())
+                records = list(result2.scalars().all())
 
-        scheduled_count = 0
+        REST_LEAVE = ("rest", "leave", "休息", "请假")
+
+        # 应到 = 有排班且非休息/请假
+        scheduled_count = sum(
+            1 for r in records if r.scheduled_shift and r.scheduled_shift not in REST_LEAVE
+        )
+        # 请假
+        leave_count = sum(
+            1 for r in records if r.scheduled_shift in ("leave", "请假")
+        )
+
         actual_count = 0
         late_count = 0
-        absent_count = 0
         early_count = 0
-        leave_count = 0
+        absent_count = 0
 
-        for r in rows:
-            # 应出勤：有排班且非休息/请假
-            if r.scheduled_shift and r.scheduled_shift not in ("rest", "leave", "休息", "请假"):
-                scheduled_count += 1
-            # 请假
-            if r.scheduled_shift in ("leave", "请假"):
-                leave_count += 1
-            # 实际出勤：有打卡记录（clock_in 非空）
+        # 2. 逐个应到员工判定
+        for r in records:
+            if not r.scheduled_shift or r.scheduled_shift in REST_LEAVE:
+                continue
             if r.clock_in:
+                # 有打卡 = 实到
                 actual_count += 1
-            # 迟到
-            if r.late_minutes and r.late_minutes > 0:
-                late_count += 1
-            # 旷工
-            if r.status == "absent":
+                if r.late_minutes and r.late_minutes > 0:
+                    late_count += 1
+                if r.early_minutes and r.early_minutes > 0:
+                    early_count += 1
+            else:
+                # 排班了但没打卡 = 旷工
                 absent_count += 1
-            # 早退
-            if r.early_minutes and r.early_minutes > 0:
-                early_count += 1
 
         return AttendanceSummary(
             scheduled_count=scheduled_count,

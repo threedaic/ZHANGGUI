@@ -112,3 +112,26 @@ async def require_contract_initiator(request: Request, db: AsyncSession = Depend
 
     if employee_id not in ids:
         raise ForbiddenError("您没有合同发起权限，请联系老板开通")
+
+
+async def get_extra_config(session: AsyncSession, store_id: str, section: str) -> dict:
+    """读取 store_settings.extra_config 中指定 section 的配置字典。
+
+    section 例如 'wine' / 'rating' / 'antifraud' / 'booking'。
+    若未配置则返回空 dict。
+    """
+    stmt = select(StoreSettings.extra_config).where(
+        StoreSettings.store_id == store_id
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if not row:
+        return {}
+    try:
+        cfg = json.loads(row) if isinstance(row, str) else row
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    if not isinstance(cfg, dict):
+        return {}
+    sub = cfg.get(section)
+    return sub if isinstance(sub, dict) else {}

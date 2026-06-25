@@ -84,6 +84,11 @@ const routes: RouteRecordRaw[] = [
         name: 'DailyGame',
         component: () => import('@/views/game/index.vue'),
       },
+      {
+        path: 'checkin',
+        name: 'DailyCheckin',
+        component: () => import('@/views/checkin/index.vue'),
+      },
     ],
   },
 
@@ -100,9 +105,14 @@ const routes: RouteRecordRaw[] = [
       },
       // 排班与人
       {
-        path: 'schedule-attendance',
-        name: 'ScheduleAttendance',
+        path: 'schedule',
+        name: 'ScheduleManage',
         component: () => import('@/views/schedule/index.vue'),
+      },
+      {
+        path: 'attendance',
+        name: 'AttendanceManage',
+        component: () => import('@/views/attendance/index.vue'),
       },
       {
         path: 'kpi',
@@ -111,14 +121,40 @@ const routes: RouteRecordRaw[] = [
       },
       // 工资与账期
       {
-        path: 'payroll',
-        name: 'PayrollMonthly',
-        component: () => import('@/views/management/PayrollMonthly.vue'),
+        path: 'auto-payroll',
+        name: 'AutoPayroll',
+        component: () => import('@/views/management/AutoPayroll.vue'),
+      },
+      // 自动发薪 - 模块二级页面
+      {
+        path: 'auto-payroll/contract',
+        name: 'AutoPayrollContract',
+        component: () => import('@/views/management/payroll/ContractDetail.vue'),
       },
       {
-        path: 'payroll/:id',
-        name: 'PayrollDetail',
-        component: () => import('@/views/management/PayrollDetail.vue'),
+        path: 'auto-payroll/performance',
+        name: 'AutoPayrollPerformance',
+        component: () => import('@/views/management/payroll/PerformanceDetail.vue'),
+      },
+      {
+        path: 'auto-payroll/attendance',
+        name: 'AutoPayrollAttendance',
+        component: () => import('@/views/management/payroll/AttendanceDetail.vue'),
+      },
+      {
+        path: 'auto-payroll/kpi',
+        name: 'AutoPayrollKpi',
+        component: () => import('@/views/management/payroll/KpiDetail.vue'),
+      },
+      {
+        path: 'auto-payroll/reward_penalty',
+        name: 'AutoPayrollRewardPenalty',
+        component: () => import('@/views/management/payroll/RewardPenaltyDetail.vue'),
+      },
+      {
+        path: 'auto-payroll/overtime',
+        name: 'AutoPayrollOvertime',
+        component: () => import('@/views/management/payroll/OvertimeDetail.vue'),
       },
       {
         path: 'disputes',
@@ -265,17 +301,6 @@ const routes: RouteRecordRaw[] = [
         name: 'SettingsCategory',
         component: () => import('@/views/settings/CategoryPage.vue'),
       },
-      // 工资项配置
-      {
-        path: 'payroll-config',
-        name: 'PayrollConfig',
-        component: () => import('@/views/settings/PayrollConfig.vue'),
-      },
-      {
-        path: 'payroll-config/formula/:code?',
-        name: 'FormulaEditor',
-        component: () => import('@/views/settings/FormulaEditor.vue'),
-      },
       // 店铺管理
       {
         path: 'store-info',
@@ -296,6 +321,27 @@ const routes: RouteRecordRaw[] = [
         path: 'tables',
         name: 'TablesSetting',
         component: () => import('@/views/settings/TablesSetting.vue'),
+      },
+      // 经营管理规则
+      {
+        path: 'booking-rule',
+        name: 'BookingRuleSetting',
+        component: () => import('@/views/settings/BookingRuleSetting.vue'),
+      },
+      {
+        path: 'rating-code',
+        name: 'RatingCodeSetting',
+        component: () => import('@/views/settings/RatingCodeSetting.vue'),
+      },
+      {
+        path: 'wine-storage',
+        name: 'WineStorageSetting',
+        component: () => import('@/views/settings/WineStorageSetting.vue'),
+      },
+      {
+        path: 'antifraud-rule',
+        name: 'AntifraudRuleSetting',
+        component: () => import('@/views/settings/AntifraudRuleSetting.vue'),
       },
       // 排班规则
       {
@@ -359,6 +405,12 @@ const routes: RouteRecordRaw[] = [
         path: 'printer',
         name: 'PrinterSetting',
         component: () => import('@/views/settings/PrinterManagement.vue'),
+      },
+      // 打卡设置
+      {
+        path: 'checkin',
+        name: 'CheckinSetting',
+        component: () => import('@/views/settings/CheckinSetting.vue'),
       },
     ],
   },

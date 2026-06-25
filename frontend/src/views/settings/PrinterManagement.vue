@@ -80,6 +80,27 @@
         <button class="add-btn" @click="showAddPrinter = true">+ 添加打印机</button>
       </div>
 
+      <!-- 推荐提示卡片 -->
+      <div class="recommend-card">
+        <div class="recommend-icon">易</div>
+        <div class="recommend-content">
+          <div class="recommend-title">推荐使用易联云打印机</div>
+          <div class="recommend-desc">
+            稳定可靠 | 全国覆盖 | 无需本地网络 | 支持多种打印场景
+          </div>
+          <div class="recommend-steps">
+            <span class="step">1. 购买易联云打印机</span>
+            <span class="step-arrow">→</span>
+            <span class="step">2. 注册开放平台账号</span>
+            <span class="step-arrow">→</span>
+            <span class="step">3. 获取密钥配置</span>
+          </div>
+        </div>
+        <a href="https://www.10ss.net/open/" target="_blank" class="recommend-link">
+          查看教程 →
+        </a>
+      </div>
+
       <div class="printer-list">
         <div
           v-for="printer in printers"
@@ -1203,6 +1224,85 @@ onMounted(() => {
 .confirm-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 推荐卡片 */
+.recommend-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(251, 0, 121, 0.08) 0%, rgba(251, 0, 121, 0.03) 100%);
+  border: 1px solid rgba(251, 0, 121, 0.2);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.recommend-icon {
+  width: 48px;
+  height: 48px;
+  background: #FB0079;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #FFFFFF;
+  flex-shrink: 0;
+}
+
+.recommend-content {
+  flex: 1;
+}
+
+.recommend-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+}
+
+.recommend-desc {
+  font-size: 12px;
+  color: #C8C8C8;
+  margin-bottom: 8px;
+}
+
+.recommend-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #7A7C80;
+}
+
+.step {
+  padding: 2px 6px;
+  background: rgba(251, 0, 121, 0.1);
+  border: 1px solid rgba(251, 0, 121, 0.2);
+  border-radius: 4px;
+}
+
+.step-arrow {
+  color: #FB0079;
+}
+
+.recommend-link {
+  padding: 8px 16px;
+  background: #FB0079;
+  border: none;
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+.recommend-link:hover {
+  opacity: 0.85;
 }
 
 /* 空状态 */

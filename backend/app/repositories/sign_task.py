@@ -145,6 +145,7 @@ class SignTaskRepository:
             )
         )
         result = await self.session.execute(stmt)
+        await self.session.commit()
         return result.rowcount > 0
 
     async def dispute(self, task_id: uuid.UUID, employee_id: uuid.UUID, reason: str) -> bool:
@@ -166,6 +167,7 @@ class SignTaskRepository:
             )
         )
         result = await self.session.execute(stmt)
+        await self.session.commit()
         return result.rowcount > 0
 
     async def revoke(self, task_id: uuid.UUID, reason: str | None = None, revoked_by: uuid.UUID | None = None) -> bool:
@@ -218,6 +220,7 @@ class SignTaskRepository:
             )
         )
         result = await self.session.execute(stmt_update)
+        await self.session.commit()
         return result.rowcount > 0
 
     async def get_by_ref(self, ref_type: str, ref_id: uuid.UUID, employee_id: uuid.UUID) -> SignTask | None:

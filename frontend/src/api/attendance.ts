@@ -66,6 +66,19 @@ export interface MyScheduleData {
   }
 }
 
+/** 今日考勤名单响应（全员可访问，无角色限制） */
+export interface TodayListData {
+  date: string
+  is_today: boolean
+  employees: {
+    employee_id: string
+    employee_name: string
+    employee_role: string
+    employee_role_label?: string
+    cells: ScheduleCell[]
+  }[]
+}
+
 /** 排班批量保存结果 */
 export interface ScheduleBatchResult {
   created: number
@@ -205,6 +218,11 @@ export interface RecordsQueryParams {
 }
 
 export const attendanceAPI = {
+  /** 获取今日考勤名单（全员可访问，无角色限制） */
+  getTodayList() {
+    return apiClient.get<ApiResponse<TodayListData>>('/attendance/today-list')
+  },
+
   /** 获取全员排班考勤表（管理端） */
   getScheduleTable(params: { date_from: string; date_to: string }) {
     return apiClient.get<ApiResponse<ScheduleTableData>>('/attendance/schedule', { params })
@@ -294,4 +312,102 @@ export const attendanceAPI = {
   getRecords(params: RecordsQueryParams) {
     return apiClient.get<ApiResponse<PageResult<AttendanceRecord>>>('/attendance/records', { params })
   },
+
+  // ==================== WiFi+拍照打卡 ====================
+
+  /** 打卡（WiFi+照片，multipart/form-data） */
+  checkin(data: { wifi_ssid?: string; wifi_bssid?: string; photo?: Blob }) {
+    const form = new FormData()
+    if (data.wifi_ssid) form.append('wifi_ssid', data.wifi_ssid)
+    if (data.wifi_bssid) form.append('wifi_bssid', data.wifi_bssid)
+    if (data.photo) form.append('photo', data.photo, 'checkin.jpg')
+    return apiClient.post<ApiResponse<CheckinResult>>('/attendance/checkin', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  /** 获取今日打卡状态 */
+  getCheckinStatus() {
+    return apiClient.get<ApiResponse<CheckinStatus>>('/attendance/checkin/status')
+  },
+
+  /** 获取打卡配置+WiFi绑定列表 */
+  getCheckinConfig() {
+    return apiClient.get<ApiResponse<CheckinConfig>>('/attendance/checkin/config')
+  },
+
+  /** 更新打卡配置 */
+  updateCheckinConfig(data: Partial<CheckinConfig>) {
+    return apiClient.put<ApiResponse<CheckinConfig>>('/attendance/checkin/config', data)
+  },
+
+  /** 添加WiFi绑定 */
+  addCheckinWifi(data: { ssid: string; bssid: string; label?: string }) {
+    return apiClient.post<ApiResponse<CheckinWifiItem>>('/attendance/checkin/wifis', data)
+  },
+
+  /** 删除WiFi绑定 */
+  deleteCheckinWifi(wifiId: string) {
+    return apiClient.delete<ApiResponse<null>>(`/attendance/checkin/wifis/${wifiId}`)
+  },
+}
+
+// ==================== 打卡相关类型 ====================
+
+export interface CheckinWifiItem {
+  id: string
+  ssid: string
+  bssid: string
+  label: string | null
+  is_active: boolean
+}
+
+export interface CheckinConfig {
+  require_wifi: boolean
+  require_photo: boolean
+  grace_minutes: number
+  photo_retention_days: number
+  time_window_minutes: number
+  wifis: CheckinWifiItem[]
+}
+
+export interface CheckinResult {
+  record_id: string
+  date: string
+  action: 'clock_in' | 'clock_out'
+  clock_time: string
+  scheduled_shift: string | null
+  shift_start_time: string | null
+  shift_end_time: string | null
+  status: string
+  late_minutes: number
+  early_minutes: number
+  matched_by: 'schedule' | 'time_window' | 'none'
+  photo_url: string | null
+  wifi_ssid: string | null
+}
+
+export interface WeeklyStats {
+  present: number
+  late: number
+  early: number
+  absent: number
+  leave: number
+  total: number
+}
+
+export interface CheckinStatus {
+  date: string
+  scheduled_shift: string | null
+  shift_start_time: string | null
+  shift_end_time: string | null
+  is_overnight: boolean
+  clock_in: string | null
+  clock_out: string | null
+  status: string
+  late_minutes: number
+  early_minutes: number
+  can_checkin: boolean
+  next_action: 'clock_in' | 'clock_out' | 'done'
+  weekly_stats: WeeklyStats
 }

@@ -47,6 +47,8 @@ class Store(TimestampMixin, Base):
     wework_token: Mapped[str | None] = mapped_column(String(100))
     wework_aes_key: Mapped[str | None] = mapped_column(String(100))
     wework_status: Mapped[str | None] = mapped_column(String(20), default="pending", nullable=True)
+    # 企微对外收款 Secret（独立于应用 Secret）
+    wework_externalpay_secret: Mapped[str | None] = mapped_column("wecom_externalpay_secret", Text)
 
 
 class StoreSettings(TimestampMixin, Base):
@@ -108,6 +110,14 @@ class StoreSettings(TimestampMixin, Base):
     # 企微机器人
     wecom_bot_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     wecom_webhook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # 打卡配置（WiFi+拍照打卡）
+    checkin_require_wifi: Mapped[bool] = mapped_column(Boolean, default=True)
+    checkin_require_photo: Mapped[bool] = mapped_column(Boolean, default=True)
+    checkin_grace_minutes: Mapped[int] = mapped_column(Integer, default=5)
+    checkin_photo_retention_days: Mapped[int] = mapped_column(Integer, default=90)
+    # 智能班次归位：时间窗口（分钟），打卡时间在班次开始/结束 ± 此值内才匹配
+    checkin_time_window_minutes: Mapped[int] = mapped_column(Integer, default=120)
 
     # 扩展配置（未来新业务配置放这里，不用改表结构）
     extra_config: Mapped[dict | None] = mapped_column(JSONB, default=dict)

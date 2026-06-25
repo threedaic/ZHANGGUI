@@ -1,10 +1,23 @@
 <script setup lang="ts">
 // 员工个人中心首页
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { storeAPI } from '@/api/store'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+const storeName = ref('')
+
+onMounted(async () => {
+  try {
+    const res = await storeAPI.getInfo()
+    if (res.data.code === 0) {
+      storeName.value = res.data.data.name || ''
+    }
+  } catch { /* ignore */ }
+})
 
 const menus = [
   { key: 'my-data', label: '我的数据', desc: 'KPI / 排名 / 业绩 / 工资 一图看清', path: '/profile/my-data', icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round"><path d="M3 17h14M5 12h2v5H5zM9 8h2v9H9zM13 4h2v13h-2z"/></svg>` },
@@ -24,7 +37,7 @@ function handleLogout() {
       <div class="avatar">{{ (auth.info.username || '?').charAt(0).toUpperCase() }}</div>
       <div class="info">
         <div class="name">{{ auth.info.username || '员工' }}</div>
-        <div class="role">{{ auth.isBoss ? '老板' : auth.isManager ? '店长' : '员工' }}</div>
+        <div class="role">{{ auth.isBoss ? '老板' : auth.isManager ? '店长' : '员工' }}<span v-if="storeName" class="store-badge">{{ storeName }}</span></div>
       </div>
     </div>
 
@@ -89,6 +102,18 @@ function handleLogout() {
     font-size: 12px;
     color: #888;
     margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .store-badge {
+    display: inline-block;
+    font-size: 11px;
+    color: $brand-primary;
+    background: rgba(251, 0, 121, 0.1);
+    padding: 1px 8px;
+    border-radius: 10px;
+    line-height: 1.6;
   }
 }
 

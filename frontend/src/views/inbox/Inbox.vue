@@ -1,5 +1,10 @@
 <template>
   <div class="inbox-page">
+    <!-- 调试信息（临时） -->
+    <div class="debug-bar">
+      数据: {{ items.length }} 条 | 待签: {{ pendingCount }} | 状态: {{ apiStatus }}
+    </div>
+
     <!-- 待签收提醒条 -->
     <div v-if="pendingCount > 0 && activeTab === 'pending'" class="reminder-bar">
       <div class="reminder-info">
@@ -49,9 +54,10 @@
       <div v-else>暂无异议任务</div>
     </div>
     <div v-else class="inbox-list">
-      <div
+      <router-link
         v-for="item in items"
         :key="item.id"
+        :to="`/daily/inbox/${item.id}`"
         class="inbox-card"
         :class="{
           pending: item.status === 'pending',
@@ -59,7 +65,7 @@
           disputed: item.status === 'disputed',
           selected: batchSelected.has(item.id),
         }"
-        @click="onCardClick(item)"
+        @click="onCardClick($event, item)"
       >
         <input
           v-if="batchMode && item.status === 'pending'"
@@ -86,7 +92,7 @@
             <path d="M5 3l4 4-4 4" stroke="#7A7C80" stroke-width="1.2" stroke-linecap="round"/>
           </svg>
         </div>
-      </div>
+      </router-link>
     </div>
 
     <!-- 批量签收底部操作栏 -->
@@ -165,6 +171,7 @@ const activeTab = ref('pending')
 const items = ref<SignTaskItem[]>([])
 const loading = ref(false)
 const pendingCount = ref(0)
+const apiStatus = ref('未加载')
 
 // 批量签收
 const batchMode = ref(false)
@@ -206,19 +213,26 @@ function formatTime(iso: string | null): string {
 
 async function loadData() {
   loading.value = true
+  apiStatus.value = '加载中...'
   try {
     const status = activeTab.value
     const res = await signTaskAPI.getInbox({ status, page: 1, page_size: 50 })
     items.value = res.data.data.items || []
-  } catch { /* */ }
-  loading.value = false
+    apiStatus.value = `成功(${items.value.length}条)`
+  } catch (e: any) {
+    apiStatus.value = '失败: ' + (e?.message || e?.response?.data?.message || '未知错误')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadCount() {
   try {
     const res = await signTaskAPI.getCount()
     pendingCount.value = res.data.data.pending
-  } catch { /* */ }
+  } catch (e: any) {
+    apiStatus.value = 'count失败: ' + (e?.message || '未知')
+  }
 }
 
 function switchTab(tab: string) {
@@ -227,12 +241,14 @@ function switchTab(tab: string) {
   loadData()
 }
 
-function onCardClick(item: SignTaskItem) {
+function onCardClick(e: Event, item: SignTaskItem) {
+  apiStatus.value = '点击了: ' + item.title
   if (batchMode && item.status === 'pending') {
+    e.preventDefault()
     toggleBatch(item.id)
     return
   }
-  router.push(`/daily/inbox/${item.id}`)
+  // router-link 会自动处理跳转
 }
 
 // ===== 批量签收 =====
@@ -366,6 +382,17 @@ onMounted(() => {
   padding-bottom: 80px;
 }
 
+.debug-bar {
+  background: #FB0079;
+  color: #FFFFFF;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+  font-family: monospace;
+  word-break: break-all;
+}
+
 .reminder-bar {
   display: flex;
   align-items: center;
@@ -497,6 +524,8 @@ onMounted(() => {
   padding: 14px 12px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+  text-decoration: none;
+  color: inherit;
 }
 
 .inbox-card.selected {

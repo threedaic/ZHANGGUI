@@ -13,6 +13,7 @@ from app.models.employee import Employee
 from app.models.user import User
 from app.repositories.sign_task import SignTaskRepository
 from app.utils.pagination import PageParams
+from app.services.inbox_types import InboxType, get_inbox_type
 
 
 class SignTaskService:
@@ -74,6 +75,92 @@ class SignTaskService:
             tasks.append(task)
         return tasks
 
+    # ================================================================
+    #  标准化收件箱发送方法（推荐所有新代码用这个）
+    # ================================================================
+    async def send_to_inbox(
+        self,
+        employee_id: uuid.UUID,
+        msg_type: str,
+        ref_id: uuid.UUID,
+        issued_by: uuid.UUID,
+        extra: dict[str, Any] | None = None,
+    ) -> SignTask:
+        """
+        统一收件箱发送入口。
+
+        参数:
+            employee_id: 接收员工ID
+            msg_type:     消息类型（见 InboxType 枚举）
+            ref_id:       关联业务记录ID（工资单ID/考勤ID/罚单ID）
+            issued_by:    发送人员工ID
+            extra:        附加数据，用于填充标题模板和详情页展示
+
+        标题、ref_type 由 inbox_types.py 注册表自动填充。
+        extra 里必须包含标题模板所需的占位字段。
+
+        示例:
+            await service.send_to_inbox(
+                employee_id=emp_id,
+                msg_type=InboxType.SALARY_SLIP,
+                ref_id=wage_id,
+                issued_by=boss_id,
+                extra={"period": "2026-07", "employee_name": "张吧员", "net_pay": 3250},
+            )
+        """
+        meta = get_inbox_type(msg_type)
+        if not meta:
+            raise ValueError(f"未知的收件箱消息类型: {msg_type}，请在 inbox_types.py 中注册")
+
+        # 用 extra 填充标题模板
+        title = meta.title_template
+        if extra:
+            try:
+                title = title.format(**extra)
+            except KeyError as e:
+                logger.warning(f"收件箱标题模板缺字段: {e}，用原始模板")
+
+        task = await self.create_task(
+            employee_id=employee_id,
+            task_type=meta.code,
+            title=title,
+            ref_type=meta.ref_type,
+            ref_id=ref_id,
+            issued_by=issued_by,
+            extra=extra,
+        )
+        logger.info(
+            f"[收件箱] 推送: type={msg_type} to={employee_id} title={title}"
+        )
+        return task
+
+    async def send_batch_to_inbox(
+        self,
+        employee_ids: list[uuid.UUID],
+        msg_type: str,
+        ref_ids: list[uuid.UUID],
+        issued_by: uuid.UUID,
+        extra_list: list[dict[str, Any]] | None = None,
+    ) -> list[SignTask]:
+        """批量发送收件箱消息（一个员工一条）"""
+        meta = get_inbox_type(msg_type)
+        if not meta:
+            raise ValueError(f"未知的收件箱消息类型: {msg_type}")
+
+        tasks = []
+        for i, emp_id in enumerate(employee_ids):
+            ref_id = ref_ids[i] if i < len(ref_ids) else ref_ids[0]
+            extra = extra_list[i] if extra_list and i < len(extra_list) else None
+            task = await self.send_to_inbox(
+                employee_id=emp_id,
+                msg_type=msg_type,
+                ref_id=ref_id,
+                issued_by=issued_by,
+                extra=extra,
+            )
+            tasks.append(task)
+        return tasks
+
     async def get_inbox(
         self,
         employee_id: uuid.UUID,
@@ -91,9 +178,11 @@ class SignTaskService:
 
     async def get_detail(self, task_id: uuid.UUID, employee_id: uuid.UUID) -> dict | None:
         task = await self.repo.get_by_id(task_id)
-        if not task or task.employee_id != employee_id:
+        # employee_id 可能是 str（来自JWT）或 UUID，统一转 UUID 再比较
+        emp_uuid = employee_id if isinstance(employee_id, uuid.UUID) else uuid.UUID(str(employee_id))
+        if not task or task.employee_id != emp_uuid:
             return None
-        items, _ = await self._enrich_tasks([task])
+        items = await self._enrich_tasks([task])
         return items[0] if items else None
 
     async def sign(self, task_id: uuid.UUID, employee_id: uuid.UUID, signature_data: str, notes: str | None = None) -> bool:
@@ -206,7 +295,7 @@ class SignTaskService:
         if not task:
             return
         try:
-            if task.ref_type == "payroll_record" and new_status == "signed":
+            if task.ref_type == "wage_record" and new_status == "signed":
                 from app.models.payroll import PayrollRecord
                 from sqlalchemy import update
                 stmt = (

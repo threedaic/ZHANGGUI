@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
+    "@types/qrcode": "^1.5.6",
     "axios": "^1.6.8",
     "dayjs": "^1.11.10",
     "echarts": "^5.5.0",
     "element-plus": "^2.6.2",
     "pinia": "^2.1.7",
+    "qrcode": "^1.5.4",
     "vant": "^4.8.7",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"

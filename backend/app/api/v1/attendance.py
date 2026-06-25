@@ -9,10 +9,16 @@ GET    /shifts            班次配置列表
 POST   /shifts            保存班次配置
 POST   /sync              同步企微打卡
 GET    /monthly           月末汇总
+POST   /checkin           WiFi+拍照打卡
+GET    /checkin/status    今日打卡状态
+GET    /checkin/config    打卡配置+WiFi绑定
+PUT    /checkin/config     更新打卡配置
+POST   /checkin/wifis     添加WiFi绑定
+DELETE /checkin/wifis/{id} 删除WiFi绑定
 """
 import uuid
 from datetime import date
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -24,10 +30,13 @@ from app.schemas.attendance import (
     SyncRequest,
     ScheduleGenerateRequest,
     EmployeeRuleUpdateRequest,
+    CheckinConfigUpdateRequest,
+    CheckinWifiCreateRequest,
 )
 from app.utils.deps import get_store_id, get_user_id, get_employee_id, require_role, make_response
 from app.utils.pagination import PageParams, paginate
 from app.utils.exceptions import ValidationError, NotFoundError
+from app.utils.redis_client import get_redis
 
 router = APIRouter()
 
@@ -40,6 +49,22 @@ def _parse_date(v: str) -> date:
 
 
 # ==================== 排班考勤表 ====================
+
+@router.get("/today-list")
+async def get_today_attendance_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取今日考勤名单（全员可访问，无角色限制）。
+
+    数据源与首页 dashboard 一致，今日无记录时回退到最近有记录的日期。
+    供日常端「应到/实到、迟到/早退、请假/旷工」点进去查看名单使用。
+    """
+    store_id = get_store_id(request)
+    svc = AttendanceService(db, store_id)
+    data = await svc.get_today_attendance_list()
+    return make_response(request=request, data=data)
+
 
 @router.get("/schedule")
 async def get_schedule(
@@ -333,3 +358,110 @@ async def get_monthly_summary(
     svc = AttendanceService(db, store_id)
     result = await svc.get_monthly_summary(period=period)
     return make_response(request=request, data={"period": period, "store_id": store_id, "items": result})
+
+
+# ==================== WiFi+拍照打卡 ====================
+
+@router.post("/checkin")
+async def checkin(
+    request: Request,
+    wifi_ssid: str | None = Form(None, description="当前WiFi名称"),
+    wifi_bssid: str | None = Form(None, description="当前WiFi BSSID"),
+    photo: UploadFile | None = File(None, description="打卡照片"),
+    db: AsyncSession = Depends(get_db),
+):
+    """WiFi+拍照打卡（交替打卡：自动判定上班/下班）"""
+    store_id = get_store_id(request)
+    employee_id = get_employee_id(request)
+    svc = AttendanceService(db, store_id)
+
+    photo_content = await photo.read() if photo else None
+    photo_filename = photo.filename if photo else None
+
+    result = await svc.checkin(
+        employee_id=employee_id,
+        wifi_ssid=wifi_ssid,
+        wifi_bssid=wifi_bssid,
+        photo_content=photo_content,
+        photo_filename=photo_filename,
+    )
+    await db.commit()
+    # 打卡后清看板缓存，让日常页数据立即更新
+    try:
+        redis = await get_redis()
+        await redis.delete(f"dashboard:{store_id}")
+    except Exception:
+        pass
+    return make_response(request=request, message="打卡成功", data=result)
+
+
+@router.get("/checkin/status")
+async def get_checkin_status(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取今日打卡状态"""
+    store_id = get_store_id(request)
+    employee_id = get_employee_id(request)
+    svc = AttendanceService(db, store_id)
+    result = await svc.get_checkin_status(employee_id)
+    return make_response(request=request, data=result)
+
+
+@router.get("/checkin/config")
+async def get_checkin_config(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取打卡配置 + WiFi绑定列表"""
+    store_id = get_store_id(request)
+    svc = AttendanceService(db, store_id)
+    result = await svc.get_checkin_config()
+    return make_response(request=request, data=result)
+
+
+@router.put("/checkin/config")
+async def update_checkin_config(
+    request: Request,
+    body: CheckinConfigUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新打卡配置（仅老板）"""
+    require_role(request, ["boss", "admin"])
+    store_id = get_store_id(request)
+    svc = AttendanceService(db, store_id)
+    result = await svc.update_checkin_config(body.model_dump(exclude_unset=True))
+    await db.commit()
+    return make_response(request=request, message="打卡配置已更新", data=result)
+
+
+@router.post("/checkin/wifis")
+async def add_checkin_wifi(
+    request: Request,
+    body: CheckinWifiCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """添加WiFi绑定（仅老板）"""
+    require_role(request, ["boss", "admin"])
+    store_id = get_store_id(request)
+    svc = AttendanceService(db, store_id)
+    result = await svc.add_checkin_wifi(
+        ssid=body.ssid, bssid=body.bssid, label=body.label,
+    )
+    await db.commit()
+    return make_response(request=request, message="WiFi绑定已添加", data=result)
+
+
+@router.delete("/checkin/wifis/{wifi_id}")
+async def delete_checkin_wifi(
+    request: Request,
+    wifi_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除WiFi绑定（仅老板）"""
+    require_role(request, ["boss", "admin"])
+    store_id = get_store_id(request)
+    svc = AttendanceService(db, store_id)
+    await svc.delete_checkin_wifi(wifi_id)
+    await db.commit()
+    return make_response(request=request, message="WiFi绑定已删除")

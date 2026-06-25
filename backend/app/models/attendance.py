@@ -42,6 +42,26 @@ class AttendanceRecord(TimestampMixin, Base):
     source: Mapped[str] = mapped_column(String(20), default="manual")
     note: Mapped[str | None] = mapped_column(Text)
 
+    # 打卡证据（WiFi+拍照打卡）
+    photo_url: Mapped[str | None] = mapped_column(Text)
+    wifi_bssid: Mapped[str | None] = mapped_column(String(32))
+    wifi_ssid: Mapped[str | None] = mapped_column(String(64))
+    photo_taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CheckinWifi(TimestampMixin, Base):
+    """门店打卡WiFi绑定（一个门店可绑多个WiFi，BSSID+SSID双绑防伪造）"""
+
+    __tablename__ = "att_checkin_wifis"
+    __table_args__ = (UniqueConstraint("store_id", "bssid"), {'extend_existing': True})
+
+    id: Mapped[uuid.UUID] = mapped_column("wifi_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_stores.store_id", ondelete="CASCADE"))
+    ssid: Mapped[str] = mapped_column(String(64))
+    bssid: Mapped[str] = mapped_column(String(32))
+    label: Mapped[str | None] = mapped_column(String(32))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
 
 class ShiftConfig(TimestampMixin, Base):
     """门店班次配置。每个门店独立，老板在设置中维护。"""

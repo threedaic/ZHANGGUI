@@ -159,14 +159,21 @@ interface FuncCard {
 
 const cards: FuncCard[] = [
   {
-    label: '订桌预约',
+    label: '打卡',
+    path: '/daily/checkin',
+    icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="14" cy="14" r="10"/><circle cx="14" cy="14" r="5"/><circle cx="14" cy="14" r="1.5" fill="#FB0079"/>
+    </svg>`,
+  },
+  {
+    label: '订桌',
     path: '/daily/booking',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <rect x="5" y="6" width="18" height="16" rx="3"/><line x1="10" y1="12" x2="18" y2="12"/><line x1="10" y1="17" x2="15" y2="17"/>
     </svg>`,
   },
   {
-    label: '存酒管理',
+    label: '存酒',
     path: '/daily/wine',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <path d="M9 4h10l2 6H7l2-6z"/><path d="M12 10v10c0 3-4 3-4 0v-10"/><rect x="16" y="10" width="5" height="12" rx="2"/>

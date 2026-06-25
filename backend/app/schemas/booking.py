@@ -17,7 +17,7 @@ class TableUpdate(BaseModel):
     area: str | None = Field(default=None, max_length=50)
     table_no: str | None = Field(default=None, max_length=10)
     capacity: int | None = Field(default=None, ge=1, le=20)
-    status: str | None = Field(default=None, pattern="^(idle|occupied|reserved)$")
+    status: str | None = Field(default=None, pattern="^(active|inactive)$")
 
 
 class TableResponse(BaseModel):

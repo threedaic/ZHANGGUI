@@ -46,8 +46,8 @@ const categories: CategoryDef[] = [
     key: 'store',
     title: '店铺管理',
     target: '店铺',
-    builtCount: 4,
-    totalCount: 4,
+    builtCount: 3,
+    totalCount: 3,
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <path d="M3 21h18"/><path d="M5 21V11l7-7 7 7v10"/>
     </svg>`,
@@ -57,7 +57,7 @@ const categories: CategoryDef[] = [
     title: '员工管理',
     target: '员工',
     builtCount: 3,
-    totalCount: 5,
+    totalCount: 3,
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <circle cx="12" cy="8" r="4"/><path d="M4 21c0-5 4-8 8-8s8 3 8 8"/>
     </svg>`,
@@ -66,7 +66,7 @@ const categories: CategoryDef[] = [
     key: 'business',
     title: '经营管理',
     target: '客人',
-    builtCount: 1,
+    builtCount: 5,
     totalCount: 5,
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>

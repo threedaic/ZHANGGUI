@@ -56,10 +56,9 @@ CREATE TABLE IF NOT EXISTS sys_users (
 -- RLS for sys_users
 ALTER TABLE sys_users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS sys_users_store_isolation ON sys_users
-    USING (store_id = current_setting('app.current_store_id')::UUID);
+    USING (store_id = current_setting('app.current_store_id', true)::uuid);
 CREATE POLICY IF NOT EXISTS sys_users_admin_all_access ON sys_users
-    FOR ALL TO authenticated_role
-    USING (TRUE) WITH CHECK (TRUE);
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 CREATE TRIGGER set_updated_at_sys_users
     BEFORE UPDATE ON sys_users
@@ -86,10 +85,9 @@ CREATE TABLE IF NOT EXISTS pos_bookings (
 -- RLS for pos_bookings
 ALTER TABLE pos_bookings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS pos_bookings_store_isolation ON pos_bookings
-    USING (store_id = current_setting('app.current_store_id')::UUID);
+    USING (store_id = current_setting('app.current_store_id', true)::uuid);
 CREATE POLICY IF NOT EXISTS pos_bookings_admin_all_access ON pos_bookings
-    FOR ALL TO authenticated_role
-    USING (TRUE) WITH CHECK (TRUE);
+    USING (current_setting('app.current_user_role', true) = 'admin');
 
 CREATE TRIGGER set_updated_at_pos_bookings
     BEFORE UPDATE ON pos_bookings
@@ -134,3 +132,8 @@ ALTER TABLE shared_store_settings ADD COLUMN IF NOT EXISTS contract_base_salary 
 ALTER TABLE shared_store_settings ADD COLUMN IF NOT EXISTS contract_probation_months INTEGER DEFAULT 1;
 ALTER TABLE shared_store_settings ADD COLUMN IF NOT EXISTS contract_notice_days INTEGER DEFAULT 30;
 ALTER TABLE shared_store_settings ADD COLUMN IF NOT EXISTS contract_duration_years INTEGER DEFAULT 1;
+
+-- 9. 修复 shared_tables 状态默认值：idle → active
+--    原建表脚本默认 'idle'，但业务代码统一用 'active' 表示启用
+UPDATE shared_tables SET status = 'active' WHERE status = 'idle';
+ALTER TABLE shared_tables ALTER COLUMN status SET DEFAULT 'active';

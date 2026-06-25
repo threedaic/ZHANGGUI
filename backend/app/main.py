@@ -42,6 +42,8 @@ from app.api.v1.sign_tasks import router as sign_tasks_router
 from app.api.v1.penalties import router as penalties_router
 from app.api.v1.printers import router as printers_router
 from app.api.v1.disputes import router as disputes_router
+from app.api.v1.auto_payroll import router as auto_payroll_router
+from app.api.v1.wework_payments import router as wework_payments_router
 from app.middleware.rls import RLSMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -58,19 +60,22 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create all tables (new SPEC 2.0 schema with UUID IDs)
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    except Exception as e:
-        logger.warning(f"create_all 部分失败: {e}")
+    # 开发/测试环境自动建表 + 种子数据；生产环境必须通过 alembic 迁移管理 schema
+    if settings.APP_ENV != "production":
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        except Exception as e:
+            logger.warning(f"create_all 部分失败: {e}")
 
-    # Seed data in separate transaction
-    try:
-        async with engine.begin() as conn:
-            await seed_default_data(conn)
-    except Exception as e:
-        logger.warning(f"seed_default_data 跳过: {e}")
+        # Seed data in separate transaction
+        try:
+            async with engine.begin() as conn:
+                await seed_default_data(conn)
+        except Exception as e:
+            logger.warning(f"seed_default_data 跳过: {e}")
+    else:
+        logger.info("生产环境：跳过 create_all/seed，schema 由 alembic 迁移管理")
 
     await init_redis()
     await init_scheduler()
@@ -328,8 +333,11 @@ app.include_router(approval_router, prefix="/api/v1/approvals", tags=["审批管
 app.include_router(notification_router, prefix="/api/v1/notifications", tags=["消息通知"])
 app.include_router(contracts_router, prefix="/api/v1/contracts", tags=["合同系统"])
 app.include_router(antifraud_router, prefix="/api/v1/antifraud", tags=["防飞单"])
+# 旧工资计算模块：前端菜单已删除，保留API供员工端查看历史工资单
 app.include_router(payroll_router, prefix="/api/v1/payroll", tags=["工资计算"])
-app.include_router(payroll_config_router, prefix="/api/v1/payroll-config", tags=["工资项配置"])
+app.include_router(payroll_config_router, prefix="/api/v1/payroll-config", tags=["薪资配置"])
+app.include_router(auto_payroll_router, prefix="/api/v1/auto-payroll", tags=["自动发薪"])
+app.include_router(wework_payments_router, prefix="/api/v1/wework-payments", tags=["企微收款"])
 app.include_router(period_router, prefix="/api/v1/periods", tags=["账期管理"])
 app.include_router(ranking_router, prefix="/api/v1/rankings", tags=["员工排名"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["数据看板"])
@@ -364,4 +372,7 @@ async def health_check():
         # In production, hide internal details (m-002 fix)
         is_prod = settings.APP_ENV == "production"
         error_detail = "service degraded" if is_prod else str(e)
-        return {"status": "degraded", "error": error_detail}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "error": error_detail},
+        )

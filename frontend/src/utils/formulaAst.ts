@@ -62,6 +62,49 @@ export function astToString(node: FormulaNode | null): string {
   }
 }
 
+// 将 AST 转为大白话描述（给老板看的人话）
+// 例如: op(*, field(performance.total_amount), field(rule.commission_rate))
+//    => "业绩总额 × 提成比例"
+const OP_SYMBOLS: Record<string, string> = {
+  '+': ' + ',
+  '-': ' - ',
+  '*': ' × ',
+  '/': ' ÷ ',
+}
+
+const FUNC_LABELS: Record<string, string> = {
+  max: '取最大',
+  min: '取最小',
+  round: '四舍五入',
+  abs: '绝对值',
+  if: '条件判断',
+}
+
+export function astToHumanReadable(node: FormulaNode | null): string {
+  if (!node) return '未配置'
+  switch (node.type) {
+    case 'const':
+      if (isPlaceholder(node)) return '？'
+      return String(node.value)
+    case 'field': {
+      const label =
+        SOURCE_FIELDS[node.source]?.find((f) => f.field === node.field)?.label ??
+        node.field
+      return label
+    }
+    case 'op': {
+      const left = astToHumanReadable(node.left)
+      const right = astToHumanReadable(node.right)
+      return `${left}${OP_SYMBOLS[node.op] ?? ' ' + node.op + ' '}${right}`
+    }
+    case 'func': {
+      const label = FUNC_LABELS[node.name] ?? node.name
+      const args = node.args.map(astToHumanReadable).join('，')
+      return `${label}(${args})`
+    }
+  }
+}
+
 // 深拷贝 AST
 export function cloneAst(node: FormulaNode | null): FormulaNode | null {
   if (!node) return null

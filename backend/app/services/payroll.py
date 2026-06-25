@@ -515,25 +515,56 @@ class PayrollService:
 
     # ==================== 工资确认 ====================
 
-    async def finalize(
+    async def review(
         self,
         record_ids: list[uuid.UUID],
         user_id: uuid.UUID,
         notes: str | None = None,
     ) -> int:
-        """确认工资条，状态 draft -> confirmed"""
+        """会计复核，状态 draft -> reviewed"""
         records = await self._get_records_by_ids(record_ids)
         if not records:
             raise NotFoundError("未找到指定的工资记录")
 
-        # 账期检查（locked 允许工资条状态流转）
         for r in records:
             await self.period_service.check_payroll_writable(r.period)
 
         not_draft = [r for r in records if r.status != "draft"]
         if not_draft:
             raise ValidationError(
-                f"以下记录非草稿状态，不可确认: {[r.id for r in not_draft]}"
+                f"以下记录非草稿状态，不可复核: {[r.id for r in not_draft]}"
+            )
+
+        now = datetime.now()
+        for r in records:
+            r.status = "reviewed"
+            r.finalized_at = now
+            r.finalized_by = user_id
+            if notes:
+                r.notes = notes
+
+        await self.session.commit()
+        logger.info(f"[Payroll] 会计复核 {len(records)} 条工资记录")
+        return len(records)
+
+    async def finalize(
+        self,
+        record_ids: list[uuid.UUID],
+        user_id: uuid.UUID,
+        notes: str | None = None,
+    ) -> int:
+        """老板确认工资条，状态 reviewed -> confirmed"""
+        records = await self._get_records_by_ids(record_ids)
+        if not records:
+            raise NotFoundError("未找到指定的工资记录")
+
+        for r in records:
+            await self.period_service.check_payroll_writable(r.period)
+
+        not_reviewed = [r for r in records if r.status != "reviewed"]
+        if not_reviewed:
+            raise ValidationError(
+                f"以下记录未经会计复核，不可确认: {[r.id for r in not_reviewed]}"
             )
 
         now = datetime.now()
@@ -545,13 +576,13 @@ class PayrollService:
                 r.notes = notes
 
         await self.session.commit()
-        logger.info(f"[Payroll] 确认 {len(records)} 条工资记录")
+        logger.info(f"[Payroll] 老板确认 {len(records)} 条工资记录")
         return len(records)
 
     async def mark_paid(
         self, record_ids: list[uuid.UUID], user_id: uuid.UUID, paid_at: str | None = None
     ) -> int:
-        """标记已发放，状态 confirmed -> paid"""
+        """会计发放工资，状态 confirmed -> paid"""
         records = await self._get_records_by_ids(record_ids)
         if not records:
             raise NotFoundError("未找到指定的工资记录")
@@ -562,7 +593,7 @@ class PayrollService:
         not_confirmed = [r for r in records if r.status != "confirmed"]
         if not_confirmed:
             raise ValidationError(
-                f"以下记录非已确认状态，不可标记发放: {[r.id for r in not_confirmed]}"
+                f"以下记录未经老板确认，不可发放: {[r.id for r in not_confirmed]}"
             )
 
         now = datetime.fromisoformat(paid_at) if paid_at else datetime.now()

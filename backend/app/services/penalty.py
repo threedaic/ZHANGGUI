@@ -10,7 +10,8 @@ from loguru import logger
 from app.models.penalty_notice import PenaltyNotice
 from app.models.employee import Employee
 from app.repositories.penalty import PenaltyRepository
-from app.schemas.penalty import PENALTY_TYPES
+from app.schemas.penalty import NOTICE_TYPES, is_reward
+from app.services.inbox_types import InboxType
 from app.utils.pagination import PageParams
 
 
@@ -42,56 +43,62 @@ class PenaltyService:
         notice = await self.repo.create(notice)
 
         if auto_issue:
-            await self._issue_and_notify(notice)
-            await self.repo.update_status(notice.id, "issued")
+            try:
+                await self._issue_and_notify(notice)
+                await self.repo.update_status(notice.id, "issued")
+                notice.status = "issued"
+            except Exception as e:
+                # 通知失败时回滚，重新保存惩罚单为草稿
+                logger.error(f"自动发布失败，保存为草稿: {e}")
+                await self.session.rollback()
+                notice = PenaltyNotice(
+                    store_id=self.store_id,
+                    employee_id=employee_id,
+                    penalty_type=penalty_type,
+                    amount=amount,
+                    reason=reason,
+                    issued_by=issued_by,
+                    issued_at=datetime.now(timezone.utc),
+                    status="draft",
+                )
+                notice = await self.repo.create(notice)
 
         return notice
 
     async def _issue_and_notify(self, notice: PenaltyNotice):
-        """发布处罚通知时自动创建签收任务并推送企微通知"""
-        try:
-            from app.services.sign_task import SignTaskService
-            sign_service = SignTaskService(self.session, self.store_id)
-            title = f"处罚通知 - {PENALTY_TYPES.get(notice.penalty_type, notice.penalty_type)}"
-            await sign_service.create_task(
-                employee_id=notice.employee_id,
-                task_type="penalty_notice",
-                title=title,
-                ref_type="penalty_notice",
-                ref_id=notice.id,
-                issued_by=notice.issued_by,
-                extra={
-                    "penalty_type": notice.penalty_type,
-                    "amount": notice.amount,
-                    "reason": notice.reason,
-                },
-            )
+        """发布奖惩通知时自动创建签收任务并推送企微通知（失败时抛出异常）"""
+        from app.services.sign_task import SignTaskService
+        sign_service = SignTaskService(self.session, self.store_id)
+        category = "奖励" if is_reward(notice.penalty_type) else "处罚"
+        type_label = NOTICE_TYPES.get(notice.penalty_type, notice.penalty_type)
+        title = f"{category}通知：{type_label}"
+        await sign_service.send_to_inbox(
+            employee_id=notice.employee_id,
+            msg_type=InboxType.PENALTY_NOTICE,
+            ref_id=notice.id,
+            issued_by=notice.issued_by,
+            extra={
+                "category": category,
+                "penalty_label": type_label,
+                "penalty_type": notice.penalty_type,
+                "amount": float(notice.amount),
+                "reason": notice.reason,
+                "is_reward": is_reward(notice.penalty_type),
+            },
+        )
 
-            # 推送企微通知
-            from app.services.notification_service import NotificationService
-            notifier = NotificationService(self.session, self.store_id)
-            # 查员工对应的 user_id
-            from app.models.user import User
-            stmt = select(User.id).join(Employee, User.employee_id == Employee.id).where(
-                Employee.id == notice.employee_id,
-                Employee.store_id == self.store_id,
-                User.is_active.is_(True),
-            )
-            result = await self.session.execute(stmt)
-            user_ids = [row[0] for row in result.all()]
-
-            if user_ids:
-                content = f"您收到一份处罚通知：{PENALTY_TYPES.get(notice.penalty_type)}\n罚款金额：¥{notice.amount}\n事由：{notice.reason}\n请在收件箱中查看并签名确认。"
-                await notifier.send(
-                    notification_type="penalty_notice",
-                    title=title,
-                    content=content,
-                    target_user_ids=user_ids,
-                    channel="all",
-                    extra={"penalty_id": notice.id},
-                )
-        except Exception as e:
-            logger.error(f"处罚通知推送失败: {e}")
+        # 推送企微通知（通知表存的是 employee_id，不是 user_id）
+        from app.services.notification_service import NotificationService
+        notifier = NotificationService(self.session, self.store_id)
+        content = f"您收到一份{category}通知：{type_label}\n金额：¥{notice.amount}\n事由：{notice.reason}\n请在收件箱中查看并签名确认。"
+        await notifier.send(
+            notification_type="penalty_notice",
+            title=title,
+            content=content,
+            target_user_ids=[notice.employee_id],
+            channel="all",
+            extra={"penalty_id": str(notice.id)},
+        )
 
     async def get_list(
         self,
@@ -169,7 +176,7 @@ class PenaltyService:
                 "created_at": n.created_at.isoformat() if n.created_at else None,
                 "employee_name": emp.name if emp else f"员工{n.employee_id}",
                 "issued_by_name": issuer.name if issuer else f"员工{n.issued_by}",
-                "penalty_type_name": PENALTY_TYPES.get(n.penalty_type, n.penalty_type),
+                "penalty_type_name": NOTICE_TYPES.get(n.penalty_type, n.penalty_type),
                 "sign_task_id": sign_task.id if sign_task else None,
                 "sign_task_status": sign_task.status if sign_task else None,
             })

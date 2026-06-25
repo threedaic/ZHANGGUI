@@ -34,7 +34,7 @@ def _get_store_id(request: Request) -> int:
     return store_id
 
 
-async def _safe_commit(db: AsyncSession, request: Request = None, after_commit=None):
+async def commit_with_after_hook(db: AsyncSession, request: Request = None, after_commit=None):
     """提交事务并安全执行 after_commit 钩子。
 
     commit 本身失败会抛出异常（由全局 handler 处理），
@@ -65,7 +65,7 @@ async def create_wine(body: WineCreate, request: Request, db: AsyncSession = Dep
         notes=body.notes,
     )
     result = WineResponse.model_validate(wine).model_dump()
-    await _safe_commit(db)
+    await commit_with_after_hook(db)
     return make_response(data=result, request=request)
 
 
@@ -86,7 +86,7 @@ async def create_wine_batch(body: WineBatchCreate, request: Request, db: AsyncSe
                 notes=body.notes,
             )
             results.append(wine)
-    await _safe_commit(db)
+    await commit_with_after_hook(db)
     return make_response(data={
         "count": len(results),
         "bottle_labels": [w.bottle_label for w in results],
@@ -135,9 +135,14 @@ async def list_wines(
 
 @router.get("/h5/{bottle_label}")
 async def h5_wine_info(bottle_label: str, request: Request, db: AsyncSession = Depends(get_db)):
-    """客人短信链接查看存酒信息"""
-    from sqlalchemy import select
+    """客人短信链接查看存酒信息
+
+    bottle_label 作为能力令牌（capability token）授权访问，
+    查询时关闭 RLS 以跨店查找（瓶码全局唯一）。
+    """
+    from sqlalchemy import select, text
     from app.models.wine_storage import WineStorage
+    await db.execute(text("SET LOCAL row_security = off"))
     stmt = select(WineStorage).where(WineStorage.bottle_label == bottle_label)
     result = await db.execute(stmt)
     wine = result.scalar_one_or_none()
@@ -155,7 +160,7 @@ async def h5_confirm_retrieve(body: WineH5ConfirmRequest, request: Request, db: 
         session=db, bottle_label=body.bottle_label,
         retrieve_ml=body.retrieve_ml, table_no=body.table_no,
     )
-    await _safe_commit(db)
+    await commit_with_after_hook(db)
     return make_response(message="已通知服务员，请稍候",
         data={"bottle_label": body.bottle_label, "status": wine.status, "remaining_ml": wine.remaining_ml}, request=request)
 
@@ -164,10 +169,15 @@ async def h5_confirm_retrieve(body: WineH5ConfirmRequest, request: Request, db: 
 
 @router.get("/guest")
 async def guest_my_wines(request: Request, phone: str = Query(...), db: AsyncSession = Depends(get_db)):
-    """客人输入手机号查看所有存酒"""
-    from sqlalchemy import select
+    """客人输入手机号查看所有存酒
+
+    精确匹配手机号（禁止子串匹配以防数据枚举）。
+    bottle_label 作为能力令牌，查询时关闭 RLS 以跨店查找。
+    """
+    from sqlalchemy import select, text
     from app.models.wine_storage import WineStorage
-    stmt = select(WineStorage).where(WineStorage.phone.contains(phone)).order_by(WineStorage.date_stored.desc())
+    await db.execute(text("SET LOCAL row_security = off"))
+    stmt = select(WineStorage).where(WineStorage.phone == phone).order_by(WineStorage.date_stored.desc())
     result = await db.execute(stmt)
     wines = result.scalars().all()
     return make_response(data=[
@@ -200,7 +210,7 @@ async def retrieve_wine_api(
         user_id=user_id,
     )
     result = WineRetrieveResponse.model_validate(wine).model_dump()
-    await _safe_commit(db)
+    await commit_with_after_hook(db)
     return make_response(data=result, request=request)
 
 

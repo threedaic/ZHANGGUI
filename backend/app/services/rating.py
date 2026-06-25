@@ -9,6 +9,7 @@ from app.repositories.rating import RatingRepository
 from app.services.notification_service import NotificationService
 from app.schemas.rating import RatingCreate, RatingItem, RatingSummary, RatingAlert
 from app.utils.pagination import PageParams, PageResult
+from app.utils.deps import get_extra_config
 from loguru import logger
 
 
@@ -24,7 +25,16 @@ class RatingService:
             data.cleanliness,
         ]
         overall = round(sum(scores) / len(scores), 1)
-        is_low = overall <= 2.0
+
+        # 读取店铺评分配置：低分阈值与开关
+        rating_cfg = await get_extra_config(self.session, str(data.store_id), "rating")
+        low_threshold = rating_cfg.get("low_score_threshold", 2.0)
+        alert_enabled = rating_cfg.get("low_score_alert_enabled", True)
+        try:
+            low_threshold = float(low_threshold)
+        except (TypeError, ValueError):
+            low_threshold = 2.0
+        is_low = overall <= low_threshold
 
         rating = GuestRating(
             store_id=data.store_id,
@@ -45,8 +55,8 @@ class RatingService:
 
         rating = await self.repo.create(rating)
 
-        if is_low:
-            logger.warning(f"低分评分: 桌{data.table_no} 均分{overall}")
+        if is_low and alert_enabled:
+            logger.warning(f"低分评分: 桌{data.table_no} 均分{overall} (阈值{low_threshold})")
             detail = (
                 f"> 桌号: **{data.table_no}**\n"
                 f"> 均分: **{overall}**\n"

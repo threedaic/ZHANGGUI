@@ -163,6 +163,73 @@ async def save_setting(
     )
 
 
+@router.get("/app-config")
+async def get_app_config(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """查询自建应用配置状态。
+
+    所有门店共用同一企业微信主体，企微配置（corp_id/agent_id/secret）由系统环境变量统一配置，
+    老板无需重复填写。此接口返回配置状态 + 推送开关，前端据此显示开关状态。
+    不返回 secret 等敏感信息。
+    """
+    from app.config import get_settings
+    settings = get_settings()
+    configured = bool(settings.WECOM_CORP_ID and settings.WECOM_SECRET and settings.WECOM_AGENT_ID)
+
+    # 读取门店自建应用推送开关（存于 StoreSettings.extra_config.wecom_app_enabled）
+    # 默认：已配置则开启，未配置则关闭
+    store_id = get_store_id(request)
+    from sqlalchemy import select
+    from app.models.store import StoreSettings
+    stmt = select(StoreSettings).where(StoreSettings.store_id == store_id)
+    result = await db.execute(stmt)
+    store_settings = result.scalar_one_or_none()
+    extra = store_settings.extra_config if store_settings and store_settings.extra_config else {}
+    enabled = bool(extra.get("wecom_app_enabled", configured))
+
+    return make_response(
+        request=request,
+        data={
+            "configured": configured,
+            "enabled": enabled,
+            "source": "env" if configured else "store",
+            "corp_id": settings.WECOM_CORP_ID if configured else "",
+            "agent_id": settings.WECOM_AGENT_ID if configured else "",
+        },
+    )
+
+
+class AppEnabledRequest(BaseModel):
+    enabled: bool
+
+
+@router.put("/app-enabled")
+async def set_app_enabled(
+    body: AppEnabledRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """保存自建应用推送开关（存入 StoreSettings.extra_config.wecom_app_enabled）。仅老板可操作。"""
+    require_role(request, ["boss"])
+    store_id = get_store_id(request)
+
+    from sqlalchemy import select
+    from app.models.store import StoreSettings
+    stmt = select(StoreSettings).where(StoreSettings.store_id == store_id)
+    result = await db.execute(stmt)
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = StoreSettings(store_id=store_id)
+        db.add(settings)
+    extra = settings.extra_config if settings.extra_config else {}
+    extra["wecom_app_enabled"] = body.enabled
+    settings.extra_config = extra
+    await db.commit()
+    return make_response(request=request, message="已更新", data={"enabled": body.enabled})
+
+
 @router.post("/test-webhook")
 async def test_webhook(
     request: Request,
@@ -180,3 +247,44 @@ async def test_webhook(
         return make_response(request=request, message="测试消息已发送")
     else:
         raise AppError(code=50200, message="企微群消息发送失败，请检查 Webhook 地址是否正确", http_status=502)
+
+
+@router.post("/test-app")
+async def test_app_push(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """测试自建应用消息推送（推送给当前老板自己的企微）。仅老板可操作。
+
+    需要门店已配置 corp_id / agent_id / secret，且老板账号已绑定企微 userid
+    （通过「企业微信配置」页同步通讯录后自动绑定）。
+    """
+    require_role(request, ["boss"])
+    store_id = get_store_id(request)
+    user_id = get_user_id(request)
+
+    from sqlalchemy import select, and_
+    from app.models.user import User
+    from app.models.employee import Employee
+
+    stmt = select(Employee).join(User, User.employee_id == Employee.id).where(
+        and_(User.id == user_id, Employee.store_id == store_id)
+    )
+    result = await db.execute(stmt)
+    emp = result.scalar_one_or_none()
+    if not emp or not emp.wework_userid:
+        raise AppError(
+            code=40000,
+            message="当前老板未绑定企微账号，无法测试。请先在「企业微信配置」同步通讯录。",
+        )
+
+    svc = NotificationService(db, store_id)
+    ok, msg = await svc.send_app_message(
+        wework_userids=[emp.wework_userid],
+        title="测试消息",
+        content="Crush掌柜自建应用推送配置成功。这条消息由系统自动发送，确认应用配置有效。",
+    )
+    if ok:
+        return make_response(request=request, message="测试消息已发送到您的企微")
+    else:
+        raise AppError(code=50200, message=f"推送失败: {msg}", http_status=502)

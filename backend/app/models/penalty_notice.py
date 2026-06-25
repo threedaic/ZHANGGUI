@@ -1,7 +1,7 @@
 """
 处罚通知单业务模型 — 独立于签收任务
 
-处罚类型: late_fine / absent_fine / early_fine / complaint / antifraud / other
+处罚类型: penalty_complaint / penalty_antifraud / penalty_other （考勤类迟到/旷工/早退由考勤模块自动计算）
 状态: draft → issued → acknowledged
 """
 import uuid
@@ -20,7 +20,7 @@ class PenaltyNotice(TimestampMixin, Base):
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_stores.store_id"))
     employee_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_employees.employee_id"))
 
-    penalty_type: Mapped[str] = mapped_column(String(30))  # late_fine / absent_fine / early_fine / complaint / antifraud / other
+    penalty_type: Mapped[str] = mapped_column(String(30))  # penalty_complaint / penalty_antifraud / penalty_other
     amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     reason: Mapped[str] = mapped_column(Text)
 

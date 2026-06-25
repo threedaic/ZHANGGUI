@@ -8,7 +8,8 @@ const auth = useAuthStore()
 
 const menus = [
   // 排班与人
-  { key: 'schedule', label: '排班考勤', desc: '排班表、到岗统计、换班审批', path: '/management/schedule-attendance' },
+  { key: 'schedule', label: '排班管理', desc: '排班表、一键排班、周模板', path: '/management/schedule' },
+  { key: 'attendance', label: '考勤管理', desc: '打卡记录、到岗统计、打卡设置', path: '/management/attendance' },
   { key: 'kpi', label: 'KPI考核', desc: '模板、评分、申诉', path: '/management/kpi' },
   { key: 'rankings', label: '员工排行', desc: '业绩/KPI/考勤/评分排名', path: '/management/rankings' },
   // 工资与账期

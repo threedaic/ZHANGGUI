@@ -1,5 +1,23 @@
 <template>
   <div class="create-penalty-page">
+    <!-- 奖励/惩罚切换 -->
+    <div class="mode-switch">
+      <button
+        class="mode-btn penalty"
+        :class="{ active: mode === 'penalty' }"
+        @click="switchMode('penalty')"
+      >
+        惩罚单
+      </button>
+      <button
+        class="mode-btn reward"
+        :class="{ active: mode === 'reward' }"
+        @click="switchMode('reward')"
+      >
+        奖励单
+      </button>
+    </div>
+
     <div class="form-group">
       <label class="form-label">员工</label>
       <select v-model="form.employee_id" class="form-select">
@@ -11,10 +29,10 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">处罚类型</label>
+      <label class="form-label">{{ mode === 'reward' ? '奖励' : '处罚' }}类型</label>
       <div class="type-grid">
         <button
-          v-for="t in penaltyTypes"
+          v-for="t in filteredTypes"
           :key="t.value"
           class="type-option"
           :class="{ selected: form.penalty_type === t.value }"
@@ -26,7 +44,7 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">罚款金额 (¥)</label>
+      <label class="form-label">{{ mode === 'reward' ? '奖励' : '罚款' }}金额 (¥)</label>
       <input
         v-model.number="form.amount"
         type="number"
@@ -42,17 +60,18 @@
       <textarea
         v-model="form.reason"
         class="form-textarea"
-        placeholder="请详细说明处罚事由..."
+        :placeholder="mode === 'reward' ? '请说明奖励事由...' : '请详细说明处罚事由...'"
         maxlength="2000"
       ></textarea>
     </div>
 
     <button
       class="btn-submit"
+      :class="mode"
       :disabled="!valid || submitting"
       @click="handleSubmit"
     >
-      {{ submitting ? '发布中...' : '发布处罚通知' }}
+      {{ submitting ? '发布中...' : (mode === 'reward' ? '发布奖励通知' : '发布处罚通知') }}
     </button>
     <div class="hint">发布后员工将收到签收提醒，需签名确认。</div>
   </div>
@@ -66,6 +85,7 @@ import { storeAPI } from '@/api/store'
 
 const router = useRouter()
 const submitting = ref(false)
+const mode = ref<'penalty' | 'reward'>('penalty')
 
 interface EmployeeOption {
   id: string
@@ -74,13 +94,21 @@ interface EmployeeOption {
 }
 
 const employees = ref<EmployeeOption[]>([])
-const penaltyTypes = ref<PenaltyTypeOption[]>([])
+const allTypes = ref<PenaltyTypeOption[]>([])
 
 const form = ref({
   employee_id: '' as string,
-  penalty_type: 'late_fine',
+  penalty_type: 'penalty_complaint',
   amount: 0,
   reason: '',
+})
+
+// 按模式过滤类型
+const filteredTypes = computed(() => {
+  return allTypes.value.filter((t) => {
+    if (mode.value === 'reward') return t.value.startsWith('reward_')
+    return t.value.startsWith('penalty_')
+  })
 })
 
 const valid = computed(() => {
@@ -89,6 +117,15 @@ const valid = computed(() => {
     && form.value.amount >= 0
     && form.value.reason.trim().length > 0
 })
+
+function switchMode(m: 'penalty' | 'reward') {
+  mode.value = m
+  // 切换模式时自动选第一个类型
+  const types = filteredTypes.value
+  if (types.length > 0) {
+    form.value.penalty_type = types[0].value
+  }
+}
 
 async function loadEmployees() {
   try {
@@ -108,7 +145,12 @@ async function loadEmployees() {
 async function loadTypes() {
   try {
     const res = await penaltyAPI.getTypes()
-    penaltyTypes.value = res.data.data || []
+    allTypes.value = res.data.data || []
+    // 默认选第一个惩罚类型
+    const firstPenalty = allTypes.value.find((t) => t.value.startsWith('penalty_'))
+    if (firstPenalty) {
+      form.value.penalty_type = firstPenalty.value
+    }
   } catch { /* */ }
 }
 
@@ -137,6 +179,38 @@ onMounted(() => {
 .create-penalty-page {
   padding: 0 16px;
   padding-bottom: 24px;
+}
+
+/* 奖励/惩罚切换 */
+.mode-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #333333;
+  border-radius: 10px;
+  background: #111111;
+  color: #7A7C80;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn.penalty.active {
+  border-color: #FB0079;
+  color: #FB0079;
+  background: rgba(251, 0, 121, 0.08);
+}
+
+.mode-btn.reward.active {
+  border-color: #4CAF50;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.08);
 }
 
 .form-group {
@@ -221,6 +295,10 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   margin-top: 8px;
+}
+
+.btn-submit.reward {
+  background: #4CAF50;
 }
 
 .btn-submit:disabled {

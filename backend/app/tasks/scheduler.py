@@ -45,6 +45,7 @@ async def init_scheduler():
         daily_attendance_report_job,
         auto_sync_checkin_job,
         monthly_attendance_confirm_job,
+        cleanup_checkin_photos_job,
     )
     from app.tasks.wine_stocktake_job import monthly_wine_stocktake_job
     from app.tasks.butler_reminder import butler_opening_reminder_job, butler_closing_reminder_job
@@ -54,6 +55,8 @@ async def init_scheduler():
     scheduler.add_job(daily_attendance_report_job, 'cron', hour=10, minute=5, id='daily_attendance_report_job', replace_existing=True)
     scheduler.add_job(run_daily_antifraud_scan, 'cron', hour=4, minute=0, id='run_daily_antifraud_scan', replace_existing=True)
     scheduler.add_job(monthly_attendance_confirm_job, 'cron', day=1, hour=2, minute=0, id='monthly_attendance_confirm_job', replace_existing=True)
+    # 每天 04:00 清理过期打卡照片（保留WiFi/时间元数据，仅删照片文件）
+    scheduler.add_job(cleanup_checkin_photos_job, 'cron', hour=4, minute=30, id='cleanup_checkin_photos_job', replace_existing=True)
     # 每月1号 02:30 自动生成存酒盘点单
     scheduler.add_job(monthly_wine_stocktake_job, 'cron', day=1, hour=2, minute=30, id='monthly_wine_stocktake_job', replace_existing=True)
 

@@ -92,10 +92,17 @@ interface FuncCard {
 
 const peopleCards: FuncCard[] = [
   {
-    label: '排班考勤',
-    path: '/management/schedule-attendance',
+    label: '排班管理',
+    path: '/management/schedule',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <rect x="3" y="4" width="22" height="20" rx="3"/><line x1="3" y1="11" x2="25" y2="11"/><line x1="10" y1="11" x2="10" y2="24"/>
+    </svg>`,
+  },
+  {
+    label: '考勤管理',
+    path: '/management/attendance',
+    icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="14" cy="14" r="10"/><polyline points="14,8 14,14 18,16"/>
     </svg>`,
   },
   {
@@ -106,8 +113,8 @@ const peopleCards: FuncCard[] = [
     </svg>`,
   },
   {
-    label: '工资计算',
-    path: '/management/payroll',
+    label: '自动发薪',
+    path: '/management/auto-payroll',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <rect x="3" y="6" width="22" height="16" rx="3"/><circle cx="14" cy="14" r="4"/><path d="M7 6l7-3 7 3"/>
     </svg>`,
@@ -155,7 +162,7 @@ const opsCards: FuncCard[] = [
     </svg>`,
   },
   {
-    label: '处罚通知',
+    label: '奖惩通知',
     path: '/management/penalties',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
       <circle cx="14" cy="14" r="10"/><line x1="14" y1="9" x2="14" y2="14"/><circle cx="14" cy="18" r="0.5" fill="#FB0079"/>

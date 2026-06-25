@@ -14,7 +14,7 @@ export interface SignTaskItem {
   signature_data: string | null
   dispute_reason: string | null
   disputed_at: string | null
-  issued_by: number
+  issued_by: string
   issued_at: string
   notes: string | null
   extra: Record<string, unknown> | null

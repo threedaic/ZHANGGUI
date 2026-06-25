@@ -12,8 +12,8 @@ ALTER TABLE sys_printers ENABLE ROW LEVEL SECURITY;
 -- sys_printers 的 RLS 策略：门店隔离
 CREATE POLICY sys_printers_store_isolation ON sys_printers
     FOR ALL
-    USING (store_id = current_setting('app.current_store_id')::UUID)
-    WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
+    USING (store_id = current_setting('app.current_store_id', true)::uuid)
+    WITH CHECK (store_id = current_setting('app.current_store_id', true)::uuid);
 
 -- sys_printers 的 RLS 策略：管理员豁免
 CREATE POLICY sys_printers_admin_all_access ON sys_printers
@@ -26,8 +26,8 @@ ALTER TABLE sys_print_routes ENABLE ROW LEVEL SECURITY;
 -- sys_print_routes 的 RLS 策略：门店隔离
 CREATE POLICY sys_print_routes_store_isolation ON sys_print_routes
     FOR ALL
-    USING (store_id = current_setting('app.current_store_id')::UUID)
-    WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
+    USING (store_id = current_setting('app.current_store_id', true)::uuid)
+    WITH CHECK (store_id = current_setting('app.current_store_id', true)::uuid);
 
 -- sys_print_routes 的 RLS 策略：管理员豁免
 CREATE POLICY sys_print_routes_admin_all_access ON sys_print_routes
@@ -40,8 +40,8 @@ ALTER TABLE sys_print_queue ENABLE ROW LEVEL SECURITY;
 -- sys_print_queue 的 RLS 策略：门店隔离
 CREATE POLICY sys_print_queue_store_isolation ON sys_print_queue
     FOR ALL
-    USING (store_id = current_setting('app.current_store_id')::UUID)
-    WITH CHECK (store_id = current_setting('app.current_store_id')::UUID);
+    USING (store_id = current_setting('app.current_store_id', true)::uuid)
+    WITH CHECK (store_id = current_setting('app.current_store_id', true)::uuid);
 
 -- sys_print_queue 的 RLS 策略：管理员豁免
 CREATE POLICY sys_print_queue_admin_all_access ON sys_print_queue

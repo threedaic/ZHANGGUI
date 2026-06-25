@@ -196,3 +196,75 @@ class MonthlySummaryResponse(BaseModel):
     period: str
     store_id: uuid.UUID
     items: list[MonthlySummaryItem]
+
+
+# ==================== WiFi打卡绑定 ====================
+
+class CheckinWifiItem(BaseModel):
+    id: uuid.UUID | None = None
+    ssid: str
+    bssid: str
+    label: str | None = None
+    is_active: bool = True
+
+    model_config = {"from_attributes": True}
+
+
+class CheckinWifiCreateRequest(BaseModel):
+    ssid: str = Field(..., min_length=1, max_length=64)
+    bssid: str = Field(..., min_length=1, max_length=32)
+    label: str | None = None
+    is_active: bool = True
+
+
+class CheckinConfigResponse(BaseModel):
+    """打卡配置（前端用于决定打卡流程）"""
+    require_wifi: bool = True
+    require_photo: bool = True
+    grace_minutes: int = 5
+    photo_retention_days: int = 90
+    time_window_minutes: int = 120
+    wifis: list[CheckinWifiItem] = []
+
+
+class CheckinConfigUpdateRequest(BaseModel):
+    require_wifi: bool | None = None
+    require_photo: bool | None = None
+    grace_minutes: int | None = Field(None, ge=0, le=120)
+    photo_retention_days: int | None = Field(None, ge=7, le=365)
+    time_window_minutes: int | None = Field(None, ge=30, le=360)
+
+
+# ==================== 打卡结果 ====================
+
+class CheckinResultResponse(BaseModel):
+    """打卡结果"""
+    record_id: uuid.UUID
+    date: str
+    action: str  # clock_in / clock_out
+    clock_time: str
+    scheduled_shift: str | None = None
+    shift_start_time: str | None = None
+    shift_end_time: str | None = None
+    status: str  # present / late / early / unknown
+    late_minutes: int = 0
+    early_minutes: int = 0
+    matched_by: str  # schedule / time_window
+    photo_url: str | None = None
+    wifi_ssid: str | None = None
+
+
+class CheckinStatusResponse(BaseModel):
+    """今日打卡状态（前端打卡页展示用）"""
+    date: str
+    scheduled_shift: str | None = None
+    shift_start_time: str | None = None
+    shift_end_time: str | None = None
+    is_overnight: bool = False
+    clock_in: str | None = None
+    clock_out: str | None = None
+    status: str = "unknown"
+    late_minutes: int = 0
+    early_minutes: int = 0
+    can_checkin: bool = True
+    next_action: str = "clock_in"  # clock_in / clock_out / done

@@ -171,7 +171,7 @@ CREATE POLICY admin_all_access ON shared_products
     area VARCHAR(50) DEFAULT '大厅',
     capacity INTEGER DEFAULT 4,
     min_spend NUMERIC(10,2) DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'idle',
+    status VARCHAR(20) DEFAULT 'active',
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
