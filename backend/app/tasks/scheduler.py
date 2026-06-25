@@ -44,6 +44,7 @@ async def init_scheduler():
     from app.tasks.notification_jobs import (
         daily_attendance_report_job,
         auto_sync_checkin_job,
+        auto_sync_wework_contacts_job,
         monthly_attendance_confirm_job,
         cleanup_checkin_photos_job,
     )
@@ -52,6 +53,7 @@ async def init_scheduler():
     from loguru import logger
 
     scheduler.add_job(auto_sync_checkin_job, 'cron', hour=10, minute=0, id='auto_sync_checkin_job', replace_existing=True)
+    scheduler.add_job(auto_sync_wework_contacts_job, 'cron', hour=10, minute=3, id='auto_sync_wework_contacts_job', replace_existing=True)
     scheduler.add_job(daily_attendance_report_job, 'cron', hour=10, minute=5, id='daily_attendance_report_job', replace_existing=True)
     scheduler.add_job(run_daily_antifraud_scan, 'cron', hour=4, minute=0, id='run_daily_antifraud_scan', replace_existing=True)
     scheduler.add_job(monthly_attendance_confirm_job, 'cron', day=1, hour=2, minute=0, id='monthly_attendance_confirm_job', replace_existing=True)

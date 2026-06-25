@@ -41,10 +41,44 @@ async def auto_sync_checkin_job() -> None:
                         logger.info(f"自动同步打卡: 门店={store.name} 同步{synced}条")
                     await session.commit()
                 except Exception as e:
-                    logger.warning(f"自动同步打卡失败 门店={store.name}: {e}")
+                    logger.error(f"自动同步打卡失败 门店={store.name}: {e}")
                     await session.rollback()
         except Exception as e:
-            logger.error(f"自动同步打卡总任务失败: {e}")
+            logger.error(f"自动同步打卡任务失败: {e}")
+
+
+async def auto_sync_wework_contacts_job() -> None:
+    """每天 10:03 自动同步企微通讯录（新员工/离职人员）。
+
+    遍历所有配置了企微的门店，调用 sync_contacts 同步部门成员。
+    """
+    from app.models.store import Store
+    from app.services.wework import sync_contacts
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        try:
+            store_result = await session.execute(
+                select(Store).where(Store.status == "active")
+            )
+            stores = store_result.scalars().all()
+            for store in stores:
+                if not store.wework_corp_id or not store.wework_department_id:
+                    continue
+                try:
+                    result = await sync_contacts(session, store.id)
+                    await session.commit()
+                    logger.info(
+                        f"自动同步通讯录: 门店={store.name} "
+                        f"新增={result.get('created', 0)} "
+                        f"更新={result.get('updated', 0)} "
+                        f"角色变更={result.get('role_changed', 0)}"
+                    )
+                except Exception as e:
+                    logger.error(f"自动同步通讯录失败 门店={store.name}: {e}")
+                    await session.rollback()
+        except Exception as e:
+            logger.error(f"自动同步通讯录任务失败: {e}")
 
 
 async def daily_attendance_report_job() -> None:
