@@ -8,7 +8,8 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- updated_at 自动更新触发器函�?CREATE OR REPLACE FUNCTION set_updated_at()
+-- updated_at 自动更新触发器函�?
+CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -20,7 +21,8 @@ $$ LANGUAGE plpgsql;
 -- 一、共享基础�?shared_*�?张）
 -- ===========================================================================
 
--- 1. 门店�?CREATE TABLE IF NOT EXISTS shared_stores (
+-- 1. 门店�?
+CREATE TABLE IF NOT EXISTS shared_stores (
     store_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_code VARCHAR(32) UNIQUE NOT NULL,
     store_name VARCHAR(64) NOT NULL,
@@ -54,7 +56,8 @@ CREATE TABLE IF NOT EXISTS shared_franchisees (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. 员工�?CREATE TABLE IF NOT EXISTS shared_employees (
+-- 3. 员工�?
+CREATE TABLE IF NOT EXISTS shared_employees (
     employee_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     employee_code VARCHAR(20) UNIQUE NOT NULL,
@@ -82,7 +85,8 @@ CREATE POLICY admin_all_access ON shared_employees
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 4. 会员�?CREATE TABLE IF NOT EXISTS shared_members (
+-- 4. 会员�?
+CREATE TABLE IF NOT EXISTS shared_members (
     member_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     nickname VARCHAR(64),
@@ -110,7 +114,8 @@ CREATE POLICY admin_all_access ON shared_members
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 5. 会员等级配置�?CREATE TABLE IF NOT EXISTS shared_member_levels (
+-- 5. 会员等级配置�?
+CREATE TABLE IF NOT EXISTS shared_member_levels (
     level_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     level_code VARCHAR(20) NOT NULL,
@@ -122,7 +127,8 @@ CREATE POLICY admin_all_access ON shared_members
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. 商品分类�?CREATE TABLE IF NOT EXISTS shared_categories (
+-- 6. 商品分类�?
+CREATE TABLE IF NOT EXISTS shared_categories (
     category_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     parent_id UUID,
@@ -134,7 +140,8 @@ CREATE POLICY admin_all_access ON shared_members
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. 商品�?CREATE TABLE IF NOT EXISTS shared_products (
+-- 7. 商品�?
+CREATE TABLE IF NOT EXISTS shared_products (
     product_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     category_id UUID REFERENCES shared_categories(category_id),
@@ -164,7 +171,8 @@ CREATE POLICY admin_all_access ON shared_products
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 8. 桌台�?CREATE TABLE IF NOT EXISTS shared_tables (
+-- 8. 桌台�?
+CREATE TABLE IF NOT EXISTS shared_tables (
     table_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id),
     table_no VARCHAR(16) NOT NULL,
@@ -189,7 +197,8 @@ CREATE POLICY admin_all_access ON shared_tables
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 9. 设备注册表（桌灯/打印机等�?CREATE TABLE IF NOT EXISTS shared_devices (
+-- 9. 设备注册表（桌灯/打印机等�?
+CREATE TABLE IF NOT EXISTS shared_devices (
     device_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     device_type VARCHAR(20) NOT NULL,     -- desk_lamp/printer/kitchen_display
@@ -201,7 +210,8 @@ CREATE POLICY admin_all_access ON shared_tables
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 10. 门店配置表（平铺结构，每店一行；extra_config JSONB 承载未来扩展�?CREATE TABLE IF NOT EXISTS shared_store_settings (
+-- 10. 门店配置表（平铺结构，每店一行；extra_config JSONB 承载未来扩展�?
+CREATE TABLE IF NOT EXISTS shared_store_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL REFERENCES shared_stores(store_id) UNIQUE,
     -- 排班规则
@@ -296,7 +306,8 @@ CREATE POLICY admin_all_access ON pos_orders
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 12. 订单明细�?CREATE TABLE IF NOT EXISTS pos_order_items (
+-- 12. 订单明细�?
+CREATE TABLE IF NOT EXISTS pos_order_items (
     item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     order_id UUID NOT NULL REFERENCES pos_orders(order_id),
@@ -349,7 +360,8 @@ CREATE POLICY admin_all_access ON pos_payments
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 14. 支付方式配置�?CREATE TABLE IF NOT EXISTS pos_payment_methods (
+-- 14. 支付方式配置�?
+CREATE TABLE IF NOT EXISTS pos_payment_methods (
     method_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     name VARCHAR(50) NOT NULL,
@@ -359,7 +371,8 @@ CREATE POLICY admin_all_access ON pos_payments
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 15. 桌台会话�?CREATE TABLE IF NOT EXISTS pos_table_sessions (
+-- 15. 桌台会话�?
+CREATE TABLE IF NOT EXISTS pos_table_sessions (
     session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     table_id UUID NOT NULL REFERENCES shared_tables(table_id),
@@ -395,7 +408,8 @@ CREATE POLICY admin_all_access ON pos_refunds
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 17. 免单/折扣审批�?CREATE TABLE IF NOT EXISTS pos_discount_approvals (
+-- 17. 免单/折扣审批�?
+CREATE TABLE IF NOT EXISTS pos_discount_approvals (
     approval_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     order_id UUID NOT NULL REFERENCES pos_orders(order_id),
@@ -415,7 +429,8 @@ CREATE POLICY admin_all_access ON pos_discount_approvals
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 18. 会员余额流水�?CREATE TABLE IF NOT EXISTS pos_member_transactions (
+-- 18. 会员余额流水�?
+CREATE TABLE IF NOT EXISTS pos_member_transactions (
     transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     member_id UUID NOT NULL REFERENCES shared_members(member_id),
@@ -437,7 +452,8 @@ CREATE POLICY admin_all_access ON pos_member_transactions
     FOR ALL
     USING (current_setting('app.current_user_role', true) = 'admin');
 
--- 19. 订单操作日志�?CREATE TABLE IF NOT EXISTS pos_order_logs (
+-- 19. 订单操作日志�?
+CREATE TABLE IF NOT EXISTS pos_order_logs (
     log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     order_id UUID NOT NULL,
@@ -447,7 +463,8 @@ CREATE POLICY admin_all_access ON pos_member_transactions
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 20. 每日对账�?CREATE TABLE IF NOT EXISTS pos_daily_reconciliations (
+-- 20. 每日对账�?
+CREATE TABLE IF NOT EXISTS pos_daily_reconciliations (
     reconciliation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     date DATE NOT NULL,
@@ -464,7 +481,8 @@ CREATE POLICY admin_all_access ON pos_member_transactions
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 21. 纸条社交�?CREATE TABLE IF NOT EXISTS pos_desk_notes (
+-- 21. 纸条社交�?
+CREATE TABLE IF NOT EXISTS pos_desk_notes (
     note_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     from_table_id UUID NOT NULL,
@@ -486,7 +504,8 @@ CREATE POLICY admin_all_access ON pos_desk_notes
 -- 三、游戏模块表 game_*�?张）
 -- ===========================================================================
 
--- 22. 游戏模板�?CREATE TABLE IF NOT EXISTS game_templates (
+-- 22. 游戏模板�?
+CREATE TABLE IF NOT EXISTS game_templates (
     template_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
     game_type VARCHAR(50) NOT NULL,
@@ -498,7 +517,8 @@ CREATE POLICY admin_all_access ON pos_desk_notes
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 23. 游戏会话�?CREATE TABLE IF NOT EXISTS game_sessions (
+-- 23. 游戏会话�?
+CREATE TABLE IF NOT EXISTS game_sessions (
     session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
     template_id UUID REFERENCES game_templates(template_id),
@@ -534,7 +554,8 @@ CREATE TABLE IF NOT EXISTS game_participants (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 25. 游戏奖品�?CREATE TABLE IF NOT EXISTS game_prizes (
+-- 25. 游戏奖品�?
+CREATE TABLE IF NOT EXISTS game_prizes (
     prize_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES game_sessions(session_id),
     product_id UUID NOT NULL REFERENCES shared_products(product_id),
@@ -549,7 +570,8 @@ CREATE TABLE IF NOT EXISTS game_participants (
 -- 四、系统配置表 sys_*�?张）
 -- ===========================================================================
 
--- 26. 系统配置�?CREATE TABLE IF NOT EXISTS sys_configs (
+-- 26. 系统配置�?
+CREATE TABLE IF NOT EXISTS sys_configs (
     config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     config_key VARCHAR(100) NOT NULL,
@@ -559,7 +581,8 @@ CREATE TABLE IF NOT EXISTS game_participants (
     UNIQUE(store_id, config_key)
 );
 
--- 27. 审计日志�?CREATE TABLE IF NOT EXISTS sys_audit_logs (
+-- 27. 审计日志�?
+CREATE TABLE IF NOT EXISTS sys_audit_logs (
     log_id BIGSERIAL PRIMARY KEY,
     store_id UUID,
     user_id UUID NOT NULL,
