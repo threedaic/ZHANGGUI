@@ -581,8 +581,12 @@ class PrinterService:
                 return {"success": False, "message": msg, "response": {}}
 
         # 根据纸宽自适应排版，防止文字变形/截断
-        paper_width = printer.paper_width or 80
-        content = self._format_content_by_paper_width(content, paper_width)
+        # 注意：标签机用坐标定位（<TEXT x='' y=''>），不能按行排版，否则会破坏标签格式
+        printer_type = (printer.printer_type or "").lower()
+        is_label = printer_type in ("label", "标签", "标签机")
+        if not is_label:
+            paper_width = printer.paper_width or 80
+            content = self._format_content_by_paper_width(content, paper_width)
 
         logger.info(f"[云打印] 打印内容:\n{content}")
 
@@ -1042,7 +1046,37 @@ class PrinterService:
         if not printer:
             return {"status": "failed", "message": "打印机不存在"}
 
-        test_content = f"测试打印\n{printer.name}\n{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作\n\n\n"
+        # 标签机需要用坐标格式，小票机用纯文本
+        printer_type = (printer.printer_type or "").lower()
+        is_label = printer_type in ("label", "标签", "标签机")
+        brand = printer.brand or ""
+
+        if is_label and brand == "feie":
+            # 飞鹅标签机：必须用 <TEXT x='' y=''> 坐标格式
+            now_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            test_content = (
+                "<SIZE>40,30</SIZE>"
+                "<DIRECTION>1</DIRECTION>"
+                f"<TEXT x='10' y='10' font='12' w='2' h='2'>测试打印</TEXT>"
+                f"<TEXT x='10' y='70' font='12' w='1' h='1'>{printer.name}</TEXT>"
+                f"<TEXT x='10' y='100' font='12' w='1' h='1'>{now_str}</TEXT>"
+                f"<TEXT x='10' y='130' font='12' w='1' h='1'>打印机正常工作</TEXT>"
+            )
+        elif is_label and brand == "xpyun":
+            # 芯烨云标签机格式（类似飞鹅，用坐标）
+            now_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            test_content = (
+                "<SIZE>40,30</SIZE>"
+                "<DIRECTION>1</DIRECTION>"
+                f"<TEXT x='10' y='10' font='12' w='2' h='2'>测试打印</TEXT>"
+                f"<TEXT x='10' y='70' font='12' w='1' h='1'>{printer.name}</Text>"
+                f"<TEXT x='10' y='100' font='12' w='1' h='1'>{now_str}</TEXT>"
+                f"<TEXT x='10' y='130' font='12' w='1' h='1'>打印机正常工作</TEXT>"
+            )
+        else:
+            # 小票机：纯文本
+            test_content = f"测试打印\n{printer.name}\n{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n打印机正常工作\n\n\n"
+
         return await self._send_print(store_id, printer, test_content, is_test=True)
 
     # ==================== CRUD 操作（供API层调用） ====================

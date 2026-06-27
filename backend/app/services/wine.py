@@ -101,7 +101,7 @@ async def store_wine(
 
         # 每瓶异步出标签（满瓶不打印，下次直接从库房拿新的）
         if remaining_ml < 750:
-            _spawn(_safe_print_label(bottle_label, customer_name, wine_name, remaining_ml, date.today().isoformat(), cabinet_no, store_id))
+            _spawn(_safe_print_label(bottle_label, customer_name, phone, wine_name, remaining_ml, date.today().isoformat(), cabinet_no, store_id))
 
     # 短信只发一次
     _spawn(_safe_send_sms(phone, customer_name, wine_name, last_wine.bottle_label, remaining_ml))
@@ -111,28 +111,90 @@ async def store_wine(
     return last_wine
 
 
-async def _safe_print_label(bottle_label: str, customer_name: str, wine_name: str,
+async def _safe_print_label(bottle_label: str, customer_name: str, phone: str, wine_name: str,
                             remaining_ml: int, date_stored: str, cabinet_no: str, store_id: uuid.UUID):
     try:
         from app.database import AsyncSessionLocal
+        from sqlalchemy import text as sql_text
         async with AsyncSessionLocal() as session:
+            # 异步任务需要设置RLS上下文，否则查询会被行级安全拦截
+            await session.execute(sql_text("SET LOCAL app.current_store_id = :sid"), {"sid": str(store_id)})
+            await session.execute(sql_text("SET LOCAL app.current_user_role = 'boss'"))
+
             service = PrinterService(session)
             # 构建标签内容
             capacity_map = {750: "满瓶", 562: "3/4瓶", 375: "1/2瓶", 187: "1/4瓶"}
             capacity = capacity_map.get(remaining_ml, "满瓶")
-            content = f"存酒标签\n客户: {customer_name}\n酒名: {wine_name}\n容量: {capacity}\n瓶码: {bottle_label}\n柜号: {cabinet_no}\n日期: {date_stored}"
 
-            # 使用标签打印机
             store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
-            await service.print_by_category(
-                store_id=store_uuid,
-                category_id=WINE_PRINT_CATEGORY_ID,
-                content=content,
-                trigger="order_created",
-                document_type="label",
-            )
+
+            # 优先使用模块打印配置（老板在设置页配置的"存酒标签"打印机）
+            printer = await service.get_module_printer(store_uuid, "wine_storage", "store_label")
+
+            if printer:
+                content = _build_label_content(printer, customer_name, phone, wine_name, capacity, bottle_label, cabinet_no, date_stored)
+                await service._send_print(store_uuid, printer, content)
+                logger.info(f"存酒标签已发送到模块配置的打印机: {printer.name}")
+            else:
+                # 兜底：直接查找标签类型的打印机
+                printer = await service._find_printer_by_type(store_uuid, "label")
+                if printer:
+                    content = _build_label_content(printer, customer_name, phone, wine_name, capacity, bottle_label, cabinet_no, date_stored)
+                    await service._send_print(store_uuid, printer, content)
+                    logger.info(f"存酒标签已发送到标签打印机: {printer.name}")
+                else:
+                    logger.warning(f"未找到标签打印机，跳过打印")
     except Exception as e:
         logger.error(f"打印标签失败（不影响存酒）: {e}")
+
+
+def _build_label_content(printer, customer_name: str, phone: str, wine_name: str, capacity: str,
+                         bottle_label: str, cabinet_no: str, date_stored: str) -> str:
+    """生成标签内容
+
+    布局：客户姓名（最大）→ 手机号 → 酒名+容量 → 柜号 → 条形码
+    自适应纸宽：30/40/50/60mm
+    """
+    printer_type = (printer.printer_type or "").lower()
+    brand = printer.brand or ""
+    is_label = printer_type in ("label", "标签", "标签机")
+
+    if is_label and brand in ("feie", "xpyun"):
+        # 标签尺寸固定 40x30mm（飞鹅FP-N20出厂默认）
+        label_w = 40
+        label_h = 30
+        max_x = 320  # 40mm * 8dots/mm
+        max_y = 240  # 30mm * 8dots/mm
+
+        parts = [
+            f"<SIZE>{label_w},{label_h}</SIZE>",
+            "<DIRECTION>1</DIRECTION>",
+            # 客户姓名（最大字号 w=2 h=2）
+            f"<TEXT x='5' y='5' font='12' w='2' h='2'>{customer_name}</TEXT>",
+        ]
+
+        # 姓名占约40dots高，后续内容往下排
+        y = 50
+
+        # 手机号
+        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{phone}</TEXT>")
+        y += 25
+
+        # 酒名+容量
+        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{wine_name} {capacity}</TEXT>")
+        y += 25
+
+        # 柜号
+        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{cabinet_no}柜</TEXT>")
+
+        # 条形码（底部，Code128格式，用于盘点扫码）
+        # 飞鹅标签机条码标签：<BC128 x y h s n w>内容</BC128>
+        parts.append(f"<BC128 x='5' y='155' h='60' s='1' n='1' w='2'>{bottle_label}</BC128>")
+
+        return "".join(parts)
+    else:
+        # 小票机格式
+        return f"{customer_name}\n{phone}\n{wine_name} {capacity}\n{cabinet_no}柜\n{bottle_label}\n{date_stored}"
 
 
 async def _safe_send_sms(phone: str, customer_name: str, wine_name: str,
@@ -181,7 +243,12 @@ async def _safe_print_receipt(bottle_label: str, customer_name: str, wine_name: 
                               retrieve_ml: int, table_no: str, store_id: uuid.UUID):
     try:
         from app.database import AsyncSessionLocal
+        from sqlalchemy import text as sql_text
         async with AsyncSessionLocal() as session:
+            # 异步任务需要设置RLS上下文
+            await session.execute(sql_text("SET LOCAL app.current_store_id = :sid"), {"sid": str(store_id)})
+            await session.execute(sql_text("SET LOCAL app.current_user_role = 'boss'"))
+
             service = PrinterService(session)
             # 构建取酒小票内容
             content = (
@@ -198,15 +265,21 @@ async def _safe_print_receipt(bottle_label: str, customer_name: str, wine_name: 
                 f"└──────────────────────────┘"
             )
 
-            # 使用小票打印机
+            # 优先使用模块打印配置
             store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
-            await service.print_by_category(
-                store_id=store_uuid,
-                category_id=WINE_PRINT_CATEGORY_ID,
-                content=content,
-                trigger="manual",
-                document_type="receipt",
-            )
+            printer = await service.get_module_printer(store_uuid, "wine_storage", "take_receipt")
+
+            if printer:
+                await service._send_print(store_uuid, printer, content)
+                logger.info(f"取酒小票已发送到模块配置的打印机: {printer.name}")
+            else:
+                # 兜底：查找小票打印机
+                printer = await service._find_printer_by_type(store_uuid, "receipt")
+                if printer:
+                    await service._send_print(store_uuid, printer, content)
+                    logger.info(f"取酒小票已发送到小票打印机: {printer.name}")
+                else:
+                    logger.warning(f"未找到小票打印机，跳过打印")
     except Exception as e:
         logger.error(f"打印取酒小票失败（不影响取酒）: {e}")
 
