@@ -149,53 +149,131 @@ async def _safe_print_label(bottle_label: str, customer_name: str, phone: str, w
         logger.error(f"打印标签失败（不影响存酒）: {e}")
 
 
+def _detect_label_size(printer) -> tuple[int, int]:
+    """从打印机配置自动检测标签尺寸（宽mm, 高mm）
+
+    优先级：extra_config.label_width/label_height > paper_width + 默认高 > 默认40x30
+    常见标签规格：40x30, 50x30, 60x40, 80x50
+    """
+    extra = printer.extra_config or {}
+    w = extra.get("label_width") or printer.paper_width or 40
+    h = extra.get("label_height") or 30
+    return int(w), int(h)
+
+
+def _estimate_text_width(text: str, font_base: int, w_scale: int) -> int:
+    """估算文本点阵宽度（dots）。中文字符等宽，ASCII约0.55倍宽。"""
+    dots = 0
+    for ch in text:
+        if ord(ch) > 127:
+            dots += font_base * w_scale  # 中文/全角
+        else:
+            dots += int(font_base * w_scale * 0.55)  # ASCII
+    return dots
+
+
+def _fit_font_scale(text: str, max_width_dots: int, base_font: int = 12,
+                    max_scale: int = 4, min_scale: int = 1) -> int:
+    """自动缩放字号使文本不超过最大宽度，返回最优 w/h 倍率"""
+    for scale in range(max_scale, min_scale - 1, -1):
+        if _estimate_text_width(text, base_font, scale) <= max_width_dots:
+            return scale
+    return min_scale
+
+
 def _build_label_content(printer, customer_name: str, phone: str, wine_name: str, capacity: str,
                          bottle_label: str, cabinet_no: str, date_stored: str) -> str:
-    """生成标签内容
+    """生成标签内容 —— 自适应布局引擎
 
-    布局：客户姓名（最大）→ 手机号 → 酒名+容量 → 柜号 → 条形码
-    自适应纸宽：30/40/50/60mm
+    核心能力：
+    1. 自动检测标签纸尺寸（宽×高 mm）
+    2. 按比例划分区域，消除空白
+    3. 根据可用宽度自动缩放字号
+    4. 条码高度自适应填满底部
+
+    区域分配（纵向比例）：
+      客户姓名 35% | 手机号 17% | 酒名+容量 17% | 柜号 12% | 条码 19%
     """
     printer_type = (printer.printer_type or "").lower()
     brand = printer.brand or ""
     is_label = printer_type in ("label", "标签", "标签机")
 
-    if is_label and brand in ("feie", "xpyun"):
-        # 标签尺寸固定 40x30mm（飞鹅FP-N20出厂默认）
-        label_w = 40
-        label_h = 30
-        max_x = 320  # 40mm * 8dots/mm
-        max_y = 240  # 30mm * 8dots/mm
-
-        parts = [
-            f"<SIZE>{label_w},{label_h}</SIZE>",
-            "<DIRECTION>1</DIRECTION>",
-            # 客户姓名（最大字号 w=2 h=2）
-            f"<TEXT x='5' y='5' font='12' w='2' h='2'>{customer_name}</TEXT>",
-        ]
-
-        # 姓名占约40dots高，后续内容往下排
-        y = 50
-
-        # 手机号
-        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{phone}</TEXT>")
-        y += 25
-
-        # 酒名+容量
-        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{wine_name} {capacity}</TEXT>")
-        y += 25
-
-        # 柜号
-        parts.append(f"<TEXT x='5' y='{y}' font='12' w='1' h='1'>{cabinet_no}柜</TEXT>")
-
-        # 条形码（底部，Code128格式，用于盘点扫码）
-        # 飞鹅标签机条码标签：<BC128 x y h s n w>内容</BC128>
-        parts.append(f"<BC128 x='5' y='155' h='60' s='1' n='1' w='2'>{bottle_label}</BC128>")
-
-        return "".join(parts)
-    else:
-        # 小票机格式
+    if not is_label or brand not in ("feie", "xpyun"):
+        # 小票机格式（纯文本）
         return f"{customer_name}\n{phone}\n{wine_name} {capacity}\n{cabinet_no}柜\n{bottle_label}\n{date_stored}"
+
+    # ---- 1. 检测标签尺寸，计算点阵网格 ----
+    label_w_mm, label_h_mm = _detect_label_size(printer)
+    DPI = 8  # 203DPI = 8 dots/mm
+    max_x = label_w_mm * DPI
+    max_y = label_h_mm * DPI
+
+    # ---- 2. 按比例分配纵向区域 ----
+    margin_x = max(3, max_x // 40)       # 左右边距（约2.5%）
+    margin_y = max(2, max_y // 50)       # 上下边距
+    usable_x = max_x - margin_x * 2      # 可用宽度
+    usable_y = max_y - margin_y * 2      # 可用高度
+
+    # 区域比例（姓名最大，条码填底）
+    name_ratio, phone_ratio, wine_ratio, cabinet_ratio, barcode_ratio = 0.35, 0.17, 0.17, 0.12, 0.19
+
+    y = margin_y
+    name_zone_h = int(usable_y * name_ratio)
+    phone_zone_h = int(usable_y * phone_ratio)
+    wine_zone_h = int(usable_y * wine_ratio)
+    cabinet_zone_h = int(usable_y * cabinet_ratio)
+    barcode_zone_h = usable_y - name_zone_h - phone_zone_h - wine_zone_h - cabinet_zone_h
+
+    name_y = y; y += name_zone_h
+    phone_y = y; y += phone_zone_h
+    wine_y = y; y += wine_zone_h
+    cabinet_y = y; y += cabinet_zone_h
+    barcode_y = y
+
+    # ---- 3. 自动缩放字号 ----
+    # 姓名最大：在不超过可用宽度的前提下尽量放大
+    name_text = customer_name[:8]  # 限制长度防止溢出
+    name_scale = _fit_font_scale(name_text, usable_x, max_scale=4, min_scale=1)
+
+    # 普通信息行：根据标签物理宽度选择基础倍率
+    if label_w_mm >= 50:     # 50mm+
+        info_scale = 2
+    elif label_w_mm >= 35:   # 40mm
+        info_scale = 2
+    else:                    # 30mm或更窄
+        info_scale = 1
+
+    # 各行文本如果太长就降级字号
+    phone_text = phone
+    wine_text = f"{wine_name} {capacity}"
+    cabinet_text = f"{cabinet_no}柜"
+    phone_scale = min(info_scale, _fit_font_scale(phone_text, usable_x, max_scale=info_scale))
+    wine_scale = min(info_scale, _fit_font_scale(wine_text, usable_x, max_scale=info_scale))
+    cabinet_scale = min(info_scale, _fit_font_scale(cabinet_text, usable_x, max_scale=info_scale))
+
+    # ---- 4. 生成 TSPL 指令 ----
+    parts = [
+        f"<SIZE>{label_w_mm},{label_h_mm}</SIZE>",
+        "<DIRECTION>1</DIRECTION>",
+        # 客户姓名（最大字号，居顶）
+        f"<TEXT x='{margin_x}' y='{name_y}' font='12' w='{name_scale}' h='{name_scale}'>{name_text}</TEXT>",
+        # 手机号
+        f"<TEXT x='{margin_x}' y='{phone_y}' font='12' w='{phone_scale}' h='{phone_scale}'>{phone_text}</TEXT>",
+        # 酒名+容量
+        f"<TEXT x='{margin_x}' y='{wine_y}' font='12' w='{wine_scale}' h='{wine_scale}'>{wine_text}</TEXT>",
+        # 柜号
+        f"<TEXT x='{margin_x}' y='{cabinet_y}' font='12' w='{cabinet_scale}' h='{cabinet_scale}'>{cabinet_text}</TEXT>",
+    ]
+
+    # 条形码：高度填满底部区域，宽度根据标签尺寸调整
+    # BC128 参数: x y h(条码高度) s(是否显示文字1/0) n(1) w(窄条宽度1-4)
+    bc_h = max(30, barcode_zone_h - 12)  # 留一点空间给条码下方的文字
+    bc_w = 2 if usable_x >= 300 else 1   # 宽标签用粗条码更易扫
+    parts.append(
+        f"<BC128 x='{margin_x}' y='{barcode_y}' h='{bc_h}' s='1' n='1' w='{bc_w}'>{bottle_label}</BC128>"
+    )
+
+    return "".join(parts)
 
 
 async def _safe_send_sms(phone: str, customer_name: str, wine_name: str,
