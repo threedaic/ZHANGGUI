@@ -22,7 +22,7 @@ async def get_leave_balance(
     # 老板可以查任意员工，员工只能查自己
     if employee_id:
         from app.utils.deps import require_role
-        require_role(request, ["boss", "store_manager"])
+        require_role(request, ["system_admin", "boss", "store_manager"])
     else:
         employee_id = get_employee_id(request)
     if year is None:

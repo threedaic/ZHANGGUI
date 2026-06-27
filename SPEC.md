@@ -48,7 +48,7 @@ SYSTEM_ADMIN_USERIDS=ZhouPengFei,ZhangHanTing,bbmayo
 2. **可访问全部门店**：通过顶部门店切换进入任意门店
 3. **可建新门店**：在总店网页的「门店管理」页面新增门店
 4. **全局看板**：可查看全品牌汇总数据（总营收/总客流/各店对比）
-5. **RLS 豁免**：数据库策略 `current_setting('app.current_user_role', true) = 'admin'` 放行
+5. **RLS 豁免**：数据库策略 `current_setting('app.current_user_role', true) = ANY (ARRAY['admin','system_admin'])` 放行（同时兼容旧 admin 值与新 system_admin 值）
 
 ### 0.5 总店网页规范
 
@@ -95,6 +95,53 @@ SYSTEM_ADMIN_USERIDS=ZhouPengFei,ZhangHanTing,bbmayo
 3. **临时测试账号**需在 PR 说明中注明用途，测试完立即删除。
 
 任何其他情况创建账号视为违规。
+
+### 0.7 权限检查规范（铁律）
+
+> **核心原则：system_admin 是最高权限，必须能访问所有功能。所有 require_role 调用必须包含 system_admin。**
+
+#### 0.7.1 角色值统一
+
+数据库实际只存在以下三种 role 值（**禁止使用 `admin` 这个值**，统一用 `system_admin`）：
+
+| 角色 | 值 | 权限范围 |
+|------|-----|---------|
+| 系统管理员 | `system_admin` | **所有功能**（最高权限，通吃） |
+| 老板 | `boss` | 本店全部功能 |
+| 店长 | `store_manager` | 本店日常管理（不含工资配置等敏感操作） |
+| 员工 | `staff` | 只看自己的数据 |
+
+> 历史代码中出现的 `'admin'` 角色值已废弃，统一为 `'system_admin'`。RLS 策略为向后兼容仍同时放行 `admin` 和 `system_admin`。
+
+#### 0.7.2 require_role 编写规范
+
+后端所有 `require_role(request, [...])` 调用**必须**包含 `system_admin`，确保管理员账号能调试所有功能。
+
+| 场景 | 正确写法 | 错误写法 |
+|------|---------|---------|
+| 仅老板可操作 | `["system_admin", "boss"]` | `["boss"]` ❌ |
+| 老板+店长 | `["system_admin", "boss", "store_manager"]` | `["boss", "store_manager"]` ❌ |
+| 老板+会计 | `["system_admin", "boss", "accountant"]` | `["boss", "accountant"]` ❌ |
+| 老板+店长+会计 | `["system_admin", "boss", "store_manager", "accountant"]` | `["boss", "store_manager", "accountant"]` ❌ |
+
+#### 0.7.3 前端路由守卫规范
+
+前端 `router/index.ts` 的 `meta.roles` 同样**禁止**使用 `'admin'`，统一用 `'system_admin'`：
+
+| 路由 | 允许角色 |
+|------|---------|
+| `/hq` (总店端) | `['system_admin']` |
+| `/management` (管理端) | `['system_admin', 'boss', 'store_manager']` |
+| `/settings` (设置端) | `['system_admin', 'boss']` |
+| `/daily` (日常端) | 无限制（所有人可访问） |
+| `/profile` (员工端) | 无限制（所有人可访问） |
+
+#### 0.7.4 修改 require_role 的检查清单
+
+新增或修改 API 权限时，必须：
+1. 确认 `require_role` 列表包含 `system_admin`
+2. 确认不使用 `'admin'` 这个值
+3. 用 `Grep` 搜索 `require_role\(request, \["(?!system_admin)` 确认无遗漏（注：ripgrep 不支持先行断言，改为搜索 `require_role\(request, \["boss"` 后人工核对每行都含 system_admin）
 
 ---
 

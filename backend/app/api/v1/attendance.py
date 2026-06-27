@@ -74,7 +74,7 @@ async def get_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """获取全员排班考勤表（店长/老板）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     data = await svc.get_schedule_table(_parse_date(date_from), _parse_date(date_to))
@@ -103,7 +103,7 @@ async def batch_save_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """批量保存排班（店长/老板）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
     svc = AttendanceService(db, store_id)
@@ -121,7 +121,7 @@ async def generate_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """智能排班生成：根据约束自动排班（仅老板）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     repo = AttendanceRepository(db, store_id)
 
@@ -191,7 +191,7 @@ async def update_employee_rules(
     db: AsyncSession = Depends(get_db),
 ):
     """批量更新员工排班规则：班组、管理顺位（仅老板）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     from sqlalchemy import select, and_
@@ -251,7 +251,7 @@ async def save_shift(
     db: AsyncSession = Depends(get_db),
 ):
     """保存/更新班次配置（仅老板）"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     config = await svc.save_shift_config(body.model_dump())
@@ -282,7 +282,7 @@ async def sync_checkin(
     db: AsyncSession = Depends(get_db),
 ):
     """手动同步企微打卡"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     target_date = body.target_date if body else None
@@ -429,7 +429,7 @@ async def update_checkin_config(
     db: AsyncSession = Depends(get_db),
 ):
     """更新打卡配置（仅老板）"""
-    require_role(request, ["boss", "admin"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     result = await svc.update_checkin_config(body.model_dump(exclude_unset=True))
@@ -444,7 +444,7 @@ async def add_checkin_wifi(
     db: AsyncSession = Depends(get_db),
 ):
     """添加WiFi绑定（仅老板）"""
-    require_role(request, ["boss", "admin"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     result = await svc.add_checkin_wifi(
@@ -461,7 +461,7 @@ async def delete_checkin_wifi(
     db: AsyncSession = Depends(get_db),
 ):
     """删除WiFi绑定（仅老板）"""
-    require_role(request, ["boss", "admin"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     svc = AttendanceService(db, store_id)
     await svc.delete_checkin_wifi(wifi_id)

@@ -51,7 +51,7 @@ async def lock_period(
     period: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = require_employee_id(request)
     service = PeriodService(db, store_id)
@@ -70,7 +70,7 @@ async def close_period(
     period: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = require_employee_id(request)
     service = PeriodService(db, store_id)
@@ -89,7 +89,7 @@ async def reopen_period(
     period: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     user_id = require_employee_id(request)
     service = PeriodService(db, store_id)

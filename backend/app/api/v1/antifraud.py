@@ -23,7 +23,7 @@ async def trigger_scan(
     body: ScanRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     if body.store_id:
         store_id = body.store_id
@@ -52,7 +52,7 @@ async def list_alerts(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = AntiFraudService(db, store_id)
     data = await service.get_alerts(
@@ -72,7 +72,7 @@ async def get_alert_detail(
     session_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = AntiFraudService(db, store_id)
     detail = await service.get_alert_detail(session_id)
@@ -88,7 +88,7 @@ async def get_stats(
     date_to: str = Query(..., description="结束日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = AntiFraudService(db, store_id)
     data = await service.get_stats(date_from=date_from, date_to=date_to)

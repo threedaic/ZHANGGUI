@@ -176,7 +176,7 @@ async def create_schedule(
     repo: ScheduleRepository = Depends(get_repo),
 ):
     """创建单条排班。存在冲突时返回 409。"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     user_id = getattr(request.state, "user_id", None)
     checker = ScheduleChecker(repo)
     await checker.check_create(body.employee_id, body.date, body.shift_type)
@@ -208,7 +208,7 @@ async def batch_create_schedules(
     repo: ScheduleRepository = Depends(get_repo),
 ):
     """批量创建/更新一周排班。存在冲突时整体失败。"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     user_id = getattr(request.state, "user_id", None)
     checker = ScheduleChecker(repo)
 
@@ -265,7 +265,7 @@ async def update_schedule(
     repo: ScheduleRepository = Depends(get_repo),
 ):
     """更新单条排班。"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     schedule = await repo.get_by_id(schedule_id)
     if not schedule:
         raise NotFoundError(f"排班 #{schedule_id} 不存在")
@@ -301,7 +301,7 @@ async def delete_schedule(
     repo: ScheduleRepository = Depends(get_repo),
 ):
     """删除单条排班。"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     schedule = await repo.get_by_id(schedule_id)
     if not schedule:
         raise NotFoundError(f"排班 #{schedule_id} 不存在")

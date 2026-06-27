@@ -184,7 +184,7 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
 ):
     """创建任务（仅店长/老板）"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
 
@@ -232,7 +232,7 @@ async def list_templates(
     db: AsyncSession = Depends(get_db),
 ):
     """模板列表"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     repo = TaskRepository(db, store_id)
     templates = await repo.list_templates()
@@ -274,7 +274,7 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
 ):
     """创建周期模板"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
 
@@ -317,7 +317,7 @@ async def update_template(
     db: AsyncSession = Depends(get_db),
 ):
     """编辑模板"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     repo = TaskRepository(db, store_id)
 
@@ -362,7 +362,7 @@ async def toggle_template(
     db: AsyncSession = Depends(get_db),
 ):
     """启用/停用模板"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     repo = TaskRepository(db, store_id)
 
@@ -382,7 +382,7 @@ async def delete_template(
     db: AsyncSession = Depends(get_db),
 ):
     """删除模板"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     repo = TaskRepository(db, store_id)
 
@@ -454,7 +454,7 @@ async def update_task(
     db: AsyncSession = Depends(get_db),
 ):
     """编辑任务（仅创建人）"""
-    require_role(request, ["boss", "store_manager", "system_admin", "admin"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
     repo = TaskRepository(db, store_id)

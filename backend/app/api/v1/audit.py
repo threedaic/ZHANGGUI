@@ -24,7 +24,7 @@ async def list_audit_logs(
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
 ):
     """查询操作日志（老板/店长可看）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     # 构建查询

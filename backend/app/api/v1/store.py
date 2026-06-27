@@ -149,7 +149,7 @@ async def update_store_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """更新门店排班/考勤设置。"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     body_dict = body.model_dump(exclude_unset=True, exclude_none=True)

@@ -71,7 +71,7 @@ async def upsert_item(
     body: ItemConfigRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     service = PayrollConfigService(db, store_id)
     item = await service.upsert_item_config(
@@ -94,7 +94,7 @@ async def delete_item(
     item_code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     from sqlalchemy import select, and_, delete as del_stmt
     from app.models.payroll_config import PayrollItemConfig
@@ -163,7 +163,7 @@ async def update_rule(
     body: RuleUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     service = PayrollConfigService(db, store_id)
     rule = await service.update_salary_rule(rule_code, body.rule_value)
@@ -181,7 +181,7 @@ async def toggle_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """启用或禁用薪资规则（用于屏蔽流程步骤，如KPI）"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     body = await request.json()
     is_active = body.get("is_active", True)
@@ -202,7 +202,7 @@ async def init_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     service = PayrollConfigService(db, store_id)
     await service.init_default_config_if_empty()

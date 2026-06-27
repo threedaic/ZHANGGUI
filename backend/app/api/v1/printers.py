@@ -57,7 +57,7 @@ async def create_printer(
     db: AsyncSession = Depends(get_db),
 ):
     """添加打印机"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -78,7 +78,7 @@ async def update_printer(
     db: AsyncSession = Depends(get_db),
 ):
     """更新打印机"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -97,7 +97,7 @@ async def delete_printer(
     db: AsyncSession = Depends(get_db),
 ):
     """删除打印机（软删除）"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -116,7 +116,7 @@ async def test_print(
     db: AsyncSession = Depends(get_db),
 ):
     """测试打印"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -230,7 +230,7 @@ async def create_route(
     db: AsyncSession = Depends(get_db),
 ):
     """添加路由规则"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -251,7 +251,7 @@ async def update_route(
     db: AsyncSession = Depends(get_db),
 ):
     """更新路由规则"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -270,7 +270,7 @@ async def delete_route(
     db: AsyncSession = Depends(get_db),
 ):
     """删除路由规则"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -304,7 +304,7 @@ async def update_category_printer(
     db: AsyncSession = Depends(get_db),
 ):
     """更新分类绑定的打印机"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)
@@ -346,7 +346,7 @@ async def update_module_config(
     db: AsyncSession = Depends(get_db),
 ):
     """更新模块打印配置"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     service = PrinterService(db)

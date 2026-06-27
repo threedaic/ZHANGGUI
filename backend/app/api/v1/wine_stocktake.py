@@ -33,7 +33,7 @@ async def create_stocktake(
 ):
     """手动创建盘点单（店长/老板）"""
     store_id = get_store_id(request)
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     stocktake_id = await generate_monthly_stocktake(
         session=db, store_id=store_id, period=body.period,
     )
@@ -128,7 +128,7 @@ async def complete_stocktake_api(
 ):
     """完成盘点"""
     store_id = get_store_id(request)
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     result = await complete_stocktake(
         session=db, store_id=store_id, stocktake_id=stocktake_id, notes=body.notes,
     )

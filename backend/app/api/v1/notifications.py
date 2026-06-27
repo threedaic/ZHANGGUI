@@ -105,7 +105,7 @@ async def get_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """推送设置（仅老板/店长）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     svc = NotificationService(db, store_id)
     settings = await svc.get_settings()
@@ -133,7 +133,7 @@ async def save_setting(
     db: AsyncSession = Depends(get_db),
 ):
     """保存推送设置（仅老板/店长）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     svc = NotificationService(db, store_id)
     setting = await svc.save_setting(body.model_dump())
@@ -212,7 +212,7 @@ async def set_app_enabled(
     db: AsyncSession = Depends(get_db),
 ):
     """保存自建应用推送开关（存入 StoreSettings.extra_config.wecom_app_enabled）。仅老板可操作。"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
 
     from sqlalchemy import select
@@ -236,7 +236,7 @@ async def test_webhook(
     body: TestWebhookRequest,
 ):
     """测试群机器人 Webhook 是否可用。仅老板可操作。"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     from app.services.notification_service import send_to_group
 
     ok = await send_to_group(
@@ -259,7 +259,7 @@ async def test_app_push(
     需要门店已配置 corp_id / agent_id / secret，且老板账号已绑定企微 userid
     （通过「企业微信配置」页同步通讯录后自动绑定）。
     """
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
 

@@ -36,7 +36,7 @@ async def generate_payroll(
     body: PayrollGenerateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     store_id = get_store_id(request)
     user_id = getattr(request.state, "user_id", None)
     service = PayrollService(db, store_id)
@@ -67,7 +67,7 @@ async def list_monthly(
     db: AsyncSession = Depends(get_db),
 ):
     """门店月度工资汇总（仅老板/会计可见全员工资，店长不可见）"""
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     store_id = get_store_id(request)
     service = PayrollService(db, store_id)
     data = await service.get_monthly(period=period, page=page, page_size=page_size)
@@ -180,7 +180,7 @@ async def review_payroll(
     db: AsyncSession = Depends(get_db),
 ):
     """会计复核工资：draft -> reviewed"""
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     store_id = get_store_id(request)
     issuer_id = require_employee_id(request)
     service = PayrollService(db, store_id)
@@ -197,7 +197,7 @@ async def finalize_payroll(
     db: AsyncSession = Depends(get_db),
 ):
     """老板确认工资：reviewed -> confirmed"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     issuer_id = require_employee_id(request)
     service = PayrollService(db, store_id)
@@ -261,7 +261,7 @@ async def mark_paid(
     db: AsyncSession = Depends(get_db),
 ):
     """会计操作发放：confirmed -> paid"""
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     store_id = get_store_id(request)
     user_id = require_employee_id(request)
     service = PayrollService(db, store_id)

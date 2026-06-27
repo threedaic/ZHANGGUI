@@ -135,7 +135,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/management',
     component: () => import('@/layouts/ManagementLayout.vue'),
-    meta: { roles: ['system_admin', 'admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager'] },
+    meta: { roles: ['system_admin', 'boss', 'store_manager'] },
     children: [
       {
         path: '',
@@ -163,43 +163,43 @@ const routes: RouteRecordRaw[] = [
         path: 'auto-payroll',
         name: 'AutoPayrollManage',
         component: () => import('@/views/management/AutoPayroll.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/contract',
         name: 'AutoPayrollContractManage',
         component: () => import('@/views/management/payroll/ContractDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/performance',
         name: 'AutoPayrollPerformanceManage',
         component: () => import('@/views/management/payroll/PerformanceDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/attendance',
         name: 'AutoPayrollAttendanceManage',
         component: () => import('@/views/management/payroll/AttendanceDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/kpi',
         name: 'AutoPayrollKpiManage',
         component: () => import('@/views/management/payroll/KpiDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/reward_penalty',
         name: 'AutoPayrollRewardPenaltyManage',
         component: () => import('@/views/management/payroll/RewardPenaltyDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/overtime',
         name: 'AutoPayrollOvertimeManage',
         component: () => import('@/views/management/payroll/OvertimeDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       // 工资与账期
       {
@@ -340,7 +340,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/settings',
     component: () => import('@/layouts/SettingsLayout.vue'),
-    meta: { roles: ['system_admin', 'boss', 'admin'] },
+    meta: { roles: ['system_admin', 'boss'] },
     children: [
       {
         path: '',
@@ -421,44 +421,44 @@ const routes: RouteRecordRaw[] = [
         path: 'auto-payroll',
         name: 'AutoPayroll',
         component: () => import('@/views/management/AutoPayroll.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       // 自动发薪 - 模块二级页面
       {
         path: 'auto-payroll/contract',
         name: 'AutoPayrollContract',
         component: () => import('@/views/management/payroll/ContractDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/performance',
         name: 'AutoPayrollPerformance',
         component: () => import('@/views/management/payroll/PerformanceDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/attendance',
         name: 'AutoPayrollAttendance',
         component: () => import('@/views/management/payroll/AttendanceDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/kpi',
         name: 'AutoPayrollKpi',
         component: () => import('@/views/management/payroll/KpiDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/reward_penalty',
         name: 'AutoPayrollRewardPenalty',
         component: () => import('@/views/management/payroll/RewardPenaltyDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       {
         path: 'auto-payroll/overtime',
         name: 'AutoPayrollOvertime',
         component: () => import('@/views/management/payroll/OvertimeDetail.vue'),
-        meta: { roles: ['system_admin', 'boss', 'admin', 'accountant'] },
+        meta: { roles: ['system_admin', 'boss'] },
       },
       // 管家设置
       {

@@ -54,7 +54,7 @@ async def calculate_rankings(
 
     店长及以上权限。建议在月度账期锁定前计算一次。
     """
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = RankingService(db, store_id)
     records = await service.calculate_rankings(period=period, rank_type=rank_type)

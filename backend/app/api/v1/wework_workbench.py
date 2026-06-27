@@ -24,7 +24,7 @@ async def setup_workbench(
     设置后，企微工作台会显示"今日业绩"和"打卡状态"两个数据块。
     员工点击可跳转到掌柜应用。
     """
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     ok = await set_workbench_template(db, store_id)
     if ok:
@@ -42,7 +42,7 @@ async def push_workbench(
     老板点击"立即推送"按钮调用此接口。
     每小时也会自动调用一次（通过定时任务）。
     """
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     result = await push_workbench_to_all(db, store_id)
     return make_response(

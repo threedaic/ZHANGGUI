@@ -138,7 +138,7 @@ async def list_disputes(
     status: str = Query(None, description="按状态筛选"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     query = (
@@ -231,7 +231,7 @@ async def reject_dispute(
     dispute_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     user_id = getattr(request.state, "user_id", None)
     body = await request.json()
@@ -263,7 +263,7 @@ async def confirm_dispute(
     dispute_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     user_id = getattr(request.state, "user_id", None)
     body = await request.json()
@@ -304,7 +304,7 @@ async def dispute_stats(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     result = await db.execute(

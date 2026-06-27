@@ -36,7 +36,7 @@ async def get_table(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     service = _get_service(request, db)
     data = await service.get_table(period)
     return make_response(data=data, request=request)
@@ -48,7 +48,7 @@ async def calculate(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     service = _get_service(request, db)
     data = await service.calculate(period)
     await db.commit()
@@ -62,7 +62,7 @@ async def finalize(
     db: AsyncSession = Depends(get_db),
 ):
     """一键发薪：自动计算 → 存档到 wage_records → 推送签收任务到员工收件箱"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     issued_by = require_employee_id(request)
     service = _get_service(request, db)
     data = await service.finalize(period, issued_by)
@@ -80,7 +80,7 @@ async def get_modules(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     service = _get_service(request, db)
     modules = await service.get_modules()
     return make_response(data={"modules": modules, "module_info": MODULES}, request=request)
@@ -99,7 +99,7 @@ async def set_modules(
     body: ModulesUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     service = _get_service(request, db)
     modules = await service.set_modules(body.model_dump(exclude_none=True))
     await db.commit()
@@ -113,7 +113,7 @@ async def get_rules(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     service = _get_service(request, db)
     rules = await service.get_rules()
     return make_response(data=rules, request=request)
@@ -139,7 +139,7 @@ async def set_rules(
     body: RulesUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     service = _get_service(request, db)
     rules = await service.set_rules(body.model_dump(exclude_none=True))
     await db.commit()
@@ -161,7 +161,7 @@ async def update_cell(
     body: CellUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     service = _get_service(request, db)
     data = await service.update_cell(body.employee_id, body.period, body.module, body.amount)
     await db.commit()
@@ -176,7 +176,7 @@ async def get_overtime_days(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "accountant"])
+    require_role(request, ["system_admin", "boss", "accountant"])
     service = _get_service(request, db)
     days = await service.get_overtime_days(period)
     return make_response(data=days, request=request)
@@ -193,7 +193,7 @@ async def set_overtime_days(
     body: OvertimeDaysRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     service = _get_service(request, db)
     days = await service.set_overtime_days(body.period, body.days)
     await db.commit()

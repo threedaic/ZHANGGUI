@@ -400,7 +400,7 @@ async def reject_approval(
     db: AsyncSession = Depends(get_db),
 ):
     """审批驳回"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
 
@@ -447,7 +447,7 @@ async def get_employee_leave_balance(
     db: AsyncSession = Depends(get_db),
 ):
     """查询指定员工的假期余额（店长/老板）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
 
     from datetime import datetime as _dt
@@ -483,7 +483,7 @@ async def update_leave_balance(
     db: AsyncSession = Depends(get_db),
 ):
     """调整员工假期余额（仅老板）"""
-    require_role(request, ["boss"])
+    require_role(request, ["system_admin", "boss"])
     if leave_type not in LEAVE_TYPES:
         raise ValidationError(f"无效的请假类型: {leave_type}")
 

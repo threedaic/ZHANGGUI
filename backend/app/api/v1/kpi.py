@@ -66,7 +66,7 @@ async def batch_create_scores(
     body: KPIScoreBatchCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = KPIService(db, store_id)
 
@@ -107,7 +107,7 @@ async def calculate_kpi(
     body: KPICalculateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = KPIService(db, store_id)
 
@@ -205,7 +205,7 @@ async def confirm_result(
     body: KPIConfirmRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     user_id = get_user_id(request)
     store_id = get_store_id(request)
     service = KPIService(db, store_id)
@@ -255,7 +255,7 @@ async def list_appeals(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     store_id = get_store_id(request)
     service = KPIService(db, store_id)
     data = await service.get_appeals_for_review(status=status, page=page, page_size=page_size)
@@ -287,7 +287,7 @@ async def review_appeal(
     body: KPIAppealReview,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     user_id = get_user_id(request)
     store_id = get_store_id(request)
     service = KPIService(db, store_id)

@@ -32,7 +32,7 @@ async def create_penalty(
     body: PenaltyCreateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     issuer_id = require_employee_id(request)
     service = _get_service(request, db)
     notice = await service.create(
@@ -61,7 +61,7 @@ async def list_penalties(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     service = _get_service(request, db)
     items, total = await service.get_list(
         penalty_type=penalty_type,
@@ -94,7 +94,7 @@ async def get_penalty(
     notice_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     service = _get_service(request, db)
     detail = await service.get_detail(notice_id)
     if not detail:
@@ -109,7 +109,7 @@ async def update_penalty(
     body: PenaltyUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     service = _get_service(request, db)
     updates = body.model_dump(exclude_none=True)
     if not updates:
@@ -126,7 +126,7 @@ async def delete_penalty(
     notice_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     service = _get_service(request, db)
     ok = await service.delete(notice_id)
     if not ok:

@@ -104,7 +104,7 @@ async def list_issued(
     db: AsyncSession = Depends(get_db),
 ):
     employee_id = require_employee_id(request)
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     service = _get_service(request, db)
     items, total = await service.get_issued(
         issued_by=employee_id,
@@ -129,7 +129,7 @@ async def list_disputes(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     service = _get_service(request, db)
     items, total = await service.get_disputes(page=page, page_size=page_size)
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
@@ -195,7 +195,7 @@ async def remind_employee(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["system_admin", "boss", "store_manager", "accountant"])
     store_id = getattr(request.state, "store_id", None)
     from app.repositories.sign_task import SignTaskRepository
     repo = SignTaskRepository(db, store_id)
@@ -235,7 +235,7 @@ async def revoke_task(
     body: RevokeRequest | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["system_admin", "boss", "store_manager"])
     employee_id = require_employee_id(request)
     service = _get_service(request, db)
     ok = await service.revoke(
