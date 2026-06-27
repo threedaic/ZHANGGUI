@@ -214,8 +214,8 @@ def _build_label_content(printer, customer_name: str, phone: str, wine_name: str
     usable_x = max_x - margin_x * 2      # 可用宽度
     usable_y = max_y - margin_y * 2      # 可用高度
 
-    # 区域比例（姓名最大，条码填底）
-    name_ratio, phone_ratio, wine_ratio, cabinet_ratio, barcode_ratio = 0.35, 0.17, 0.17, 0.12, 0.19
+    # 区域比例（姓名醒目，条码占底部1/3保证可扫）
+    name_ratio, phone_ratio, wine_ratio, cabinet_ratio, barcode_ratio = 0.28, 0.14, 0.14, 0.10, 0.34
 
     y = margin_y
     name_zone_h = int(usable_y * name_ratio)
