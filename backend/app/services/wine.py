@@ -161,38 +161,47 @@ def _detect_label_size(printer) -> tuple[int, int]:
     return int(w), int(h)
 
 
-def _estimate_text_width(text: str, font_base: int, w_scale: int) -> int:
-    """估算文本点阵宽度（dots）。中文字符等宽，ASCII约0.55倍宽。"""
+# 飞鹅/芯烨 font=12 = 简体中文 24×24 dots，放大w/h倍后实际占 24×h dots 高
+FONT_BASE_W = 24   # 中文字符宽度(dots)，font=12
+FONT_BASE_H = 24   # 中文字符高度(dots)，font=12
+ASCII_RATIO = 0.5  # ASCII字符宽度约为中文的50%
+DPI = 8            # 203DPI = 8 dots/mm
+
+
+def _text_height(scale: int) -> int:
+    """单行文字高度（dots）"""
+    return FONT_BASE_H * scale
+
+
+def _text_width(text: str, scale: int) -> int:
+    """估算文本点阵宽度（dots）"""
     dots = 0
     for ch in text:
         if ord(ch) > 127:
-            dots += font_base * w_scale  # 中文/全角
+            dots += FONT_BASE_W * scale
         else:
-            dots += int(font_base * w_scale * 0.55)  # ASCII
+            dots += int(FONT_BASE_W * scale * ASCII_RATIO)
     return dots
 
 
-def _fit_font_scale(text: str, max_width_dots: int, base_font: int = 12,
-                    max_scale: int = 4, min_scale: int = 1) -> int:
-    """自动缩放字号使文本不超过最大宽度，返回最优 w/h 倍率"""
-    for scale in range(max_scale, min_scale - 1, -1):
-        if _estimate_text_width(text, base_font, scale) <= max_width_dots:
-            return scale
-    return min_scale
+def _best_scale(text: str, max_width: int, max_s: int = 4, min_s: int = 1) -> int:
+    """找不超过max_width的最大字号倍率"""
+    for s in range(max_s, min_s - 1, -1):
+        if _text_width(text, s) <= max_width:
+            return s
+    return min_s
 
 
 def _build_label_content(printer, customer_name: str, phone: str, wine_name: str, capacity: str,
                          bottle_label: str, cabinet_no: str, date_stored: str) -> str:
     """生成标签内容 —— 自适应布局引擎
 
-    核心能力：
-    1. 自动检测标签纸尺寸（宽×高 mm）
-    2. 按比例划分区域，消除空白
-    3. 根据可用宽度自动缩放字号
-    4. 条码高度自适应填满底部
+    基于飞鹅官方文档：font=12 的中文字体为 24×24 dots，w/h 为放大倍率。
+    所有坐标基于实际渲染高度计算，确保不重叠。
 
-    区域分配（纵向比例）：
-      客户姓名 35% | 手机号 17% | 酒名+容量 17% | 柜号 12% | 条码 19%
+    布局策略：
+      从上到下依次排列，每个元素的 Y = 上一个元素的 Y + 上一个元素的实际高度 + 间距
+      姓名（最大）→ 手机号 → 酒名+容量 → 柜号 → 条码
     """
     printer_type = (printer.printer_type or "").lower()
     brand = printer.brand or ""
@@ -202,76 +211,99 @@ def _build_label_content(printer, customer_name: str, phone: str, wine_name: str
         # 小票机格式（纯文本）
         return f"{customer_name}\n{phone}\n{wine_name} {capacity}\n{cabinet_no}柜\n{bottle_label}\n{date_stored}"
 
-    # ---- 1. 检测标签尺寸，计算点阵网格 ----
+    # ---- 1. 检测标签尺寸 ----
     label_w_mm, label_h_mm = _detect_label_size(printer)
-    DPI = 8  # 203DPI = 8 dots/mm
     max_x = label_w_mm * DPI
     max_y = label_h_mm * DPI
 
-    # ---- 2. 按比例分配纵向区域 ----
-    margin_x = max(3, max_x // 40)       # 左右边距（约2.5%）
-    margin_y = max(2, max_y // 50)       # 上下边距
-    usable_x = max_x - margin_x * 2      # 可用宽度
-    usable_y = max_y - margin_y * 2      # 可用高度
+    # ---- 2. 计算布局参数 ----
+    margin = max(4, max_x // 30)      # 边距
+    gap = max(2, max_y // 60)         # 行间距
+    usable_w = max_x - margin * 2     # 可用宽度
+    usable_h = max_y - margin * 2     # 可用高度
 
-    # 区域比例（姓名醒目，条码占底部1/3保证可扫）
-    name_ratio, phone_ratio, wine_ratio, cabinet_ratio, barcode_ratio = 0.28, 0.14, 0.14, 0.10, 0.34
-
-    y = margin_y
-    name_zone_h = int(usable_y * name_ratio)
-    phone_zone_h = int(usable_y * phone_ratio)
-    wine_zone_h = int(usable_y * wine_ratio)
-    cabinet_zone_h = int(usable_y * cabinet_ratio)
-    barcode_zone_h = usable_y - name_zone_h - phone_zone_h - wine_zone_h - cabinet_zone_h
-
-    name_y = y; y += name_zone_h
-    phone_y = y; y += phone_zone_h
-    wine_y = y; y += wine_zone_h
-    cabinet_y = y; y += cabinet_zone_h
-    barcode_y = y
-
-    # ---- 3. 自动缩放字号 ----
-    # 姓名最大：在不超过可用宽度的前提下尽量放大
-    name_text = customer_name[:8]  # 限制长度防止溢出
-    name_scale = _fit_font_scale(name_text, usable_x, max_scale=4, min_scale=1)
-
-    # 普通信息行：根据标签物理宽度选择基础倍率
-    if label_w_mm >= 50:     # 50mm+
-        info_scale = 2
-    elif label_w_mm >= 35:   # 40mm
-        info_scale = 2
-    else:                    # 30mm或更窄
-        info_scale = 1
-
-    # 各行文本如果太长就降级字号
+    # ---- 3. 确定各元素字号（宽度和高度双重约束）----
+    name_text = customer_name[:6]
     phone_text = phone
     wine_text = f"{wine_name} {capacity}"
     cabinet_text = f"{cabinet_no}柜"
-    phone_scale = min(info_scale, _fit_font_scale(phone_text, usable_x, max_scale=info_scale))
-    wine_scale = min(info_scale, _fit_font_scale(wine_text, usable_x, max_scale=info_scale))
-    cabinet_scale = min(info_scale, _fit_font_scale(cabinet_text, usable_x, max_scale=info_scale))
 
-    # ---- 4. 生成 TSPL 指令 ----
+    # 条码至少需要的高度（条码本身40 + 下方文字24）
+    bc_min_h = 64
+
+    # 从大到小尝试字号组合，找到能放下的最大字号
+    # 姓名倍率从4降到1，信息行倍率从2降到1
+    chosen = None
+    for name_s in range(4, 0, -1):
+        # 宽度约束：姓名不能超宽
+        if _text_width(name_text, name_s) > usable_w:
+            continue
+        for info_s in range(2, 0, -1):
+            # 宽度约束：信息行不能超宽
+            if (_text_width(phone_text, info_s) > usable_w or
+                _text_width(wine_text, info_s) > usable_w):
+                continue
+            # 高度约束：所有元素 + 条码必须放得下
+            total_h = (_text_height(name_s) + _text_height(info_s) * 3 +
+                       gap * 4 + bc_min_h)
+            if total_h <= usable_h:
+                chosen = (name_s, info_s)
+                break
+        if chosen:
+            break
+
+    if chosen:
+        name_scale, info_scale = chosen
+    else:
+        # 极端情况：全部用最小字号
+        name_scale = _best_scale(name_text, usable_w, max_s=4, min_s=1)
+        info_scale = 1
+
+    phone_scale = min(info_scale, _best_scale(phone_text, usable_w, max_s=info_scale))
+    wine_scale = min(info_scale, _best_scale(wine_text, usable_w, max_s=info_scale))
+    cabinet_scale = min(info_scale, _best_scale(cabinet_text, usable_w, max_s=info_scale))
+
+    # ---- 4. 从上到下计算每个元素的实际Y坐标 ----
+    y = margin
+
+    # 姓名
+    name_y = y
+    name_h = _text_height(name_scale)
+    y += name_h + gap
+
+    # 手机号
+    phone_y = y
+    phone_h = _text_height(phone_scale)
+    y += phone_h + gap
+
+    # 酒名+容量
+    wine_y = y
+    wine_h = _text_height(wine_scale)
+    y += wine_h + gap
+
+    # 柜号
+    cabinet_y = y
+    cabinet_h = _text_height(cabinet_scale)
+    y += cabinet_h + gap
+
+    # 条码：用剩余空间，至少留40 dots给条码本身 + 24 dots给条码下方文字
+    barcode_y = y
+    barcode_bottom = max_y - margin          # 标签底部
+    bc_text_h = 24                            # 条码下方文字高度
+    bc_h = max(40, barcode_bottom - barcode_y - bc_text_h)
+    # 条码窄条宽度：宽标签用2，窄标签用1
+    bc_narrow = 2 if usable_w >= 300 else 1
+
+    # ---- 5. 生成 TSPL 指令 ----
     parts = [
         f"<SIZE>{label_w_mm},{label_h_mm}</SIZE>",
         "<DIRECTION>1</DIRECTION>",
-        # 客户姓名（最大字号，居顶）
-        f"<TEXT x='{margin_x}' y='{name_y}' font='12' w='{name_scale}' h='{name_scale}'>{name_text}</TEXT>",
-        # 手机号
-        f"<TEXT x='{margin_x}' y='{phone_y}' font='12' w='{phone_scale}' h='{phone_scale}'>{phone_text}</TEXT>",
-        # 酒名+容量
-        f"<TEXT x='{margin_x}' y='{wine_y}' font='12' w='{wine_scale}' h='{wine_scale}'>{wine_text}</TEXT>",
-        # 柜号
-        f"<TEXT x='{margin_x}' y='{cabinet_y}' font='12' w='{cabinet_scale}' h='{cabinet_scale}'>{cabinet_text}</TEXT>",
+        f"<TEXT x='{margin}' y='{name_y}' font='12' w='{name_scale}' h='{name_scale}'>{name_text}</TEXT>",
+        f"<TEXT x='{margin}' y='{phone_y}' font='12' w='{phone_scale}' h='{phone_scale}'>{phone_text}</TEXT>",
+        f"<TEXT x='{margin}' y='{wine_y}' font='12' w='{wine_scale}' h='{wine_scale}'>{wine_text}</TEXT>",
+        f"<TEXT x='{margin}' y='{cabinet_y}' font='12' w='{cabinet_scale}' h='{cabinet_scale}'>{cabinet_text}</TEXT>",
+        f"<BC128 x='{margin}' y='{barcode_y}' h='{bc_h}' s='1' n='{bc_narrow}' w='1'>{bottle_label}</BC128>",
     ]
-
-    # 条形码：高度填满底部区域，宽度根据标签尺寸调整
-    # BC128 参数: x y h(条码高度) s(是否显示文字1/0) n(1) w(窄条宽度1-4)
-    bc_h = max(30, barcode_zone_h - 12)  # 留一点空间给条码下方的文字
-    bc_w = 2 if usable_x >= 300 else 1   # 宽标签用粗条码更易扫
-    parts.append(
-        f"<BC128 x='{margin_x}' y='{barcode_y}' h='{bc_h}' s='1' n='1' w='{bc_w}'>{bottle_label}</BC128>"
-    )
 
     return "".join(parts)
 
