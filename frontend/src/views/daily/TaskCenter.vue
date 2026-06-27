@@ -4,33 +4,7 @@
       <h1 class="page-title">任务中心</h1>
     </div>
 
-    <!-- 功能入口（独立区块） -->
-    <div class="section-label">功能</div>
-    <div class="feature-entries">
-      <button class="feature-card" @click="router.push('/daily/butler')">
-        <div class="feature-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-          </svg>
-        </div>
-        <div class="feature-text">
-          <span class="feature-name">开闭店检查</span>
-          <span class="feature-desc">开店 / 闭店流程清单</span>
-        </div>
-        <svg class="feature-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- 我的任务 -->
-    <div class="section-label">
-      <span>我的任务</span>
-      <span v-if="pendingCount > 0" class="section-badge">{{ pendingCount }} 待处理</span>
-    </div>
-
-    <!-- 状态筛选（chip 行） -->
+    <!-- 类型筛选 chip：全部 / 我的 / 可认领 / 检查单 -->
     <div class="filter-chips">
       <button
         v-for="opt in filterOptions"
@@ -38,105 +12,56 @@
         class="filter-chip"
         :class="{ active: filter === opt.value }"
         @click="filter = opt.value"
-      >{{ opt.label }}</button>
+      >
+        {{ opt.label }}
+        <span v-if="opt.count !== undefined && opt.count > 0" class="chip-count">{{ opt.count }}</span>
+      </button>
     </div>
 
-    <!-- 任务列表 -->
+    <!-- 统一列表：检查单 + 我的任务 + 可认领任务 -->
     <div class="task-list">
       <div v-if="loading" class="loading-state">加载中...</div>
-      <div v-else-if="tasks.length === 0" class="empty-state">
+      <div v-else-if="displayItems.length === 0" class="empty-state">
         <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#444" stroke-width="1.5">
           <path d="M14 18h20v22H14z" rx="3"/><path d="M19 10v8M29 10v8"/><path d="M14 24h20"/>
         </svg>
-        <span>{{ filter ? '没有符合条件的任务' : '暂无任务' }}</span>
+        <span>{{ filter === 'mine' ? '暂无指派给你的任务' : filter === 'pool' ? '暂无可认领任务' : filter === 'butler' ? '暂无待办检查单' : '暂无任务' }}</span>
       </div>
       <div v-else>
         <div
-          v-for="task in tasks"
-          :key="task.id"
+          v-for="item in displayItems"
+          :key="item.uid"
           class="task-item"
-          :class="[`priority-${task.priority}`, `status-${task.status}`]"
-          @click="openDetail(task)"
+          :class="[`priority-${item.priority}`, `kind-${item.kind}`]"
+          @click="onItemClick(item)"
         >
           <div class="task-left">
-            <div class="task-priority-dot" :class="task.priority"></div>
+            <div class="task-priority-dot" :class="item.priority"></div>
             <div class="task-info">
-              <span class="task-title">{{ task.title }}</span>
+              <span class="task-title">{{ item.title }}</span>
               <span class="task-meta">
-                <span v-if="task.due_date" class="meta-tag">截止 {{ task.due_date }}</span>
-                <span class="meta-tag">{{ task.task_type_label }}</span>
-                <span v-if="task.attachments_count" class="meta-tag">附件 {{ task.attachments_count }}</span>
+                <span class="meta-tag kind-tag" :class="item.kind">{{ item.kind_label }}</span>
+                <span v-if="item.due_text" class="meta-tag">{{ item.due_text }}</span>
+                <span v-if="item.progress_text" class="meta-tag">{{ item.progress_text }}</span>
+                <span v-if="item.assignee_name" class="meta-tag">执行人 {{ item.assignee_name }}</span>
               </span>
             </div>
           </div>
           <div class="task-right">
-            <span class="status-chip" :class="task.status">{{ task.status_label }}</span>
+            <span v-if="item.kind === 'pool'" class="status-chip pool">可认领</span>
+            <span v-else-if="item.kind === 'butler'" class="status-chip butler">{{ item.status_label }}</span>
+            <span v-else class="status-chip" :class="item.status">{{ item.status_label }}</span>
           </div>
         </div>
       </div>
 
-      <!-- 分页 -->
-      <div v-if="total > pageSize" class="pagination">
+      <!-- 分页（仅我的任务/全部模式生效） -->
+      <div v-if="showPagination" class="pagination">
         <button :disabled="page <= 1" @click="page--; loadTasks()">上一页</button>
         <span>{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
         <button :disabled="page * pageSize >= total" @click="page++; loadTasks()">下一页</button>
       </div>
     </div>
-
-    <!-- 认领池入口（仅当有可认领任务时显示） -->
-    <div v-if="poolCount > 0" class="pool-entry" @click="goPool">
-      <div class="pool-left">
-        <div class="pool-dot"></div>
-        <div class="pool-text">
-          <span class="pool-title">有 {{ poolCount }} 个任务可认领</span>
-          <span class="pool-desc">点击查看认领池</span>
-        </div>
-      </div>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-        <path d="M9 18l6-6-6-6"/>
-      </svg>
-    </div>
-
-    <!-- 认领池抽屉 -->
-    <Transition name="slide-up">
-      <div v-if="poolOpen" class="detail-overlay" @click.self="poolOpen = false">
-        <div class="detail-panel pool-panel">
-          <div class="detail-header">
-            <h3>认领池（{{ poolTasks.length }}）</h3>
-            <button class="close-btn" @click="poolOpen = false">×</button>
-          </div>
-          <div class="detail-body">
-            <div v-if="poolLoading" class="loading-state">加载中...</div>
-            <div v-else-if="poolTasks.length === 0" class="empty-state">
-              <span>暂无可认领任务</span>
-            </div>
-            <div v-else>
-              <div
-                v-for="task in poolTasks"
-                :key="task.id"
-                class="task-item"
-                :class="[`priority-${task.priority}`]"
-                @click="openDetail(task)"
-              >
-                <div class="task-left">
-                  <div class="task-priority-dot" :class="task.priority"></div>
-                  <div class="task-info">
-                    <span class="task-title">{{ task.title }}</span>
-                    <span class="task-meta">
-                      <span v-if="task.due_date" class="meta-tag">截止 {{ task.due_date }}</span>
-                      <span class="meta-tag">{{ task.task_type_label }}</span>
-                    </span>
-                  </div>
-                </div>
-                <div class="task-right">
-                  <span class="pool-claim-chip">可认领</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Transition>
 
     <!-- 任务详情弹窗 -->
     <Transition name="slide-up">
@@ -250,109 +175,172 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { taskAPI, type TaskItem } from '@/api/task'
+import { getTodayStatus, type ButlerTodayStatus } from '@/api/butler'
 
 const router = useRouter()
 const auth = useAuthStore()
 
+// ============ 数据 ============
+type DisplayItem = {
+  uid: string
+  kind: 'mine' | 'pool' | 'butler'
+  kind_label: string
+  title: string
+  priority: string
+  status?: string
+  status_label: string
+  due_text?: string
+  progress_text?: string
+  assignee_name?: string
+  // 但书：原 task 对象（用于打开详情）
+  task_id?: string
+  // butler 跳转目标
+  butler_session_id?: string | null
+  butler_type?: 'opening' | 'closing'
+}
+
 const loading = ref(false)
-const tasks = ref<TaskItem[]>([])
+const myTasks = ref<TaskItem[]>([])
+const poolTasks = ref<TaskItem[]>([])
+const butlerStatus = ref<ButlerTodayStatus | null>(null)
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
-const filter = ref('')
-const pendingCount = ref(0)
+const filter = ref<'' | 'mine' | 'pool' | 'butler'>('')
 const detailTask = ref<any>(null)
 const previewPhoto = ref<string | null>(null)
 
-// 执行反馈草稿与保存状态
+// ============ 计数 ============
+const pendingCount = computed(() => myTasks.value.filter(t => t.status === 'pending').length)
+const poolCount = computed(() => poolTasks.value.length)
+const butlerCount = computed(() => butlerStatus.value?.pending?.length || 0)
+
+// ============ 执行反馈草稿与保存状态 ============
 const noteDraft = ref('')
 const noteStatus = ref<'idle' | 'saving' | 'saved'>('idle')
 const noteStatusText = computed(() => ({ idle: '', saving: '保存中...', saved: '已保存' }[noteStatus.value]))
 const noteStatusClass = computed(() => ({ saving: 'saving', saved: 'saved' }[noteStatus.value] || ''))
 
-// 是否可编辑执行反馈：任务未结束 + 当前用户是执行人/创建人/管理员
 const canEditNote = computed(() => {
   if (!detailTask.value) return false
   const t = detailTask.value
   if (t.status === 'completed' || t.status === 'cancelled') return false
-  // 待认领的池任务不能编（没执行人）
   if (t.task_type === 'pool' && !t.assignee_id) return false
   const role = auth.role
   const isAdmin = ['boss', 'store_manager', 'system_admin', 'admin'].includes(role)
   return isAdmin || t.assignee_id === auth.info.employee_id || t.created_by === auth.info.user_id
 })
 
-// 认领池
-const poolCount = ref(0)
-const poolOpen = ref(false)
-const poolLoading = ref(false)
-const poolTasks = ref<TaskItem[]>([])
+// ============ chip 筛选 ============
+const filterOptions = computed(() => [
+  { value: '' as const, label: '全部', count: pendingCount.value + poolCount.value + butlerCount.value },
+  { value: 'mine' as const, label: '我的', count: pendingCount.value },
+  { value: 'pool' as const, label: '可认领', count: poolCount.value },
+  { value: 'butler' as const, label: '检查单', count: butlerCount.value },
+])
 
-const filterOptions = [
-  { value: '', label: '全部' },
-  { value: 'pending', label: '待处理' },
-  { value: 'in_progress', label: '进行中' },
-  { value: 'completed', label: '已完成' },
-]
-
-async function loadTasks() {
-  loading.value = true
-  try {
-    const params: any = { page: page.value, page_size: pageSize }
-    if (filter.value) params.status = filter.value
-    const res = await taskAPI.myTasks(params)
-    tasks.value = res.data.data.items || []
-    total.value = res.data.data.total || 0
-  } catch {} finally {
-    loading.value = false
+// ============ 转换：把三类原始数据 → DisplayItem ============
+function taskToItem(t: TaskItem, kind: 'mine' | 'pool'): DisplayItem {
+  const kindLabelMap = { mine: '指派任务', pool: '认领池' }
+  const statusLabelMap: Record<string, string> = {
+    pending: '待处理', in_progress: '进行中', completed: '已完成', cancelled: '已取消',
+  }
+  return {
+    uid: `${kind}-${t.id}`,
+    kind,
+    kind_label: kindLabelMap[kind],
+    title: t.title,
+    priority: t.priority,
+    status: t.status,
+    status_label: t.status_label || statusLabelMap[t.status] || t.status,
+    due_text: t.due_date ? `截止 ${t.due_date}` : undefined,
+    assignee_name: t.assignee_name || undefined,
+    task_id: t.id,
   }
 }
 
-async function loadPendingCount() {
+function butlerToItem(p: ButlerTodayStatus['pending'][number]): DisplayItem {
+  const total = p.total || 0
+  const completed = p.completed || 0
+  return {
+    uid: `butler-${p.type}-${p.session_id || 'new'}`,
+    kind: 'butler',
+    kind_label: p.type === 'opening' ? '开店检查' : '闭店检查',
+    title: p.label,
+    priority: 'high',
+    status_label: total === 0 ? '待开始' : (completed >= total ? '已完成' : '进行中'),
+    progress_text: total > 0 ? `${completed}/${total}` : undefined,
+    due_text: p.type === 'opening' ? '今日 11:30 前' : '今日 23:30 前',
+    butler_session_id: p.session_id,
+    butler_type: p.type,
+  }
+}
+
+// ============ 当前显示列表 ============
+const displayItems = computed<DisplayItem[]>(() => {
+  const mineItems = myTasks.value.map(t => taskToItem(t, 'mine'))
+  const poolItems = poolTasks.value.map(t => taskToItem(t, 'pool'))
+  const butlerItems = (butlerStatus.value?.pending || []).map(butlerToItem)
+
+  if (filter.value === 'mine') return mineItems
+  if (filter.value === 'pool') return poolItems
+  if (filter.value === 'butler') return butlerItems
+  // 全部：检查单优先 → 我的 → 可认领
+  return [...butlerItems, ...mineItems, ...poolItems]
+})
+
+const showPagination = computed(() => filter.value === 'mine' && total.value > pageSize)
+
+// ============ 加载 ============
+async function loadMyTasks() {
   try {
-    const res = await taskAPI.myTasks({ status: 'pending', page: 1, page_size: 1 })
-    pendingCount.value = res.data.data.total || 0
+    const params: any = { page: page.value, page_size: pageSize }
+    const res = await taskAPI.myTasks(params)
+    myTasks.value = res.data.data.items || []
+    total.value = res.data.data.total || 0
   } catch {}
 }
 
-async function loadPoolCount() {
-  try {
-    const res = await taskAPI.pool({ page: 1, page_size: 1 })
-    poolCount.value = res.data.data.total || 0
-  } catch {}
-}
-
-async function openPool() {
-  poolOpen.value = true
-  poolLoading.value = true
+async function loadPool() {
   try {
     const res = await taskAPI.pool({ page: 1, page_size: 50 })
     poolTasks.value = res.data.data.items || []
-  } catch {} finally {
-    poolLoading.value = false
-  }
+  } catch {}
 }
 
-function goPool() {
-  openPool()
+async function loadButler() {
+  try {
+    const res = await getTodayStatus()
+    if (res.data.code === 0) butlerStatus.value = res.data.data
+  } catch {}
 }
 
-watch(filter, () => {
-  page.value = 1
-  loadTasks()
-})
+async function loadAll() {
+  loading.value = true
+  await Promise.all([loadMyTasks(), loadPool(), loadButler()])
+  loading.value = false
+}
+
+watch(filter, () => { page.value = 1 })
 
 onMounted(() => {
-  loadTasks()
-  loadPendingCount()
-  loadPoolCount()
+  loadAll()
 })
 
-async function openDetail(task: TaskItem) {
+// ============ 点击行为分流 ============
+function onItemClick(item: DisplayItem) {
+  if (item.kind === 'butler') {
+    // 跳 butler 页（如已有 session 直接进会话；否则进 butler 首页会自动创建）
+    router.push('/daily/butler')
+    return
+  }
+  if (item.task_id) openDetail(item.task_id)
+}
+
+async function openDetail(taskId: string) {
   try {
-    const res = await taskAPI.get(task.id)
+    const res = await taskAPI.get(taskId)
     detailTask.value = res.data.data
-    // 初始化反馈草稿 & 状态
     noteDraft.value = res.data.data.completion_note || ''
     noteStatus.value = 'idle'
   } catch {}
@@ -364,17 +352,14 @@ async function saveNote() {
   const taskId = detailTask.value.id
   const newText = noteDraft.value.trim()
   const oldText = (detailTask.value.completion_note || '').trim()
-  // 内容未变不保存
   if (newText === oldText) return
   noteStatus.value = 'saving'
   try {
     const res = await taskAPI.saveNote(taskId, newText)
     detailTask.value = res.data.data
     noteStatus.value = 'saved'
-    // 2 秒后状态归位
-    setTimeout(() => {
-      if (noteStatus.value === 'saved') noteStatus.value = 'idle'
-    }, 2000)
+    setTimeout(() => { if (noteStatus.value === 'saved') noteStatus.value = 'idle' }, 2000)
+    loadMyTasks()
   } catch {
     noteStatus.value = 'idle'
   }
@@ -386,10 +371,8 @@ async function handleClaim() {
     await taskAPI.claim(detailTask.value.id)
     ElMessage.success('认领成功')
     detailTask.value = null
-    poolOpen.value = false
-    loadTasks()
-    loadPendingCount()
-    loadPoolCount()
+    loadMyTasks()
+    loadPool()
   } catch {}
 }
 
@@ -399,12 +382,10 @@ async function handleStatus(status: string) {
   const task = detailTask.value
 
   if (status === 'completed') {
-    // 完成校验：require_photo=true 必须先上传照片
     if (task.require_photo && !task.attachments?.length) {
       ElMessage.warning('此任务要求完成时上传照片，请先上传至少一张照片')
       return
     }
-    // 完成校验：require_note=true 必须有反馈（草稿优先）
     if (task.require_note) {
       const draft = noteDraft.value.trim()
       const stored = (task.completion_note || '').trim()
@@ -412,11 +393,9 @@ async function handleStatus(status: string) {
         ElMessage.warning('请先填写「执行反馈」再完成任务')
         return
       }
-      // 草稿与已存不一致时，先把草稿提交
       if (draft && draft !== stored) {
-        try {
-          await taskAPI.saveNote(task.id, draft)
-        } catch {
+        try { await taskAPI.saveNote(task.id, draft) }
+        catch {
           ElMessage.error('保存反馈失败，请重试')
           return
         }
@@ -435,8 +414,7 @@ async function handleStatus(status: string) {
     await taskAPI.updateStatus(task.id, status)
     ElMessage.success('操作成功')
     detailTask.value = null
-    loadTasks()
-    loadPendingCount()
+    loadMyTasks()
   } catch {}
 }
 
@@ -571,6 +549,9 @@ async function handleUpload(e: Event) {
 }
 .filter-chip {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 500;
@@ -587,63 +568,48 @@ async function handleUpload(e: Event) {
   background: #FB0079;
   border-color: #FB0079;
 }
-
-/* 认领池入口 */
-.pool-entry {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 76px;
-  z-index: 50;
-  width: calc(100% - 32px);
-  max-width: 568px;
-  display: flex;
+.chip-count {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #FB0079 0%, #FF6BAA 100%);
-  border-radius: 14px;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(251,0,121,0.3);
-  transition: transform 0.2s;
-  -webkit-tap-highlight-color: transparent;
-}
-.pool-entry:active {
-  transform: translateX(-50%) scale(0.98);
-}
-.pool-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.pool-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
-  flex-shrink: 0;
-}
-.pool-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.pool-title {
-  font-size: 14px;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
   font-weight: 700;
   color: #fff;
+  background: rgba(255,255,255,0.18);
+  border-radius: 8px;
 }
-.pool-desc {
-  font-size: 11px;
-  color: rgba(255,255,255,0.85);
+.filter-chip:not(.active) .chip-count {
+  background: rgba(251,0,121,0.25);
+  color: #FF6BAA;
 }
 
-/* 认领池抽屉 */
-.pool-panel .task-item {
-  margin-bottom: 8px;
+/* 类型标签：mine / pool / butler 三色 */
+.kind-tag {
+  font-weight: 600;
 }
-.pool-claim-chip {
+.kind-tag.mine {
+  color: #FFB02E;
+  background: rgba(255,176,46,0.1);
+}
+.kind-tag.pool {
+  color: #FB0079;
+  background: rgba(251,0,121,0.1);
+}
+.kind-tag.butler {
+  color: #4ADE80;
+  background: rgba(74,222,128,0.1);
+}
+
+/* 检查单卡片样式微调 */
+.kind-butler .task-priority-dot {
+  background: #4ADE80 !important;
+}
+
+/* 状态徽章变体：pool / butler */
+.status-chip.pool {
   font-size: 10px;
   font-weight: 600;
   padding: 3px 8px;
@@ -651,6 +617,15 @@ async function handleUpload(e: Event) {
   color: #FB0079;
   background: rgba(251,0,121,0.12);
   border: 1px solid rgba(251,0,121,0.25);
+}
+.status-chip.butler {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #4ADE80;
+  background: rgba(74,222,128,0.12);
+  border: 1px solid rgba(74,222,128,0.25);
 }
 
 /* Task list */

@@ -17,22 +17,22 @@
 
       <div
         class="task-center"
-        :class="{ 'has-urgent': butlerPending || oaPendingCount > 0 }"
+        :class="{ 'has-urgent': totalTodoCount > 0 }"
         @click="goTaskList()"
       >
         <div class="tc-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 11l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-7.5 9.5C9.5 19.5 6 17 6 12V5l7.5-3L21 5v7z"/>
           </svg>
-          <span v-if="butlerPending || oaPendingCount > 0" class="tc-badge"></span>
+          <span v-if="totalTodoCount > 0" class="tc-badge"></span>
         </div>
         <div class="tc-body">
           <span class="tc-title">任务中心</span>
           <span v-if="butlerPending" class="tc-hint urgent">
             {{ butlerPending.label }}未完成
           </span>
-          <span v-else-if="oaPendingCount > 0" class="tc-hint urgent">
-            {{ oaPendingCount }}个任务待处理
+          <span v-else-if="totalTodoCount > 0" class="tc-hint urgent">
+            {{ totalTodoCount }}项待办（{{ oaPendingCount }}任务{{ poolAvailableCount > 0 ? `/${poolAvailableCount}可认领` : '' }}）
           </span>
           <span v-else class="tc-hint">今日暂无待办</span>
         </div>
@@ -117,6 +117,12 @@ const dashboard = ref<DashboardData | null>(null)
 const myPayrollNet = ref<number>(0)
 const butlerStatus = ref<ButlerTodayStatus | null>(null)
 const oaPendingCount = ref(0)
+const poolAvailableCount = ref(0)  // 可认领任务数
+
+// 首页提醒条：合并所有待办（OA 任务 + 检查单 + 可认领）
+const totalTodoCount = computed(() =>
+  oaPendingCount.value + (butlerStatus.value?.pending?.length || 0) + poolAvailableCount.value
+)
 
 // 首页提醒条：取第一个待办项
 const butlerPending = computed(() => {
@@ -230,10 +236,12 @@ async function loadApprovalCount() {
 
 async function loadOaPendingCount() {
   try {
-    const res = await taskAPI.myTasks({ status: 'pending', page: 1, page_size: 1 })
-    if (res.data.code === 0) {
-      oaPendingCount.value = res.data.data.total || 0
-    }
+    const [myRes, poolRes] = await Promise.all([
+      taskAPI.myTasks({ status: 'pending', page: 1, page_size: 1 }),
+      taskAPI.pool({ page: 1, page_size: 1 }),
+    ])
+    if (myRes.data.code === 0) oaPendingCount.value = myRes.data.data.total || 0
+    if (poolRes.data.code === 0) poolAvailableCount.value = poolRes.data.data.total || 0
   } catch { /* silent */ }
 }
 
