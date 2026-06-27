@@ -118,7 +118,8 @@ async def _safe_print_label(bottle_label: str, customer_name: str, phone: str, w
         from sqlalchemy import text as sql_text
         async with AsyncSessionLocal() as session:
             # 异步任务需要设置RLS上下文，否则查询会被行级安全拦截
-            await session.execute(sql_text("SET LOCAL app.current_store_id = :sid"), {"sid": str(store_id)})
+            # 注意：asyncpg 不支持 SET LOCAL 的参数绑定，必须用字符串内联
+            await session.execute(sql_text(f"SET LOCAL app.current_store_id = '{store_id}'"))
             await session.execute(sql_text("SET LOCAL app.current_user_role = 'boss'"))
 
             service = PrinterService(session)
@@ -246,7 +247,8 @@ async def _safe_print_receipt(bottle_label: str, customer_name: str, wine_name: 
         from sqlalchemy import text as sql_text
         async with AsyncSessionLocal() as session:
             # 异步任务需要设置RLS上下文
-            await session.execute(sql_text("SET LOCAL app.current_store_id = :sid"), {"sid": str(store_id)})
+            # 注意：asyncpg 不支持 SET LOCAL 的参数绑定，必须用字符串内联
+            await session.execute(sql_text(f"SET LOCAL app.current_store_id = '{store_id}'"))
             await session.execute(sql_text("SET LOCAL app.current_user_role = 'boss'"))
 
             service = PrinterService(session)
