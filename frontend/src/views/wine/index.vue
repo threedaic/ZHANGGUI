@@ -249,7 +249,15 @@ async function onStore() {
     })
     if (res.code === 0) {
       const total = storeItems.value.reduce((s, it) => s + it.quantity, 0)
-      ElMessage.success(`存酒成功！共 ${total} 瓶`)
+      const hasFullBottle = storeItems.value.some(it => it.remaining_ml >= 750)
+      const hasOpenBottle = storeItems.value.some(it => it.remaining_ml < 750)
+      if (hasOpenBottle && hasFullBottle) {
+        ElMessage.success(`存酒成功！共 ${total} 瓶，已打印开瓶标签`)
+      } else if (hasFullBottle && !hasOpenBottle) {
+        ElMessage.success(`存酒成功！共 ${total} 瓶（满瓶不打标签）`)
+      } else {
+        ElMessage.success(`存酒成功！共 ${total} 瓶，标签已发送到打印机`)
+      }
       showStoreDialog.value = false; resetStoreForm()
     } else {
       ElMessage.error(res.message || '存酒失败')
