@@ -69,6 +69,7 @@ async function onSubmit() {
       store_id: data.user.store_id,
       role: data.user.role as 'boss' | 'store_manager' | 'staff',
       username: data.user.username,
+      employee_name: data.user.employee_name,
     })
     ElMessage.success('登录成功')
     router.push('/')

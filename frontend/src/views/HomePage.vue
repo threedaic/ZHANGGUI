@@ -209,7 +209,7 @@ async function loadInboxCount() {
   try {
     const res = await signTaskAPI.getCount()
     if (res.data.code === 0) {
-      const inboxCard = cards.find(c => c.path === '/daily/inbox')
+      const inboxCard = cards.value.find(c => c.path === '/daily/inbox')
       if (inboxCard) inboxCard.badge = res.data.data.pending
     }
   } catch (e) { console.error('[HomePage] loadInboxCount failed:', e) }
@@ -222,7 +222,7 @@ async function loadApprovalCount() {
       const d = res.data.data
       // 普通员工看 assigned_to_me，店长/老板看 total_pending
       const count = d.assigned_to_me || d.total_pending || 0
-      const approvalCard = cards.find(c => c.path === '/daily/approval')
+      const approvalCard = cards.value.find(c => c.path === '/daily/approval')
       if (approvalCard) approvalCard.badge = count
     }
   } catch (e) { console.error('[HomePage] loadApprovalCount failed:', e) }
@@ -244,7 +244,7 @@ interface FuncCard {
   badge?: number
 }
 
-const cards: FuncCard[] = [
+const cards = ref<FuncCard[]>([
   {
     label: '打卡',
     path: '/daily/checkin',
@@ -296,7 +296,7 @@ const cards: FuncCard[] = [
       <rect x="3" y="8" width="22" height="14" rx="4"/><circle cx="9" cy="15" r="1.5"/><circle cx="19" cy="15" r="1.5"/><line x1="13" y1="13" x2="15" y2="13"/><line x1="14" y1="12" x2="14" y2="14"/>
     </svg>`,
   },
-]
+])
 </script>
 
 <style scoped>

@@ -1,10 +1,21 @@
 <script setup lang="ts">
 // 管理首页（店长入口）
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+// 角色标签：system_admin显示"系统管理员"，admin隐藏显示"店长"
+const roleLabel = computed(() => {
+  const role = auth.info.role
+  if (role === 'system_admin') return '系统管理员'
+  if (role === 'boss') return '老板'
+  if (role === 'admin') return '店长'
+  return '店长'
+})
+const isSystemAdmin = computed(() => auth.info.role === 'system_admin')
 
 const menus = [
   // 排班与人
@@ -30,8 +41,8 @@ const menus = [
 <template>
   <div class="mgmt-home">
     <div class="welcome">
-      <div class="hello">你好，{{ auth.info.username || '店长' }}</div>
-      <div class="role-tag">{{ auth.isBoss ? '老板' : '店长' }}</div>
+      <div class="hello">你好，{{ auth.info.employee_name || auth.info.username || '店长' }}</div>
+      <div class="role-tag" :class="{ 'role-tag-sysadmin': isSystemAdmin }">{{ roleLabel }}</div>
     </div>
 
     <div class="menu-grid">
@@ -75,6 +86,13 @@ const menus = [
     border: 1px solid $brand-primary;
     padding: 2px 8px;
     border-radius: 10px;
+  }
+  .role-tag-sysadmin {
+    color: $brand-white;
+    font-weight: 600;
+    background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
+    border: none;
+    box-shadow: 0 0 8px rgba(251, 0, 121, 0.5);
   }
 }
 

@@ -183,9 +183,25 @@
                 <div v-if="detailTask.requirements" class="req-text">{{ detailTask.requirements }}</div>
               </div>
             </div>
-            <div class="detail-field" v-if="detailTask.completion_note">
+            <div class="detail-field" v-if="detailTask.completion_note && !canEditNote">
               <span class="field-label">完成说明</span>
               <span class="desc-text">{{ detailTask.completion_note }}</span>
+            </div>
+
+            <!-- 执行反馈：员工接收任务后即可编辑，失焦自动保存 -->
+            <div v-if="canEditNote" class="detail-field">
+              <span class="field-label">
+                执行反馈
+                <span class="note-status" :class="noteStatusClass">{{ noteStatusText }}</span>
+              </span>
+              <textarea
+                v-model="noteDraft"
+                class="note-textarea"
+                rows="4"
+                maxlength="2000"
+                placeholder="随时记录执行进度、问题、说明等（失焦自动保存）"
+                @blur="saveNote"
+              ></textarea>
             </div>
 
             <!-- 照片 -->
@@ -211,7 +227,7 @@
               </button>
               <label class="btn-upload">
                 上传照片
-                <input type="file" accept="image/*" hidden @change="handleUpload" />
+                <input type="file" accept="image/*" @change="handleUpload" />
               </label>
             </div>
           </div>
@@ -229,12 +245,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 import { taskAPI, type TaskItem } from '@/api/task'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const tasks = ref<TaskItem[]>([])
@@ -245,6 +263,24 @@ const filter = ref('')
 const pendingCount = ref(0)
 const detailTask = ref<any>(null)
 const previewPhoto = ref<string | null>(null)
+
+// 执行反馈草稿与保存状态
+const noteDraft = ref('')
+const noteStatus = ref<'idle' | 'saving' | 'saved'>('idle')
+const noteStatusText = computed(() => ({ idle: '', saving: '保存中...', saved: '已保存' }[noteStatus.value]))
+const noteStatusClass = computed(() => ({ saving: 'saving', saved: 'saved' }[noteStatus.value] || ''))
+
+// 是否可编辑执行反馈：任务未结束 + 当前用户是执行人/创建人/管理员
+const canEditNote = computed(() => {
+  if (!detailTask.value) return false
+  const t = detailTask.value
+  if (t.status === 'completed' || t.status === 'cancelled') return false
+  // 待认领的池任务不能编（没执行人）
+  if (t.task_type === 'pool' && !t.assignee_id) return false
+  const role = auth.role
+  const isAdmin = ['boss', 'store_manager', 'system_admin', 'admin'].includes(role)
+  return isAdmin || t.assignee_id === auth.info.employee_id || t.created_by === auth.info.user_id
+})
 
 // 认领池
 const poolCount = ref(0)
@@ -316,7 +352,32 @@ async function openDetail(task: TaskItem) {
   try {
     const res = await taskAPI.get(task.id)
     detailTask.value = res.data.data
+    // 初始化反馈草稿 & 状态
+    noteDraft.value = res.data.data.completion_note || ''
+    noteStatus.value = 'idle'
   } catch {}
+}
+
+// 失焦自动保存执行反馈
+async function saveNote() {
+  if (!detailTask.value || !canEditNote.value) return
+  const taskId = detailTask.value.id
+  const newText = noteDraft.value.trim()
+  const oldText = (detailTask.value.completion_note || '').trim()
+  // 内容未变不保存
+  if (newText === oldText) return
+  noteStatus.value = 'saving'
+  try {
+    const res = await taskAPI.saveNote(taskId, newText)
+    detailTask.value = res.data.data
+    noteStatus.value = 'saved'
+    // 2 秒后状态归位
+    setTimeout(() => {
+      if (noteStatus.value === 'saved') noteStatus.value = 'idle'
+    }, 2000)
+  } catch {
+    noteStatus.value = 'idle'
+  }
 }
 
 async function handleClaim() {
@@ -335,33 +396,35 @@ async function handleClaim() {
 async function handleStatus(status: string) {
   if (!detailTask.value) return
   const labels: Record<string, string> = { in_progress: '开始处理', completed: '完成任务' }
+  const task = detailTask.value
 
-  // 完成校验
-  let completionNote: string | undefined
   if (status === 'completed') {
-    const task = detailTask.value
-    // 校验：require_photo=true 必须先上传照片
+    // 完成校验：require_photo=true 必须先上传照片
     if (task.require_photo && !task.attachments?.length) {
       ElMessage.warning('此任务要求完成时上传照片，请先上传至少一张照片')
       return
     }
-    // 校验：require_note=true 必须填完成说明
+    // 完成校验：require_note=true 必须有反馈（草稿优先）
     if (task.require_note) {
-      try {
-        const { value } = await ElMessageBox.prompt('请填写完成说明', '完成说明', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          inputType: 'textarea',
-          inputPlaceholder: '请填写本次任务的完成说明',
-          inputValidator: (val) => (val && val.trim().length > 0) || '完成说明不能为空',
-        })
-        completionNote = value.trim()
-      } catch { return }
-    } else {
-      try {
-        await ElMessageBox.confirm(`确定${labels[status]}吗？`, '确认')
-      } catch { return }
+      const draft = noteDraft.value.trim()
+      const stored = (task.completion_note || '').trim()
+      if (!draft && !stored) {
+        ElMessage.warning('请先填写「执行反馈」再完成任务')
+        return
+      }
+      // 草稿与已存不一致时，先把草稿提交
+      if (draft && draft !== stored) {
+        try {
+          await taskAPI.saveNote(task.id, draft)
+        } catch {
+          ElMessage.error('保存反馈失败，请重试')
+          return
+        }
+      }
     }
+    try {
+      await ElMessageBox.confirm(`确定${labels[status]}吗？`, '确认')
+    } catch { return }
   } else {
     try {
       await ElMessageBox.confirm(`确定${labels[status]}吗？`, '确认')
@@ -369,7 +432,7 @@ async function handleStatus(status: string) {
   }
 
   try {
-    await taskAPI.updateStatus(detailTask.value.id, status, completionNote)
+    await taskAPI.updateStatus(task.id, status)
     ElMessage.success('操作成功')
     detailTask.value = null
     loadTasks()
@@ -813,6 +876,42 @@ async function handleUpload(e: Event) {
   white-space: pre-wrap;
 }
 
+/* 执行反馈 textarea */
+.note-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.note-textarea::placeholder {
+  color: #555;
+}
+.note-textarea:focus {
+  border-color: #FB0079;
+  background: rgba(255, 255, 255, 0.06);
+}
+.note-status {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.note-status.saving {
+  color: #FFB02E;
+}
+.note-status.saved {
+  color: #4ADE80;
+}
+
 /* Photo */
 .photo-section {
   margin-top: 12px;
@@ -872,9 +971,30 @@ async function handleUpload(e: Event) {
   background: #34c759;
 }
 .btn-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
   color: #888;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1) !important;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-upload:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.btn-upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Photo preview */

@@ -74,14 +74,17 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
     store_id = _to_str(user.store_id)
     logger.info(f"[LOGIN] user.store_id={store_id}")
 
-    # 如果 user 没有 store_id，尝试从 employee 获取
-    if store_id is None and user.employee_id:
-        logger.info("[LOGIN] 从 employee 获取 store_id")
+    # 查 employee 获取 store_id（如缺）和 name
+    employee_name = None
+    if user.employee_id:
+        logger.info("[LOGIN] 查 employee 获取信息")
         emp_result = await db.execute(select(Employee).where(Employee.id == user.employee_id))
         emp = emp_result.scalar_one_or_none()
         if emp:
-            store_id = _to_str(emp.store_id)
-            logger.info(f"[LOGIN] emp.store_id={store_id}")
+            if store_id is None:
+                store_id = _to_str(emp.store_id)
+                logger.info(f"[LOGIN] emp.store_id={store_id}")
+            employee_name = emp.name
 
     # 老板账号没有具体门店时，默认使用第一个门店
     if store_id is None and user.role == "boss":
@@ -98,6 +101,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
         "role": user.role,
         "employee_id": _to_str(user.employee_id),
         "store_id": store_id,
+        "employee_name": employee_name,
     }
 
     access_token = create_access_token(token_data)
@@ -114,6 +118,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
             "role": user.role,
             "employee_id": _to_str(user.employee_id),
             "store_id": store_id,
+            "employee_name": employee_name,
             "must_change_password": user.must_change_password,
         },
     }, request=request)
@@ -136,6 +141,7 @@ async def refresh(body: RefreshRequest, request: Request):
         "role": payload.get("role"),
         "employee_id": payload.get("employee_id"),
         "store_id": payload.get("store_id"),
+        "employee_name": payload.get("employee_name"),
     }
     access_token = create_access_token(token_data)
 
@@ -161,6 +167,7 @@ async def get_me(request: Request):
         "role": payload.get("role"),
         "employee_id": payload.get("employee_id"),
         "store_id": payload.get("store_id"),
+        "employee_name": payload.get("employee_name"),
     }, request=request)
 
 
@@ -301,16 +308,19 @@ async def wework_login(request: Request, db: AsyncSession = Depends(get_db)):
         "role": user.role,
         "employee_id": _to_str(emp.id),
         "store_id": _to_str(emp.store_id),
+        "employee_name": emp.name,
     }
     access_token_str = create_access_token(token_data)
     refresh_token_str = create_refresh_token(token_data)
 
     await db.commit()
 
+    from urllib.parse import quote
     frontend_url = (
         f"/auth-callback"
         f"?access_token={access_token_str}"
         f"&refresh_token={refresh_token_str}"
         f"&role={user.role}"
+        f"&employee_name={quote(emp.name or '')}"
     )
     return RedirectResponse(url=frontend_url)

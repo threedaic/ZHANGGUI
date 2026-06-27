@@ -132,6 +132,13 @@ export const taskAPI = {
     return apiClient.patch<ApiResponse<TaskItem>>(`/tasks/${taskId}`, data)
   },
 
+  // 暂存执行反馈文字（不限任务状态，执行人/创建人/管理员均可）
+  saveNote(taskId: string, note: string) {
+    return apiClient.patch<ApiResponse<TaskItem>>(`/tasks/${taskId}/note`, {
+      completion_note: note,
+    })
+  },
+
   // 更新状态
   updateStatus(taskId: string, status: string, completionNote?: string) {
     const payload: Record<string, unknown> = { status }

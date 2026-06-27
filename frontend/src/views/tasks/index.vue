@@ -5,18 +5,15 @@
       <span class="page-subtitle">分配 · 跟踪 · 完成</span>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="tabs">
+    <!-- 状态筛选 chip -->
+    <div class="filter-chips">
       <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="tab-btn"
-        :class="{ active: activeTab === tab.key }"
-        @click="activeTab = tab.key"
-      >
-        {{ tab.label }}
-        <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
-      </button>
+        v-for="opt in statusFilters"
+        :key="opt.value"
+        class="filter-chip"
+        :class="{ active: statusFilter === opt.value }"
+        @click="statusFilter = opt.value"
+      >{{ opt.label }}</button>
     </div>
 
     <!-- 新建任务 -->
@@ -29,12 +26,12 @@
       </button>
     </div>
 
-    <!-- 新建表单 -->
+    <!-- 新建表单（统一：单次任务 / 周期任务） -->
     <Transition name="slide">
       <div v-if="showCreate" class="create-form">
         <div class="form-group">
           <label>任务标题</label>
-          <input v-model="newTask.title" placeholder="如：清理后厨冰箱" maxlength="200" />
+          <input v-model="newTask.title" placeholder="如：清理后厨冰箱 / 每周大扫除" maxlength="200" />
         </div>
         <div class="form-group">
           <label>任务描述（可选）</label>
@@ -42,7 +39,7 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>类型</label>
+            <label>分配方式</label>
             <div class="radio-group">
               <button :class="{ selected: newTask.task_type === 'direct' }" @click="newTask.task_type = 'direct'">指派</button>
               <button :class="{ selected: newTask.task_type === 'pool' }" @click="newTask.task_type = 'pool'">认领</button>
@@ -66,9 +63,34 @@
             </option>
           </select>
         </div>
+
+        <!-- 重复频率：不重复 / 每天 / 每周 / 每月 -->
         <div class="form-group">
-          <label>截止日期（可选）</label>
-          <input type="date" v-model="newTask.due_date" />
+          <label>重复频率</label>
+          <div class="radio-group">
+            <button :class="{ selected: newTask.recurrence === 'none' }" @click="newTask.recurrence = 'none'">不重复</button>
+            <button :class="{ selected: newTask.recurrence === 'daily' }" @click="newTask.recurrence = 'daily'">每天</button>
+            <button :class="{ selected: newTask.recurrence === 'weekly' }" @click="newTask.recurrence = 'weekly'">每周</button>
+            <button :class="{ selected: newTask.recurrence === 'monthly' }" @click="newTask.recurrence = 'monthly'">每月</button>
+          </div>
+        </div>
+        <div class="form-group" v-if="newTask.recurrence === 'weekly'">
+          <label>每周几</label>
+          <div class="radio-group">
+            <button v-for="(d, i) in ['日','一','二','三','四','五','六']" :key="i"
+              :class="{ selected: weeklyDay === i }"
+              @click="weeklyDay = i">周{{ d }}</button>
+          </div>
+        </div>
+        <div class="form-group" v-if="newTask.recurrence === 'monthly'">
+          <label>每月几号</label>
+          <input type="number" v-model.number="monthlyDay" min="1" max="31" placeholder="1-31" />
+        </div>
+
+        <div class="form-group">
+          <label>{{ newTask.recurrence === 'none' ? '截止日期（可选）' : '每日截止时间（可选）' }}</label>
+          <input v-if="newTask.recurrence === 'none'" type="date" v-model="newTask.due_date" />
+          <input v-else type="time" v-model="newTask.due_time" />
         </div>
         <div class="form-group">
           <label>完成要求</label>
@@ -86,13 +108,15 @@
         </div>
         <div class="form-actions">
           <button class="btn-cancel" @click="showCreate = false">取消</button>
-          <button class="btn-submit" :disabled="!newTask.title" @click="handleCreate">创建任务</button>
+          <button class="btn-submit" :disabled="!newTask.title" @click="handleCreate">
+            {{ newTask.recurrence === 'none' ? '创建任务' : '创建周期任务' }}
+          </button>
         </div>
       </div>
     </Transition>
 
     <!-- 任务列表 -->
-    <div v-if="activeTab !== 'templates'" class="task-list">
+    <div class="task-list">
       <div v-if="loading" class="loading-state">加载中...</div>
       <div v-else-if="tasks.length === 0" class="empty-state">
         <div class="empty-icon">
@@ -100,7 +124,7 @@
             <path d="M9 11h22v18H9z" rx="2"/><path d="M15 7v4M25 7v4"/><path d="M13 17h14M13 23h8"/>
           </svg>
         </div>
-        <span>{{ activeTab === 'pool' ? '暂无可认领的任务' : '暂无任务' }}</span>
+        <span>暂无任务</span>
       </div>
       <div v-else>
         <div
@@ -130,117 +154,6 @@
         <span>{{ page }} / {{ Math.ceil(total / pageSize) }}</span>
         <button :disabled="page * pageSize >= total" @click="page++; loadTasks()">下一页</button>
       </div>
-    </div>
-
-    <!-- 周期模板 -->
-    <div v-if="activeTab === 'templates'" class="template-list">
-      <div v-if="loading" class="loading-state">加载中...</div>
-      <div v-else-if="templates.length === 0" class="empty-state">
-        <div class="empty-icon">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#555" stroke-width="1.5">
-            <circle cx="20" cy="20" r="14"/><path d="M20 12v8l5 3"/>
-          </svg>
-        </div>
-        <span>暂无周期模板</span>
-        <span class="empty-hint">创建模板可自动生成周期任务</span>
-      </div>
-      <div v-else>
-        <div v-for="tpl in templates" :key="tpl.id" class="tpl-card">
-          <div class="tpl-top">
-            <span class="tpl-recurrence">{{ tpl.recurrence_type_label }}</span>
-            <span class="tpl-status" :class="{ enabled: tpl.enabled }">{{ tpl.enabled ? '已启用' : '已停用' }}</span>
-          </div>
-          <div class="tpl-title">{{ tpl.title }}</div>
-          <div class="tpl-meta">
-            <span>执行人 {{ tpl.assignee_name }}</span>
-            <span v-if="tpl.due_time">截止 {{ tpl.due_time }}</span>
-          </div>
-          <div class="tpl-actions">
-            <button @click.stop="handleToggleTemplate(tpl)">{{ tpl.enabled ? '停用' : '启用' }}</button>
-            <button class="danger" @click.stop="handleDeleteTemplate(tpl)">删除</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 新建模板 -->
-      <div v-if="isManager" class="create-section" style="margin-top: 16px;">
-        <button class="create-btn" @click="showCreateTemplate = !showCreateTemplate">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          新建周期模板
-        </button>
-      </div>
-
-      <Transition name="slide">
-        <div v-if="showCreateTemplate" class="create-form">
-          <div class="form-group">
-            <label>模板标题</label>
-            <input v-model="newTpl.title" placeholder="如：每周大扫除" maxlength="200" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>周期</label>
-              <div class="radio-group">
-                <button :class="{ selected: newTpl.recurrence_type === 'daily' }" @click="newTpl.recurrence_type = 'daily'">每天</button>
-                <button :class="{ selected: newTpl.recurrence_type === 'weekly' }" @click="newTpl.recurrence_type = 'weekly'">每周</button>
-                <button :class="{ selected: newTpl.recurrence_type === 'monthly' }" @click="newTpl.recurrence_type = 'monthly'">每月</button>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>优先级</label>
-              <div class="radio-group">
-                <button :class="{ selected: newTpl.priority === 'high' }" @click="newTpl.priority = 'high'">紧急</button>
-                <button :class="{ selected: newTpl.priority === 'medium' }" @click="newTpl.priority = 'medium'">普通</button>
-                <button :class="{ selected: newTpl.priority === 'low' }" @click="newTpl.priority = 'low'">低</button>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>执行人</label>
-            <select v-model="newTpl.assignee_id">
-              <option value="">请选择员工</option>
-              <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                {{ emp.name }}（{{ emp.role_label }}）
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>截止时间（可选）</label>
-            <input type="time" v-model="newTpl.due_time" />
-          </div>
-          <div class="form-group" v-if="newTpl.recurrence_type === 'weekly'">
-            <label>每周几</label>
-            <div class="radio-group">
-              <button v-for="(d, i) in ['日','一','二','三','四','五','六']" :key="i"
-                :class="{ selected: weeklyDay === i }"
-                @click="weeklyDay = i">{{ d }}</button>
-            </div>
-          </div>
-          <div class="form-group" v-if="newTpl.recurrence_type === 'monthly'">
-            <label>每月几号</label>
-            <input type="number" v-model.number="monthlyDay" min="1" max="31" placeholder="1-31" />
-          </div>
-          <div class="form-group">
-            <label>完成要求</label>
-            <div class="checkbox-group">
-              <label class="checkbox-item">
-                <input type="checkbox" v-model="newTpl.require_photo" />
-                <span>需上传照片</span>
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" v-model="newTpl.require_note" />
-                <span>需填写完成说明</span>
-              </label>
-            </div>
-            <textarea v-model="newTpl.requirements" placeholder="完成要求说明（可选）" rows="2" class="mt-8" />
-          </div>
-          <div class="form-actions">
-            <button class="btn-cancel" @click="showCreateTemplate = false">取消</button>
-            <button class="btn-submit" :disabled="!newTpl.title || !newTpl.assignee_id" @click="handleCreateTemplate">创建模板</button>
-          </div>
-        </div>
-      </Transition>
     </div>
 
     <!-- 任务详情弹窗 -->
@@ -288,9 +201,25 @@
                 <div v-if="detailTask.requirements" class="req-text">{{ detailTask.requirements }}</div>
               </div>
             </div>
-            <div class="detail-row" v-if="detailTask.completion_note">
+            <div class="detail-row" v-if="detailTask.completion_note && !canEditNote">
               <span class="detail-label">完成说明</span>
               <span class="detail-desc">{{ detailTask.completion_note }}</span>
+            </div>
+
+            <!-- 执行反馈：可编辑态 -->
+            <div v-if="canEditNote" class="detail-row">
+              <span class="detail-label">
+                执行反馈
+                <span class="note-status" :class="noteStatusClass">{{ noteStatusText }}</span>
+              </span>
+              <textarea
+                v-model="noteDraft"
+                class="note-textarea"
+                rows="4"
+                maxlength="2000"
+                placeholder="随时记录执行进度、问题、说明等（失焦自动保存）"
+                @blur="saveNote"
+              ></textarea>
             </div>
             <div class="detail-row">
               <span class="detail-label">创建时间</span>
@@ -323,7 +252,7 @@
               </button>
               <label class="btn-upload">
                 上传照片
-                <input type="file" accept="image/jpeg,image/png,image/webp" hidden @change="handleUploadPhoto" />
+                <input type="file" accept="image/jpeg,image/png,image/webp" @change="handleUploadPhoto" />
               </label>
             </div>
           </div>
@@ -344,17 +273,16 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { taskAPI, type TaskItem, type TemplateItem, type EmployeeOption } from '@/api/task'
+import { taskAPI, type TaskItem, type EmployeeOption } from '@/api/task'
 
 const auth = useAuthStore()
 const isManager = computed(() => ['boss', 'store_manager', 'system_admin', 'admin'].includes(auth.role))
 
 // ===================== State =====================
 
-const activeTab = ref<'all' | 'my' | 'pool' | 'templates'>('all')
+const statusFilter = ref<'' | 'pending' | 'in_progress' | 'completed' | 'cancelled'>('')
 const loading = ref(false)
 const tasks = ref<TaskItem[]>([])
-const templates = ref<TemplateItem[]>([])
 const employees = ref<EmployeeOption[]>([])
 const page = ref(1)
 const pageSize = 20
@@ -362,7 +290,30 @@ const total = ref(0)
 const detailTask = ref<any>(null)
 const previewPhoto = ref<string | null>(null)
 const showCreate = ref(false)
-const showCreateTemplate = ref(false)
+
+// 执行反馈草稿与保存状态
+const noteDraft = ref('')
+const noteStatus = ref<'idle' | 'saving' | 'saved'>('idle')
+const noteStatusText = computed(() => ({ idle: '', saving: '保存中...', saved: '已保存' }[noteStatus.value]))
+const noteStatusClass = computed(() => ({ saving: 'saving', saved: 'saved' }[noteStatus.value] || ''))
+
+// 是否可编辑执行反馈
+const canEditNote = computed(() => {
+  if (!detailTask.value) return false
+  const t = detailTask.value
+  if (t.status === 'completed' || t.status === 'cancelled') return false
+  if (t.task_type === 'pool' && !t.assignee_id) return false
+  // 管理端：管理员/创建人/执行人 均可
+  return isManager.value || t.assignee_id === auth.info.employee_id || t.created_by === auth.info.user_id
+})
+
+const statusFilters = [
+  { value: '' as const, label: '全部' },
+  { value: 'pending' as const, label: '待处理' },
+  { value: 'in_progress' as const, label: '进行中' },
+  { value: 'completed' as const, label: '已完成' },
+  { value: 'cancelled' as const, label: '已取消' },
+]
 
 const newTask = ref({
   title: '',
@@ -371,18 +322,8 @@ const newTask = ref({
   priority: 'medium' as string,
   assignee_id: '',
   due_date: '',
-  require_photo: false,
-  require_note: false,
-  requirements: '',
-})
-
-const newTpl = ref({
-  title: '',
-  description: '',
-  recurrence_type: 'weekly' as 'daily' | 'weekly' | 'monthly',
-  priority: 'medium',
-  assignee_id: '',
   due_time: '',
+  recurrence: 'none' as 'none' | 'daily' | 'weekly' | 'monthly',
   require_photo: false,
   require_note: false,
   requirements: '',
@@ -393,38 +334,16 @@ const monthlyDay = ref(1)
 
 const pendingCount = computed(() => tasks.value.filter(t => t.status === 'pending').length)
 
-const tabs = computed(() => [
-  { key: 'all', label: '全部任务', badge: 0 },
-  { key: 'my', label: '我的任务', badge: 0 },
-  { key: 'pool', label: '认领池', badge: 0 },
-  { key: 'templates', label: '周期模板', badge: 0 },
-])
-
 // ===================== Load Data =====================
 
 async function loadTasks() {
   loading.value = true
   try {
-    let res
-    if (activeTab.value === 'my') {
-      res = await taskAPI.myTasks({ page: page.value, page_size: pageSize })
-    } else if (activeTab.value === 'pool') {
-      res = await taskAPI.pool({ page: page.value, page_size: pageSize })
-    } else {
-      res = await taskAPI.list({ page: page.value, page_size: pageSize })
-    }
+    const params: any = { page: page.value, page_size: pageSize }
+    if (statusFilter.value) params.status = statusFilter.value
+    const res = await taskAPI.list(params)
     tasks.value = res.data.data.items || []
     total.value = res.data.data.total || 0
-  } catch {} finally {
-    loading.value = false
-  }
-}
-
-async function loadTemplates() {
-  loading.value = true
-  try {
-    const res = await taskAPI.listTemplates()
-    templates.value = res.data.data || []
   } catch {} finally {
     loading.value = false
   }
@@ -437,13 +356,9 @@ async function loadEmployees() {
   } catch {}
 }
 
-watch(activeTab, () => {
+watch(statusFilter, () => {
   page.value = 1
-  if (activeTab.value === 'templates') {
-    loadTemplates()
-  } else {
-    loadTasks()
-  }
+  loadTasks()
 })
 
 onMounted(() => {
@@ -455,35 +370,102 @@ onMounted(() => {
 
 async function handleCreate() {
   if (!newTask.value.title) return
+
+  const isRecurring = newTask.value.recurrence !== 'none'
+
+  // 校验：周期任务必须指派执行人（pool 周期任务无意义）
+  if (isRecurring && newTask.value.task_type === 'pool') {
+    ElMessage.warning('周期任务必须指派执行人，请选择「指派」并选员工')
+    return
+  }
+  if (isRecurring && !newTask.value.assignee_id) {
+    ElMessage.warning('请选择执行人')
+    return
+  }
+
   try {
-    const data: any = {
-      title: newTask.value.title,
-      description: newTask.value.description,
-      task_type: newTask.value.task_type,
-      priority: newTask.value.priority,
-      require_photo: newTask.value.require_photo,
-      require_note: newTask.value.require_note,
-      requirements: newTask.value.requirements || undefined,
+    if (isRecurring) {
+      // 走周期模板 API
+      const rule: Record<string, any> = { interval: 1 }
+      if (newTask.value.recurrence === 'weekly') {
+        rule.days_of_week = [weeklyDay.value]
+      } else if (newTask.value.recurrence === 'monthly') {
+        rule.day_of_month = monthlyDay.value
+      }
+      await taskAPI.createTemplate({
+        title: newTask.value.title,
+        description: newTask.value.description,
+        recurrence_type: newTask.value.recurrence as 'daily' | 'weekly' | 'monthly',
+        priority: newTask.value.priority,
+        assignee_id: newTask.value.assignee_id,
+        due_time: newTask.value.due_time || undefined,
+        recurrence_rule: rule,
+        require_photo: newTask.value.require_photo,
+        require_note: newTask.value.require_note,
+        requirements: newTask.value.requirements || undefined,
+      })
+      ElMessage.success('周期任务创建成功，将按设定频率自动生成')
+    } else {
+      // 走单次任务 API
+      const data: any = {
+        title: newTask.value.title,
+        description: newTask.value.description,
+        task_type: newTask.value.task_type,
+        priority: newTask.value.priority,
+        require_photo: newTask.value.require_photo,
+        require_note: newTask.value.require_note,
+        requirements: newTask.value.requirements || undefined,
+      }
+      if (newTask.value.task_type === 'direct' && newTask.value.assignee_id) {
+        data.assignee_id = newTask.value.assignee_id
+      }
+      if (newTask.value.due_date) {
+        data.due_date = newTask.value.due_date
+      }
+      await taskAPI.create(data)
+      ElMessage.success('任务创建成功')
     }
-    if (newTask.value.task_type === 'direct' && newTask.value.assignee_id) {
-      data.assignee_id = newTask.value.assignee_id
-    }
-    if (newTask.value.due_date) {
-      data.due_date = newTask.value.due_date
-    }
-    await taskAPI.create(data)
-    ElMessage.success('任务创建成功')
     showCreate.value = false
-    newTask.value = { title: '', description: '', task_type: 'direct', priority: 'medium', assignee_id: '', due_date: '', require_photo: false, require_note: false, requirements: '' }
+    resetForm()
     loadTasks()
   } catch {}
+}
+
+function resetForm() {
+  newTask.value = {
+    title: '', description: '', task_type: 'direct', priority: 'medium',
+    assignee_id: '', due_date: '', due_time: '', recurrence: 'none',
+    require_photo: false, require_note: false, requirements: '',
+  }
+  weeklyDay.value = 1
+  monthlyDay.value = 1
 }
 
 async function openDetail(task: TaskItem) {
   try {
     const res = await taskAPI.get(task.id)
     detailTask.value = res.data.data
+    noteDraft.value = res.data.data.completion_note || ''
+    noteStatus.value = 'idle'
   } catch {}
+}
+
+// 失焦自动保存执行反馈
+async function saveNote() {
+  if (!detailTask.value || !canEditNote.value) return
+  const taskId = detailTask.value.id
+  const newText = noteDraft.value.trim()
+  const oldText = (detailTask.value.completion_note || '').trim()
+  if (newText === oldText) return
+  noteStatus.value = 'saving'
+  try {
+    const res = await taskAPI.saveNote(taskId, newText)
+    detailTask.value = res.data.data
+    noteStatus.value = 'saved'
+    setTimeout(() => { if (noteStatus.value === 'saved') noteStatus.value = 'idle' }, 2000)
+  } catch {
+    noteStatus.value = 'idle'
+  }
 }
 
 async function handleClaim() {
@@ -499,33 +481,34 @@ async function handleClaim() {
 async function handleStatusUpdate(status: string) {
   if (!detailTask.value) return
   const labels: Record<string, string> = { in_progress: '开始处理', completed: '标记完成', cancelled: '取消' }
+  const task = detailTask.value
 
-  // 完成校验
-  let completionNote: string | undefined
   if (status === 'completed') {
-    const task = detailTask.value
-    // 校验：require_photo=true 必须先上传照片
+    // 完成校验：require_photo=true 必须先上传照片
     if (task.require_photo && !task.attachments?.length) {
       ElMessage.warning('此任务要求完成时上传照片，请先上传至少一张照片')
       return
     }
-    // 校验：require_note=true 必须填完成说明
+    // 完成校验：require_note=true 必须有反馈（草稿优先）
     if (task.require_note) {
-      try {
-        const { value } = await ElMessageBox.prompt('请填写完成说明', '完成说明', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          inputType: 'textarea',
-          inputPlaceholder: '请填写本次任务的完成说明',
-          inputValidator: (val) => (val && val.trim().length > 0) || '完成说明不能为空',
-        })
-        completionNote = value.trim()
-      } catch { return }
-    } else {
-      try {
-        await ElMessageBox.confirm(`确定要${labels[status] || status}吗？`, '确认操作')
-      } catch { return }
+      const draft = noteDraft.value.trim()
+      const stored = (task.completion_note || '').trim()
+      if (!draft && !stored) {
+        ElMessage.warning('请先填写「执行反馈」再完成任务')
+        return
+      }
+      if (draft && draft !== stored) {
+        try {
+          await taskAPI.saveNote(task.id, draft)
+        } catch {
+          ElMessage.error('保存反馈失败，请重试')
+          return
+        }
+      }
     }
+    try {
+      await ElMessageBox.confirm(`确定要${labels[status] || status}吗？`, '确认操作')
+    } catch { return }
   } else {
     try {
       await ElMessageBox.confirm(`确定要${labels[status] || status}吗？`, '确认操作')
@@ -533,7 +516,7 @@ async function handleStatusUpdate(status: string) {
   }
 
   try {
-    await taskAPI.updateStatus(detailTask.value.id, status, completionNote)
+    await taskAPI.updateStatus(task.id, status)
     ElMessage.success('操作成功')
     detailTask.value = null
     loadTasks()
@@ -561,57 +544,6 @@ async function handleUploadPhoto(e: Event) {
   } catch {}
   ;(e.target as HTMLInputElement).value = ''
 }
-
-async function handleToggleTemplate(tpl: TemplateItem) {
-  try {
-    await taskAPI.toggleTemplate(tpl.id)
-    ElMessage.success(tpl.enabled ? '已停用' : '已启用')
-    loadTemplates()
-  } catch {}
-}
-
-async function handleDeleteTemplate(tpl: TemplateItem) {
-  try {
-    await ElMessageBox.confirm(`确定删除模板「${tpl.title}」吗？`, '确认删除')
-  } catch { return }
-  try {
-    await taskAPI.deleteTemplate(tpl.id)
-    ElMessage.success('已删除')
-    loadTemplates()
-  } catch {}
-}
-
-async function handleCreateTemplate() {
-  if (!newTpl.value.title || !newTpl.value.assignee_id) return
-  const rule: Record<string, any> = {}
-  if (newTpl.value.recurrence_type === 'weekly') {
-    rule.days_of_week = [weeklyDay.value]
-    rule.interval = 1
-  } else if (newTpl.value.recurrence_type === 'monthly') {
-    rule.day_of_month = monthlyDay.value
-    rule.interval = 1
-  } else {
-    rule.interval = 1
-  }
-  try {
-    await taskAPI.createTemplate({
-      title: newTpl.value.title,
-      description: newTpl.value.description,
-      recurrence_type: newTpl.value.recurrence_type,
-      priority: newTpl.value.priority,
-      assignee_id: newTpl.value.assignee_id,
-      due_time: newTpl.value.due_time || undefined,
-      recurrence_rule: rule,
-      require_photo: newTpl.value.require_photo,
-      require_note: newTpl.value.require_note,
-      requirements: newTpl.value.requirements || undefined,
-    })
-    ElMessage.success('模板创建成功')
-    showCreateTemplate.value = false
-    newTpl.value = { title: '', description: '', recurrence_type: 'weekly', priority: 'medium', assignee_id: '', due_time: '', require_photo: false, require_note: false, requirements: '' }
-    loadTemplates()
-  } catch {}
-}
 </script>
 
 <style scoped lang="scss">
@@ -635,46 +567,32 @@ async function handleCreateTemplate() {
   color: #666;
 }
 
-/* Tabs */
-.tabs {
+/* Filter chips */
+.filter-chips {
   display: flex;
-  gap: 4px;
-  background: #141414;
-  border-radius: 12px;
-  padding: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 16px;
-  border: 1px solid rgba(255,255,255,0.06);
 }
-.tab-btn {
-  flex: 1;
-  padding: 8px 0;
+.filter-chip {
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 500;
   color: #888;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s;
-  position: relative;
 }
-.tab-btn.active {
-  color: #fff;
-  background: rgba(251, 0, 121, 0.15);
+.filter-chip:hover {
+  color: #ccc;
+  background: rgba(255,255,255,0.08);
 }
-.tab-badge {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 9px;
-  min-width: 14px;
-  height: 14px;
-  line-height: 14px;
-  text-align: center;
-  background: #FB0079;
+.filter-chip.active {
   color: #fff;
-  border-radius: 7px;
-  padding: 0 3px;
+  background: rgba(251, 0, 121, 0.18);
+  border-color: rgba(251, 0, 121, 0.45);
 }
 
 /* Create */
@@ -811,6 +729,43 @@ async function handleCreateTemplate() {
   line-height: 1.5;
   white-space: pre-wrap;
 }
+
+/* 执行反馈 textarea */
+.note-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.note-textarea::placeholder {
+  color: #555;
+}
+.note-textarea:focus {
+  border-color: #FB0079;
+  background: rgba(255, 255, 255, 0.06);
+}
+.note-status {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.note-status.saving {
+  color: #FFB02E;
+}
+.note-status.saved {
+  color: #4ADE80;
+}
+
 .form-actions {
   display: flex;
   gap: 8px;
@@ -919,65 +874,6 @@ async function handleCreateTemplate() {
   color: #FB0079;
 }
 
-/* Template Cards */
-.tpl-card {
-  background: #141414;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 8px;
-}
-.tpl-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.tpl-recurrence {
-  font-size: 10px;
-  color: #FB0079;
-  background: rgba(251,0,121,0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.tpl-status {
-  font-size: 10px;
-  color: #888;
-}
-.tpl-status.enabled {
-  color: #34c759;
-}
-.tpl-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  margin-bottom: 4px;
-}
-.tpl-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: #666;
-  margin-bottom: 8px;
-}
-.tpl-actions {
-  display: flex;
-  gap: 8px;
-}
-.tpl-actions button {
-  padding: 4px 10px;
-  font-size: 11px;
-  color: #888;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.tpl-actions button.danger {
-  color: #ff3b30;
-  border-color: rgba(255,59,48,0.2);
-}
-
 /* Empty & Loading */
 .empty-state {
   display: flex;
@@ -987,10 +883,6 @@ async function handleCreateTemplate() {
   padding: 40px 0;
   color: #555;
   font-size: 13px;
-}
-.empty-hint {
-  font-size: 11px;
-  color: #444;
 }
 .loading-state {
   text-align: center;
@@ -1152,9 +1044,30 @@ async function handleCreateTemplate() {
   background: #ff3b30;
 }
 .btn-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
   color: #888;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1) !important;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-upload:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.btn-upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Photo Preview */

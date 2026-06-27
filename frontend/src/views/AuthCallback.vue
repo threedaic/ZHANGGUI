@@ -12,6 +12,7 @@ onMounted(async () => {
   const accessToken = route.query.access_token as string | undefined
   const refreshToken = route.query.refresh_token as string | undefined
   const role = route.query.role as string | undefined
+  const employeeName = route.query.employee_name as string | undefined
   const error = route.query.error as string | undefined
 
   // OAuth 失败回调
@@ -41,6 +42,7 @@ onMounted(async () => {
     store_id: null,
     role: (role as 'boss' | 'store_manager' | 'staff') || 'staff',
     username: '',
+    employee_name: employeeName || '',
   })
 
   try {

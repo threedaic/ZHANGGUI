@@ -10,6 +10,7 @@ export interface UserInfo {
   store_id: string | null
   role: UserRole
   username?: string
+  employee_name?: string
 }
 
 const STORAGE_KEY = 'crush_auth'
@@ -58,6 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
       store_id: data.store_id,
       role: (data.role as UserRole) || 'staff',
       username: data.username,
+      employee_name: data.employee_name,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(info.value))
   }

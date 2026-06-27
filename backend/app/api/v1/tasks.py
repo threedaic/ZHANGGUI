@@ -543,17 +543,66 @@ async def update_status(
             att_count = await repo.count_attachments(task_id)
             if att_count == 0:
                 raise ValidationError("此任务要求完成时上传照片，请先上传至少一张照片")
-        # 完成校验：require_note=true 必须填完成说明
+        # 完成校验：require_note=true 必须有完成说明（已暂存 note 优先，否则用 body 传的）
         if getattr(task, "require_note", False):
-            note = (body.get("completion_note") or "").strip()
+            existing_note = (getattr(task, "completion_note", "") or "").strip()
+            new_note = (body.get("completion_note") or "").strip()
+            note = new_note or existing_note
             if not note:
                 raise ValidationError("此任务要求填写完成说明，请补充完成说明后再标记完成")
             updates["completion_note"] = note
+        elif "completion_note" in body:
+            # 即使不强制 require_note，也允许完成时附带 note
+            note = (body.get("completion_note") or "").strip()
+            if note:
+                updates["completion_note"] = note
 
     await repo.update_task(task_id, updates)
     await db.commit()
     task = await repo.get_task(task_id)
     return make_response(message="状态已更新", data=_task_to_dict(task))
+
+
+@router.patch("/{task_id}/note")
+async def update_note(
+    task_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """执行人暂存执行反馈文字（completion_note），不限任务状态。
+
+    - 权限：执行人本人 / 创建人 / admin 角色
+    - 任务已完成/已取消时拒绝修改
+    - 完成任务时如果 require_note=true，已暂存的 note 直接生效，不再要求重填
+    """
+    store_id = get_store_id(request)
+    user_id = get_user_id(request)
+    role = getattr(request.state, "role", "staff")
+    employee_id = getattr(request.state, "employee_id", None)
+
+    repo = TaskRepository(db, store_id)
+    task = await repo.get_task(task_id)
+    if not task:
+        raise NotFoundError("任务不存在")
+
+    if task.status in ("completed", "cancelled"):
+        raise ConflictError("任务已结束，无法修改反馈")
+
+    is_assignee = task.assignee_id and str(task.assignee_id) == employee_id
+    is_creator = str(task.created_by) == user_id
+    is_admin = role in ("boss", "store_manager", "system_admin", "admin")
+    if not (is_assignee or is_creator or is_admin):
+        raise ForbiddenError("仅执行人/创建人/管理员可编辑反馈")
+
+    body = await request.json()
+    note = (body.get("completion_note") or "").strip()
+    if len(note) > 2000:
+        raise ValidationError("反馈内容不能超过 2000 字")
+
+    await repo.update_task(task_id, {"completion_note": note})
+    await db.commit()
+    task = await repo.get_task(task_id)
+    return make_response(message="已保存", data=_task_to_dict(task))
 
 
 @router.post("/{task_id}/claim")

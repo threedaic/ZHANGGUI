@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 员工个人中心首页
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { storeAPI } from '@/api/store'
@@ -9,6 +9,21 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const storeName = ref('')
+
+// 角色标签：system_admin显示"系统管理员"，admin隐藏显示"店长"
+const roleLabel = computed(() => {
+  const role = auth.info.role
+  if (role === 'system_admin') return '系统管理员'
+  if (role === 'boss') return '老板'
+  if (role === 'admin') return '店长'
+  if (role === 'store_manager') return '店长'
+  if (role === 'accountant') return '会计'
+  if (role === 'bar_manager') return '吧台主管'
+  if (role === 'service_manager') return '服务主管'
+  if (role === 'kitchen_manager') return '厨房主管'
+  return '员工'
+})
+const isSystemAdmin = computed(() => auth.info.role === 'system_admin')
 
 onMounted(async () => {
   try {
@@ -34,10 +49,13 @@ function handleLogout() {
 <template>
   <div class="profile-home">
     <div class="user-card">
-      <div class="avatar">{{ (auth.info.username || '?').charAt(0).toUpperCase() }}</div>
+      <div class="avatar">{{ (auth.info.employee_name || auth.info.username || '?').charAt(0).toUpperCase() }}</div>
       <div class="info">
-        <div class="name">{{ auth.info.username || '员工' }}</div>
-        <div class="role">{{ auth.isBoss ? '老板' : auth.isManager ? '店长' : '员工' }}<span v-if="storeName" class="store-badge">{{ storeName }}</span></div>
+        <div class="name">{{ auth.info.employee_name || auth.info.username || '员工' }}</div>
+        <div class="role">
+          <span :class="{ 'role-sysadmin': isSystemAdmin }">{{ roleLabel }}</span>
+          <span v-if="storeName" class="store-badge">{{ storeName }}</span>
+        </div>
       </div>
     </div>
 
@@ -110,6 +128,14 @@ function handleLogout() {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+  .role-sysadmin {
+    color: $brand-white;
+    font-weight: 600;
+    background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
+    padding: 2px 10px;
+    border-radius: 10px;
+    box-shadow: 0 0 8px rgba(251, 0, 121, 0.5);
   }
   .store-badge {
     display: inline-block;

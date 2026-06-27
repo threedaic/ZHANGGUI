@@ -372,7 +372,7 @@ const accountantAccess = ref<'none' | 'readonly' | 'editable'>('none')
 const extraConfigCache = ref<Record<string, any>>({})
 
 const canEdit = computed(() => {
-  if (auth.role === 'boss' || auth.role === 'admin') return true
+  if (auth.role === 'system_admin' || auth.role === 'boss' || auth.role === 'admin') return true
   if (auth.role === 'accountant') return accountantAccess.value === 'editable'
   return false
 })
