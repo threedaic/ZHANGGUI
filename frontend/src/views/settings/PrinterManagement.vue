@@ -420,10 +420,20 @@
         <div class="form-group">
           <label class="form-label">纸宽 (mm)</label>
           <select v-model.number="printerForm.paper_width" class="form-input">
-            <option :value="58">58mm（窄纸/标签机）</option>
+            <option :value="40">40mm（标签机）</option>
+            <option :value="58">58mm（窄纸/小票机）</option>
             <option :value="76">76mm</option>
             <option :value="80">80mm（标准/出单机）</option>
             <option :value="110">110mm（宽纸）</option>
+          </select>
+        </div>
+        <div class="form-group" v-if="printerForm.printer_type === 'label'">
+          <label class="form-label">标签高度 (mm)</label>
+          <select v-model.number="labelHeight" class="form-input">
+            <option :value="20">20mm</option>
+            <option :value="30">30mm</option>
+            <option :value="40">40mm</option>
+            <option :value="50">50mm</option>
           </select>
         </div>
         <div class="modal-actions">
@@ -556,6 +566,7 @@ const printerForm = reactive<PrinterForm>({
   api_secret: '',
   paper_width: 80,
 })
+const labelHeight = ref(30)  // 标签高度（仅标签机显示）
 
 // 路由规则相关
 const routes = ref<PrintRoute[]>([])
@@ -631,6 +642,12 @@ function editPrinter(printer: PrinterInfo) {
   printerForm.device_sn = printer.device_sn || ''
   printerForm.api_user = printer.api_user || ''
   printerForm.paper_width = printer.paper_width || 80
+  // 读取已有的标签尺寸配置
+  const extra = (printer as any).extra_config || {}
+  labelHeight.value = extra.label_height || 30
+  if (extra.label_width) {
+    printerForm.paper_width = extra.label_width  // 标签宽度覆盖纸宽
+  }
 }
 
 function closePrinterModal() {
@@ -643,6 +660,7 @@ function closePrinterModal() {
   printerForm.api_user = ''
   printerForm.api_secret = ''
   printerForm.paper_width = 80
+  labelHeight.value = 30
 }
 
 async function savePrinter() {
@@ -660,11 +678,21 @@ async function savePrinter() {
 
   saving.value = true
   try {
+    // 标签机：把标签尺寸写入 extra_config
+    const extraConfig: Record<string, any> = {}
+    if (printerForm.printer_type === 'label') {
+      extraConfig.label_width = printerForm.paper_width
+      extraConfig.label_height = labelHeight.value
+    }
+
     if (editingPrinter.value) {
       // 编辑模式：空密码不发送，避免覆盖原值
       const updateData: Record<string, any> = { ...printerForm }
       if (!updateData.api_secret) {
         delete updateData.api_secret
+      }
+      if (Object.keys(extraConfig).length > 0) {
+        updateData.extra_config = extraConfig
       }
       const { data: res } = await printersAPI.update(editingPrinter.value.printer_id, updateData as any)
       if (res.code === 0) {
@@ -675,7 +703,11 @@ async function savePrinter() {
         ElMessage.error(res.message || '更新失败')
       }
     } else {
-      const { data: res } = await printersAPI.create(printerForm)
+      const createData: Record<string, any> = { ...printerForm }
+      if (Object.keys(extraConfig).length > 0) {
+        createData.extra_config = extraConfig
+      }
+      const { data: res } = await printersAPI.create(createData as any)
       if (res.code === 0) {
         ElMessage.success('打印机添加成功')
         closePrinterModal()

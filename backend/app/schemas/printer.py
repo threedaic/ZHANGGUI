@@ -23,8 +23,8 @@ class PrinterCreate(BaseModel):
     api_key: Optional[str] = Field(None, description="API密钥")
     api_user: Optional[str] = Field(None, max_length=100, description="API账号")
     api_secret: Optional[str] = Field(None, description="API密钥")
-    paper_width: int = Field(default=80, ge=58, le=110, description="纸宽mm")
-    extra_config: Optional[Dict[str, Any]] = Field(default_factory=dict, description="扩展配置")
+    paper_width: int = Field(default=80, ge=30, le=110, description="纸宽mm")
+    extra_config: Optional[Dict[str, Any]] = Field(default_factory=dict, description="扩展配置(标签机可设label_width/label_height)")
 
 
 class PrinterUpdate(BaseModel):
@@ -37,7 +37,7 @@ class PrinterUpdate(BaseModel):
     api_key: Optional[str] = Field(None, description="API密钥")
     api_user: Optional[str] = Field(None, max_length=100, description="API账号")
     api_secret: Optional[str] = Field(None, description="API密钥")
-    paper_width: Optional[int] = Field(None, ge=58, le=110, description="纸宽mm")
+    paper_width: Optional[int] = Field(None, ge=30, le=110, description="纸宽mm")
     extra_config: Optional[Dict[str, Any]] = Field(None, description="扩展配置")
     is_active: Optional[bool] = Field(None, description="是否启用")
 
@@ -49,9 +49,12 @@ class PrinterResponse(BaseModel):
     printer_type: str
     brand: Optional[str]
     device_sn: Optional[str]
+    api_user: Optional[str]
+    paper_width: int
     online_status: bool
     last_heartbeat: Optional[str]
     is_active: bool
+    extra_config: Optional[Dict[str, Any]] = None
     created_at: Optional[str]
 
 

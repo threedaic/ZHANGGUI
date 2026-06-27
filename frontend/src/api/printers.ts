@@ -14,6 +14,7 @@ export interface PrinterInfo {
   online_status: boolean
   last_heartbeat?: string
   is_active: boolean
+  extra_config?: Record<string, any>
 }
 
 /** 打印机表单 */
