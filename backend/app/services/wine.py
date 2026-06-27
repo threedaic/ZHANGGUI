@@ -208,8 +208,16 @@ def _build_label_content(printer, customer_name: str, phone: str, wine_name: str
     is_label = printer_type in ("label", "标签", "标签机")
 
     if not is_label or brand not in ("feie", "xpyun"):
-        # 小票机格式（纯文本）
-        return f"{customer_name}\n{phone}\n{wine_name} {capacity}\n{cabinet_no}柜\n{bottle_label}\n{date_stored}"
+        # 不支持TSPL坐标的标签机/小票机：用排版标签格式（居中+放大姓名）
+        return (
+            f"<C><B>{customer_name}</B></C>\n"
+            f"<C>{phone}</C>\n"
+            f"----------------------------\n"
+            f"{wine_name} {capacity}\n"
+            f"{cabinet_no}柜\n"
+            f"瓶码:{bottle_label}\n"
+            f"{date_stored}\n\n\n"
+        )
 
     # ---- 1. 检测标签尺寸 ----
     label_w_mm, label_h_mm = _detect_label_size(printer)
