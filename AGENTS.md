@@ -23,11 +23,13 @@
 
 > **原则**：每个端在对应阶段开始时才创建目录，届时已有统一 UI 设计规范。当前阶段只完善员工端（游戏模块、商品管理）。
 
-### 8角色体系（SPEC §5.1）
+### 8角色体系（SPEC §0.1 / §5.1）
+
+> 角色代码统一为 `system_admin`（兼容旧值 `admin`）。详见 SPEC §0.1。
 
 | 角色 | 代码 | 权限范围 |
 |------|------|----------|
-| 管理员 | admin | 全国所有门店 |
+| 管理员 | system_admin | 全国所有门店 |
 | 老板 | boss | 本店全部数据 |
 | 店长 | store_manager | 本店运营数据（不含工资明细） |
 | 会计 | accountant | 本店财务/工资 |
@@ -53,13 +55,13 @@
 -- 门店隔离
 CREATE POLICY store_isolation ON {表名}
     USING (store_id = current_setting('app.current_store_id', true)::uuid);
--- admin 豁免
+-- system_admin 豁免（兼容旧值 admin）
 CREATE POLICY admin_all_access ON {表名}
     FOR ALL
-    USING (current_setting('app.current_role', true) = 'admin');
+    USING (current_setting('app.current_user_role', true) = ANY (ARRAY['system_admin', 'admin']));
 ```
 
-后端 `database.py` 使用 `SET LOCAL app.current_store_id / app.current_role` 设置 session 变量。
+后端 `database.py` 使用 `SET LOCAL app.current_store_id / app.current_user_role` 设置 session 变量。
 
 ### API 版本（SPEC §4.1）
 

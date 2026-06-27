@@ -24,7 +24,7 @@
 | 容器 | 端口 | 用途 |
 |------|------|------|
 | crush-zhanggui-api | 8001 | 后端 FastAPI |
-| crush-zhanggui-db | 5432 | PostgreSQL 16（容器内5432，宿主机映射5433） |
+| crush-zhanggui-db | 5432→5433 | PostgreSQL 16（容器内5432，宿主机映射5433） |
 | crush-redis | 6379 | Redis 7 |
 
 **数据库连接（线上）：** `crush_app / UXIe8QzwOLNjE3SWSImGhXbv6z_aCZhu / crush_zhanggui`

@@ -5,20 +5,27 @@
 > 修正说明：基于完整阅读全部12份项目文档后，对比v1.0发现30个矛盾点和13项遗漏，经逐条确认后修正。
 > v2.1 补充：新增att_*/wage_*/hr_*完整表结构（24张表）、工资公式引擎、薪资规则时间线、工资异常处理流程。
 > v2.2 补充：新增收件箱消息系统统一规范、统一模块自查清单（5项待统一）。
-> v2.3 补充：明确连锁品牌四级权限体系（system_admin/boss/store_manager/staff），新增"总店网页"全局管理规范。
+> v2.3 补充：明确连锁品牌权限体系，新增"总店网页"全局管理规范。
+> v2.4 修正：统一角色体系为8角色（§0与§5.1对齐），角色代码统一为 system_admin（兼容 admin）。
 
 ---
 
 ## 〇、角色与权限体系（连锁品牌核心规范）
 
-### 0.1 四级角色定义
+### 0.1 角色定义（8角色，详见 §5.1）
+
+系统采用8角色体系，按管理层级划分。最高角色为 `system_admin`（兼容旧值 `admin`）。
 
 | 角色 | 中文 | 管辖范围 | 典型用户 | 是否绑定门店 |
 |------|------|----------|----------|--------------|
 | `system_admin` | 系统管理员 | 全品牌全部门店 | Crush管理群成员（周鹏飞/卡西/王柏霄等） | ❌ 不绑定 |
 | `boss` | 单店老板 | 一家门店 | 各店投资人/老板 | ✅ 绑定一家 |
 | `store_manager` | 店长 | 一家门店的日常运营 | 各店店长 | ✅ 绑定一家 |
-| `staff` | 员工 | 自己的数据 | 各店员工 | ✅ 绑定一家 |
+| `accountant` | 会计 | 一家门店的财务/工资 | 各店会计 | ✅ 绑定一家 |
+| `bar_manager` | 吧台负责人 | 出酒状态+退单复核 | 吧台主管 | ✅ 绑定一家 |
+| `service_manager` | 服务负责人 | 服务相关 | 服务主管 | ✅ 绑定一家 |
+| `kitchen_manager` | 厨房负责人 | 厨房订单管理 | 厨房主管 | ✅ 绑定一家 |
+| `staff` | 店员 | 自己的数据 | 各店员工 | ✅ 绑定一家 |
 
 ### 0.2 系统管理员识别规则（重要！不可遗忘）
 
@@ -1987,11 +1994,11 @@ disputed（有申诉）→ 老板核实 → adjusted（已调整）→ 差额并
 
 ### 5.1 角色体系（8个角色）
 
-> **修正点**：从7角色(cashier/bartender等岗位名称)改为8角色(管理层级名称)，去掉brand_admin，新增admin。
+> 详见 §0.1。角色代码统一为 `system_admin`（兼容旧值 `admin`）。RLS 策略同时放行 `admin` 和 `system_admin`。
 
 | 角色 | 代码 | 权限范围 |
 |------|------|----------|
-| 管理员 | admin | 全国所有门店 |
+| 管理员 | system_admin | 全国所有门店 |
 | 老板 | boss | 本店全部数据 |
 | 店长 | store_manager | 本店运营数据（不含工资明细） |
 | 会计 | accountant | 本店财务/工资 |
@@ -2011,7 +2018,7 @@ disputed（有申诉）→ 老板核实 → adjusted（已调整）→ 差额并
 
 ### 5.3 权限矩阵
 
-| 操作 | admin | boss | store_manager | accountant | bar_manager | service_manager | kitchen_manager | staff |
+| 操作 | system_admin | boss | store_manager | accountant | bar_manager | service_manager | kitchen_manager | staff |
 |------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 开台/点单/加单/结账 | ✓ | ✓ | ✓ | -- | -- | -- | -- | ✓ |
 | 出酒状态切换 | ✓ | ✓ | -- | -- | ✓ | -- | -- | ✓ |
@@ -2049,7 +2056,7 @@ disputed（有申诉）→ 老板核实 → adjusted（已调整）→ 差额并
 
 | 角色 | 可看内容 |
 |------|----------|
-| admin | 全国工资汇总 |
+| system_admin | 全国工资汇总 |
 | boss | 本店工资明细 |
 | store_manager | 本店工资汇总（不含明细） |
 | 员工 | 只看自己的工资 |
@@ -2158,8 +2165,8 @@ feat/xxx (功能分支)
 | API版本 | **统一/api/v1/** |
 | ORM | **SQLAlchemy async** |
 | 表前缀 | shared_/pos_/wage_/att_/sig_/game_/sys_ |
-| 角色体系 | **8角色：admin/boss/store_manager/accountant/bar_manager/service_manager/kitchen_manager/staff** |
-| 品牌管理员 | **admin角色看全国，不需要单独brand_admin** |
+| 角色体系 | **8角色：system_admin/boss/store_manager/accountant/bar_manager/service_manager/kitchen_manager/staff** |
+| 品牌管理员 | **system_admin 角色看全国（兼容旧值 admin），不需要单独 brand_admin** |
 | 加盟商 | **不需要franchisee，企微部门多归属解决** |
 
 ---
