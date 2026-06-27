@@ -175,9 +175,44 @@ export interface ButlerTodayStatus {
     session_id: string | null
     completed: number
     total: number
+    assignee_name: string | null
+    assignee_id: string | null
+    fallback_used: boolean
+    fallback_reason: string | null
   }[]
 }
 
 export function getTodayStatus() {
   return apiClient.get<ApiResponse<ButlerTodayStatus>>('/butler/today-status')
+}
+
+// ==================== 执行人顺位配置 ====================
+
+export interface AssigneeRule {
+  rule_id: string
+  session_type: 'opening' | 'closing'
+  employee_id: string
+  employee_name: string
+  employee_role: string
+  priority: number
+  is_active: boolean
+}
+
+export interface AssignableEmployee {
+  employee_id: string
+  name: string
+  role: string
+}
+
+export function listAssigneeRules(sessionType?: 'opening' | 'closing') {
+  const params = sessionType ? { session_type: sessionType } : {}
+  return apiClient.get<ApiResponse<AssigneeRule[]>>('/butler/assignee-rules', { params })
+}
+
+export function saveAssigneeRules(sessionType: 'opening' | 'closing', items: { employee_id: string; priority: number }[]) {
+  return apiClient.post<ApiResponse<AssigneeRule[]>>('/butler/assignee-rules', { session_type: sessionType, items })
+}
+
+export function listAssignableEmployees() {
+  return apiClient.get<ApiResponse<AssignableEmployee[]>>('/butler/assignee-employees')
 }

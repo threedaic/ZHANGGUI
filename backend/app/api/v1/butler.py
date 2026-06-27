@@ -325,6 +325,8 @@ async def get_today_status(
     """
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
+    from app.repositories.butler_assignee import ButlerAssigneeRepository
+    assignee_repo = ButlerAssigneeRepository(db, store_id)
 
     from datetime import date
     today = date.today()
@@ -364,21 +366,31 @@ async def get_today_status(
     pending = []
     # 开店检查：只在上午显示（6:00-14:00）
     if has_opening and not opening_done and 6 <= current_hour <= 14:
+        assignee = await assignee_repo.get_today_assignment("opening")
         pending.append({
             "type": "opening",
             "label": "开店检查",
             "session_id": today_opening["id"] if today_opening else None,
             "completed": today_opening["completed_items"] if today_opening else 0,
             "total": today_opening["total_items"] if today_opening else 0,
+            "assignee_name": assignee["employee_name"] if assignee else None,
+            "assignee_id": assignee["employee_id"] if assignee else None,
+            "fallback_used": assignee["fallback_used"] if assignee else False,
+            "fallback_reason": assignee["fallback_reason"] if assignee else None,
         })
     # 闭店检查：只在晚上显示（20:00-次日4:00）
     if has_closing and not closing_done and (current_hour >= 20 or current_hour <= 4):
+        assignee = await assignee_repo.get_today_assignment("closing")
         pending.append({
             "type": "closing",
             "label": "闭店检查",
             "session_id": today_closing["id"] if today_closing else None,
             "completed": today_closing["completed_items"] if today_closing else 0,
             "total": today_closing["total_items"] if today_closing else 0,
+            "assignee_name": assignee["employee_name"] if assignee else None,
+            "assignee_id": assignee["employee_id"] if assignee else None,
+            "fallback_used": assignee["fallback_used"] if assignee else False,
+            "fallback_reason": assignee["fallback_reason"] if assignee else None,
         })
 
     return make_response(request=request, data={
@@ -402,4 +414,66 @@ async def get_dashboard(
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     data = await repo.get_all_stores_status()
+    return make_response(request=request, data=data)
+
+
+# ==================== 执行人顺位配置 ====================
+
+from pydantic import BaseModel
+from typing import List, Optional
+
+
+class AssigneeItem(BaseModel):
+    employee_id: str
+    priority: int
+
+
+class AssigneeRuleSave(BaseModel):
+    session_type: str            # opening / closing
+    items: List[AssigneeItem]
+
+
+@router.get("/assignee-rules")
+async def list_assignee_rules(
+    request: Request,
+    session_type: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """查询本店执行人顺位配置（含员工姓名）"""
+    store_id = get_store_id(request)
+    repo = ButlerAssigneeRepository(db, store_id)
+    data = await repo.list_rules(session_type=session_type)
+    return make_response(request=request, data=data)
+
+
+@router.post("/assignee-rules")
+async def save_assignee_rules(
+    request: Request,
+    body: AssigneeRuleSave,
+    db: AsyncSession = Depends(get_db),
+):
+    """整体替换某会话类型的顺位（管理端拖动保存）"""
+    require_role(request, ["boss", "system_admin", "store_manager"])
+    if body.session_type not in ("opening", "closing"):
+        raise ValidationError("session_type 只能是 opening 或 closing")
+    store_id = get_store_id(request)
+    repo = ButlerAssigneeRepository(db, store_id)
+    await repo.replace_rules(
+        session_type=body.session_type,
+        items=[it.model_dump() for it in body.items],
+    )
+    data = await repo.list_rules(session_type=body.session_type)
+    return make_response(request=request, data=data, message="顺位保存成功")
+
+
+@router.get("/assignee-employees")
+async def list_assignable_employees(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """列出本店可指派的员工（管理端配置顺位时下拉用）"""
+    require_role(request, ["boss", "system_admin", "store_manager"])
+    store_id = get_store_id(request)
+    repo = ButlerAssigneeRepository(db, store_id)
+    data = await repo.list_active_employees()
     return make_response(request=request, data=data)

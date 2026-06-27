@@ -262,6 +262,13 @@ function taskToItem(t: TaskItem, kind: 'mine' | 'pool'): DisplayItem {
 function butlerToItem(p: ButlerTodayStatus['pending'][number]): DisplayItem {
   const total = p.total || 0
   const completed = p.completed || 0
+  // 显示指派人：第一顺位 → "张三"，触发兜底 → "李四（顶替）"
+  let assigneeText: string | undefined
+  if (p.assignee_name) {
+    assigneeText = p.fallback_used ? `${p.assignee_name}（顶替）` : `指派 ${p.assignee_name}`
+  } else {
+    assigneeText = '未指派'
+  }
   return {
     uid: `butler-${p.type}-${p.session_id || 'new'}`,
     kind: 'butler',
@@ -270,7 +277,7 @@ function butlerToItem(p: ButlerTodayStatus['pending'][number]): DisplayItem {
     priority: 'high',
     status_label: total === 0 ? '待开始' : (completed >= total ? '已完成' : '进行中'),
     progress_text: total > 0 ? `${completed}/${total}` : undefined,
-    due_text: p.type === 'opening' ? '今日 11:30 前' : '今日 23:30 前',
+    due_text: `${assigneeText} · ${p.type === 'opening' ? '11:30前' : '23:30前'}`,
     butler_session_id: p.session_id,
     butler_type: p.type,
   }

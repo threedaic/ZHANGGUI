@@ -138,10 +138,6 @@ const butlerPending = computed(() => {
   return { ...p, is_overdue }
 })
 
-function goButler() {
-  router.push('/daily/butler')
-}
-
 function goTaskList() {
   router.push('/daily/tasks')
 }
@@ -281,13 +277,6 @@ const cards = ref<FuncCard[]>([
       <path d="M5 4h13l5 5v15H5z"/><path d="M18 4v5h5"/><path d="M10 14h8"/><path d="M10 18h5"/>
     </svg>`,
     badge: 0,
-  },
-  {
-    label: '开闭店',
-    path: '/daily/butler',
-    icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
-      <rect x="4" y="3" width="18" height="22" rx="2"/><line x1="9" y1="8" x2="17" y2="8"/><line x1="9" y1="13" x2="17" y2="13"/><line x1="9" y1="18" x2="13" y2="18"/>
-    </svg>`,
   },
   {
     label: '收件箱',

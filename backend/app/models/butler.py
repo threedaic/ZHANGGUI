@@ -1,15 +1,17 @@
 """
 智能管家模块 — 开闭店检查数据模型
 
-四张表：
+六张表：
   butler_checklist_templates    — 清单模板（店长闭店检查单 / 吧台开店检查单 等）
   butler_checklist_items        — 模板明细项
   butler_sessions               — 开店/闭店会话
   butler_item_results           — 每项检查的执行结果
+  butler_assignee_rules         — 执行人顺位配置（每店×每类型一组顺位）
+  butler_daily_assignments      — 每日实际指派记录（含兜底原因）
 """
 import uuid
-from datetime import datetime
-from sqlalchemy import String, Integer, Text, Boolean, ForeignKey, DateTime
+from datetime import datetime, date
+from sqlalchemy import String, Integer, Text, Boolean, ForeignKey, DateTime, Date
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
@@ -88,3 +90,32 @@ class ClosingItemResult(TimestampMixin, Base):
     review_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sys_users.user_id"), nullable=True)
     review_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ButlerAssigneeRule(TimestampMixin, Base):
+    """开闭店检查单执行人顺位配置（每店×每类型一组顺位）"""
+
+    __tablename__ = "butler_assignee_rules"
+    __table_args__ = {'extend_existing': True}
+
+    id: Mapped[uuid.UUID] = mapped_column("rule_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_stores.store_id", ondelete="CASCADE"))
+    session_type: Mapped[str] = mapped_column(String(10))           # opening / closing
+    employee_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_employees.employee_id", ondelete="CASCADE"))
+    priority: Mapped[int] = mapped_column(Integer)                  # 1=第一顺位
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ButlerDailyAssignment(TimestampMixin, Base):
+    """每日实际指派记录（含兜底原因，方便审计）"""
+
+    __tablename__ = "butler_daily_assignments"
+    __table_args__ = {'extend_existing': True}
+
+    id: Mapped[uuid.UUID] = mapped_column("assignment_id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_stores.store_id", ondelete="CASCADE"))
+    session_type: Mapped[str] = mapped_column(String(10))           # opening / closing
+    assign_date: Mapped[date] = mapped_column(Date)
+    employee_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("shared_employees.employee_id", ondelete="CASCADE"))
+    fallback_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    fallback_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
