@@ -21,14 +21,19 @@ def _get_aes_key() -> bytes:
     """从配置读取 EncodingAESKey 并 base64 解码为 32 字节密钥。"""
     key = get_settings().WECOM_CALLBACK_AES_KEY
     if not key or len(key) != 43:
-        raise ValueError("WECOM_CALLBACK_AES_KEY 必须是 43 字符的 Base64 字符串")
+        raise ValueError(f"WECOM_CALLBACK_AES_KEY 必须是 43 字符的 Base64 字符串，当前: {len(key) if key else 0}")
+    # 企微规范: EncodingAESKey + "=" 再 base64 解码得到 32 字节 AES 密钥
     return base64.b64decode(key + "=")
 
 
 def _sha1_signature(token: str, timestamp: str, nonce: str, encrypt: str = "") -> str:
     """企微签名: sha1(sort([token, timestamp, nonce, encrypt]))."""
-    parts = sorted([token, timestamp, nonce, encrypt]) if encrypt else sorted([token, timestamp, nonce])
-    return hashlib.sha1("".join(parts).encode("utf-8")).hexdigest()
+    if encrypt:
+        parts = sorted([token, timestamp, nonce, encrypt])
+    else:
+        parts = sorted([token, timestamp, nonce])
+    raw = "".join(parts).encode("utf-8")
+    return hashlib.sha1(raw).hexdigest()
 
 
 def verify_signature(msg_signature: str, token: str, timestamp: str, nonce: str, encrypt: str = "") -> bool:
@@ -38,10 +43,10 @@ def verify_signature(msg_signature: str, token: str, timestamp: str, nonce: str,
 
 
 def _pkcs7_unpad(data: bytes) -> bytes:
-    """PKCS#7 去填充。"""
+    """PKCS#7 去填充。企微规范: 填充字节数 1-32。"""
     pad_len = data[-1]
     if pad_len < 1 or pad_len > 32:
-        raise ValueError("Invalid PKCS#7 padding")
+        raise ValueError(f"Invalid PKCS#7 padding: {pad_len}")
     return data[:-pad_len]
 
 
@@ -54,7 +59,8 @@ def decrypt(encrypt: str) -> tuple[str, str]:
     key = _get_aes_key()
     iv = key[:16]
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(base64.b64decode(encrypt))
+    encrypted = base64.b64decode(encrypt)
+    decrypted = cipher.decrypt(encrypted)
     decrypted = _pkcs7_unpad(decrypted)
 
     # 解密后内容: 16字节随机串 + 4字节msg_len(大端) + msg_content + corp_id
@@ -86,7 +92,21 @@ def verify_url(msg_signature: str, timestamp: str, nonce: str, echostr: str) -> 
         ValueError: 签名校验失败
     """
     token = get_settings().WECOM_CALLBACK_TOKEN
-    if not verify_signature(msg_signature, token, timestamp, nonce, echostr):
-        raise ValueError(f"签名校验失败: sig={msg_signature}")
+    # 注意: echostr 可能被 URL 编码（如 %2F, %3D），FastAPI 的 Query 会自动解码
+    # 但如果是从 raw query string 拿的，需要手动 urllib.parse.unquote
+    expected_sig = _sha1_signature(token, timestamp, nonce, echostr)
+    if expected_sig != msg_signature:
+        from loguru import logger
+        logger.error(
+            f"签名校验失败:\n"
+            f"  期望: {expected_sig}\n"
+            f"  实际: {msg_signature}\n"
+            f"  token: {token}\n"
+            f"  timestamp: {timestamp}\n"
+            f"  nonce: {nonce}\n"
+            f"  echostr: {echostr}"
+        )
+        raise ValueError(f"签名校验失败")
     plain, _ = decrypt(echostr)
     return plain
+

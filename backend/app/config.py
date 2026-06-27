@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8小时，覆盖整个班次
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # 数据加密密钥（用于加密存储 API Key 等敏感字段，与 JWT 密钥分离）
+    # 留空时回退到 JWT_SECRET 派生（向后兼容），生产环境强烈建议设置独立值。
+    # 生成方法: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPT_KEY: str = ""
+
     # Security (I-001)
     MAX_LOGIN_ATTEMPTS: int = 5  # Max failed attempts before account lockout
     LOGIN_LOCKOUT_MINUTES: int = 30  # Lockout duration after max attempts
@@ -68,7 +73,17 @@ class Settings(BaseSettings):
     SEED_BOSS_USERNAME: str = "admin"
     SEED_BOSS_PASSWORD: str = "admin123"
 
-    # WeCom boss userids (comma-separated, always granted boss role regardless of department)
+    # ============================================================
+    # 角色白名单配置 (连锁品牌四级权限体系, 参见 SPEC §0)
+    # ============================================================
+    # 系统管理员: 全品牌管理员, 不绑定门店, 能管全部门店
+    # 规则: 企微「Crush 管理」部门成员 = system_admin (不可遗忘!)
+    # 典型: 周鹏飞/卡西/王柏霄 (管理群成员)
+    # 能力: 进总店网页/建新门店/全局看板/切换任意门店
+    SYSTEM_ADMIN_USERIDS: str = ""
+
+    # 单店老板: 管一家店, 绑定到具体 store_id
+    # 通常由门店部门负责人自动识别, 或手动指定
     BOSS_WEWORK_USERIDS: str = ""
 
     # WeCom global config (all stores share the same corp account)

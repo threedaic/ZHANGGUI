@@ -30,21 +30,7 @@ class SysConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class AuditLog(Base):
-    """审计日志表（sys_audit_logs）"""
-    __tablename__ = "sys_audit_logs"
-    __table_args__ = {'extend_existing': True}
-
-    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    store_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    action: Mapped[str] = mapped_column(String(50), nullable=False)
-    resource_type: Mapped[Optional[str]] = mapped_column(String(50))
-    resource_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
-    details: Mapped[Optional[dict]] = mapped_column(JSONB)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(50))
-    user_agent: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+# 注意：AuditLog 统一在 app.models.audit 定义，避免同表双映射冲突
 
 
 class Printer(Base):

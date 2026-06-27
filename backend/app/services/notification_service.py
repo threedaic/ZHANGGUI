@@ -18,9 +18,30 @@ from app.models.employee import Employee
 from app.services.wework import get_access_token
 from app.utils.http_client import http_client
 from app.utils.redis_client import get_redis
+from app.config import get_settings
 
 
-WECOM_API = "https://qyapi.weixin.qq.com/cgi-bin"
+WECOM_API = get_settings().WECOM_API_BASE
+
+
+async def send_to_group(webhook_url: str, content: str) -> bool:
+    """发送 Markdown 消息到企微群机器人（从 wecom_notify 迁移合并）。"""
+    import json
+    try:
+        payload = json.dumps(
+            {"msgtype": "markdown", "markdown": {"content": content}},
+            ensure_ascii=False,
+        ).encode("utf-8")
+        await http_client.post(
+            webhook_url,
+            content=payload,
+            headers={"Content-Type": "application/json; charset=utf-8"},
+        )
+        return True
+    except Exception as e:
+        logger.error(f"企微群消息发送失败: {e}")
+        return False
+
 
 # 推送项默认配置（新门店数据库无记录时，前端也能看到全部推送项）
 # target_roles 决定默认推给谁；channel 固定 all（站内信+企微应用）；push_to_group 跟随群机器人总开关
@@ -197,7 +218,7 @@ class NotificationService:
                 "textcard": {
                     "title": title,
                     "description": content,
-                    "url": "https://zhanggui.crushserver.cloud/notifications",
+                    "url": f"{get_settings().FRONTEND_BASE_URL}/notifications",
                 },
             }
             resp = await http_client.post(url, json_body=body)
@@ -255,7 +276,7 @@ class NotificationService:
                 "textcard": {
                     "title": title,
                     "description": content,
-                    "url": "https://zhanggui.crushserver.cloud/notifications",
+                    "url": f"{get_settings().FRONTEND_BASE_URL}/notifications",
                 },
             }
             resp = await http_client.post(url, json_body=body)

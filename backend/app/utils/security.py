@@ -21,7 +21,15 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def _get_fernet() -> Fernet:
-    """Derive a Fernet key from JWT_SECRET (base64-url-safe 32 bytes)."""
+    """获取 Fernet 加密器。
+
+    优先使用独立的 ENCRYPT_KEY（推荐），未配置时回退到 JWT_SECRET 派生（向后兼容）。
+    分离密钥的目的：JWT 密钥泄露不能直接解密数据库中的加密字段。
+    """
+    if settings.ENCRYPT_KEY:
+        # 直接使用配置的 Fernet key
+        return Fernet(settings.ENCRYPT_KEY.encode("utf-8"))
+    # 回退方案：从 JWT_SECRET 派生（向后兼容，已有数据不会失效）
     key_material = settings.JWT_SECRET.encode("utf-8")
     fernet_key = base64.urlsafe_b64encode(key_material.ljust(32, b"\0")[:32])
     return Fernet(fernet_key)

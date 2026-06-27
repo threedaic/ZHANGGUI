@@ -66,8 +66,8 @@ async def list_monthly(
     page_size: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """门店月度工资汇总（仅店长及以上可见全员工资）"""
-    require_role(request, ["boss", "store_manager"])
+    """门店月度工资汇总（仅老板/会计可见全员工资，店长不可见）"""
+    require_role(request, ["boss", "accountant"])
     store_id = get_store_id(request)
     service = PayrollService(db, store_id)
     data = await service.get_monthly(period=period, page=page, page_size=page_size)
@@ -82,15 +82,15 @@ async def get_record(
 ):
     """工资记录详情
 
-    权限: 店长及以上可查看任意记录；普通员工仅可查看自己的工资条。
+    权限: 老板/会计可查看任意记录；普通员工仅可查看自己的工资条。店长不可见他人明细。
     """
     store_id = get_store_id(request)
     role = getattr(request.state, "role", "staff")
     service = PayrollService(db, store_id)
     data = await service.get_detail(record_id)
 
-    # 普通员工只能看自己的工资条
-    if role not in ("boss", "store_manager"):
+    # 普通员工（含店长）只能看自己的工资条
+    if role not in ("boss", "accountant"):
         employee_id = require_employee_id(request)
         if data["employee_id"] != employee_id:
             from app.utils.exceptions import ForbiddenError

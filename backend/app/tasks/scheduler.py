@@ -4,7 +4,13 @@
 所有时间基于 Asia/Shanghai (UTC+8)。
 
 班次检查时间：启动时读取 shift_configs 注册 cron；保存班次时实时更新。
+
+多 worker 防护：当 uvicorn 以 --workers N 启动时，每个进程会各自启动 scheduler
+导致定时任务重复执行。通过 SCHEDULER_ENABLED 环境变量控制只在指定 worker 启动。
+单 worker 部署（当前腾讯云）默认启用；多 worker 时需设置 SCHEDULER_ENABLED=false
+到除主 worker 外的其他进程，或改用 SQLAlchemyJobStore + Redis 分布式锁。
 """
+import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from loguru import logger
 
@@ -40,6 +46,11 @@ def schedule_shift_check(shift_code: str, start_time: str, shift_name: str = "")
 
 async def init_scheduler():
     """在 app lifespan startup 中调用。"""
+    # 多 worker 防护：SCHEDULER_ENABLED=false 时不启动，避免重复执行
+    if os.getenv("SCHEDULER_ENABLED", "true").lower() == "false":
+        logger.info("SCHEDULER_ENABLED=false，跳过定时任务启动（多 worker 部署模式）")
+        return
+
     from app.tasks.antifraud import run_daily_antifraud_scan
     from app.tasks.notification_jobs import (
         daily_attendance_report_job,
@@ -51,11 +62,14 @@ async def init_scheduler():
     )
     from app.tasks.wine_stocktake_job import monthly_wine_stocktake_job
     from app.tasks.butler_reminder import butler_opening_reminder_job, butler_closing_reminder_job
+    from app.tasks.task_recurrence_job import task_recurrence_job
     from loguru import logger
 
     scheduler.add_job(auto_sync_checkin_job, 'cron', hour=10, minute=0, id='auto_sync_checkin_job', replace_existing=True)
     scheduler.add_job(auto_sync_wework_contacts_job, 'cron', hour=10, minute=3, id='auto_sync_wework_contacts_job', replace_existing=True)
     scheduler.add_job(daily_attendance_report_job, 'cron', hour=10, minute=5, id='daily_attendance_report_job', replace_existing=True)
+    # 每日 00:05 自动生成周期任务（基于 oa_task_templates）
+    scheduler.add_job(task_recurrence_job, 'cron', hour=0, minute=5, id='task_recurrence_job', replace_existing=True)
     # 每小时推送工作台数据（今日业绩/打卡状态）到所有员工
     scheduler.add_job(auto_push_workbench_job, 'interval', hours=1, id='auto_push_workbench_job', replace_existing=True)
     scheduler.add_job(run_daily_antifraud_scan, 'cron', hour=4, minute=0, id='run_daily_antifraud_scan', replace_existing=True)

@@ -36,7 +36,7 @@ async def get_table(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["boss", "accountant"])
     service = _get_service(request, db)
     data = await service.get_table(period)
     return make_response(data=data, request=request)
@@ -80,7 +80,7 @@ async def get_modules(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["boss", "accountant"])
     service = _get_service(request, db)
     modules = await service.get_modules()
     return make_response(data={"modules": modules, "module_info": MODULES}, request=request)
@@ -113,7 +113,7 @@ async def get_rules(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["boss", "accountant"])
     service = _get_service(request, db)
     rules = await service.get_rules()
     return make_response(data=rules, request=request)
@@ -176,7 +176,7 @@ async def get_overtime_days(
     period: str = Query(..., description="账期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
 ):
-    require_role(request, ["boss", "store_manager", "accountant"])
+    require_role(request, ["boss", "accountant"])
     service = _get_service(request, db)
     days = await service.get_overtime_days(period)
     return make_response(data=days, request=request)

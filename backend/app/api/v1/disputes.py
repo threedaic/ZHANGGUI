@@ -24,6 +24,7 @@ from app.utils.deps import (
     get_store_id, require_role, get_employee_id,
     require_employee_id, make_response,
 )
+from app.utils.exceptions import ValidationError, NotFoundError, ForbiddenError
 
 router = APIRouter()
 
@@ -45,18 +46,18 @@ async def create_dispute(
     evidence = body.get("evidence")
 
     if not wage_id:
-        return make_response(code=40001, message="缺少工资记录ID", request=request)
+        raise ValidationError("缺少工资记录ID")
     if not reason:
-        return make_response(code=40002, message="请填写申诉原因", request=request)
+        raise ValidationError("请填写申诉原因")
 
     # 检查工资记录是否存在
     wage = await db.get(PayrollRecord, uuid.UUID(wage_id))
     if not wage:
-        return make_response(code=40003, message="工资记录不存在", request=request)
+        raise NotFoundError("工资记录不存在")
     if str(wage.employee_id) != str(employee_id):
-        return make_response(code=40004, message="只能申诉自己的工资", request=request)
+        raise ForbiddenError("只能申诉自己的工资")
     if wage.status == "draft":
-        return make_response(code=40005, message="工资尚未确认，无法申诉", request=request)
+        raise ValidationError("工资尚未确认，无法申诉")
 
     # 检查是否已申诉过
     existing = await db.execute(
@@ -68,7 +69,7 @@ async def create_dispute(
         )
     )
     if existing.scalar_one_or_none():
-        return make_response(code=40006, message="该月工资已有待处理的申诉", request=request)
+        raise ValidationError("该月工资已有待处理的申诉")
 
     # 创建申诉
     dispute = WageDispute(
@@ -186,15 +187,15 @@ async def get_dispute(
 
     dispute = await db.get(WageDispute, uuid.UUID(dispute_id))
     if not dispute:
-        return make_response(code=40401, message="申诉不存在", request=request)
+        raise NotFoundError("申诉不存在")
 
     # 权限检查：员工只能看自己的，boss/store_manager 可以看本店的
     role = getattr(request.state, "role", None)
     if role not in ("boss", "store_manager", "admin"):
         if str(dispute.employee_id) != str(employee_id):
-            return make_response(code=40301, message="无权查看", request=request)
+            raise ForbiddenError("无权查看")
     elif str(dispute.store_id) != str(store_id):
-        return make_response(code=40302, message="无权查看其他门店申诉", request=request)
+        raise ForbiddenError("无权查看其他门店申诉")
 
     # 获取员工姓名
     emp = await db.get(Employee, dispute.employee_id)
@@ -237,15 +238,15 @@ async def reject_dispute(
 
     dispute = await db.get(WageDispute, uuid.UUID(dispute_id))
     if not dispute:
-        return make_response(code=40401, message="申诉不存在", request=request)
+        raise NotFoundError("申诉不存在")
     if str(dispute.store_id) != str(store_id):
-        return make_response(code=40302, message="无权操作", request=request)
+        raise ForbiddenError("无权操作")
     if dispute.status != "pending":
-        return make_response(code=40001, message="只能处理待处理的申诉", request=request)
+        raise ValidationError("只能处理待处理的申诉")
 
     resolution = body.get("resolution", "")
     if not resolution:
-        return make_response(code=40002, message="请填写驳回原因", request=request)
+        raise ValidationError("请填写驳回原因")
 
     dispute.status = "rejected"
     dispute.resolution = resolution
@@ -269,18 +270,18 @@ async def confirm_dispute(
 
     dispute = await db.get(WageDispute, uuid.UUID(dispute_id))
     if not dispute:
-        return make_response(code=40401, message="申诉不存在", request=request)
+        raise NotFoundError("申诉不存在")
     if str(dispute.store_id) != str(store_id):
-        return make_response(code=40302, message="无权操作", request=request)
+        raise ForbiddenError("无权操作")
     if dispute.status != "pending":
-        return make_response(code=40001, message="只能处理待处理的申诉", request=request)
+        raise ValidationError("只能处理待处理的申诉")
 
     adjusted_amount = body.get("adjusted_amount")
     adjusted_in_period = body.get("adjusted_in_period")
     resolution = body.get("resolution", "")
 
     if adjusted_amount is None:
-        return make_response(code=40003, message="请填写调整金额", request=request)
+        raise ValidationError("请填写调整金额")
 
     # 计算差额：正数=补发，负数=扣回
     original = float(dispute.original_amount or 0)

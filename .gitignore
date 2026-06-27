@@ -77,3 +77,11 @@ frontend/components.d.ts
 # 设计稿临时目录
 stitch-designs/
 
+# 压缩包（部署用，不入库）
+*.tar.gz
+*.zip
+backend/backend_fix.tar.gz
+backend_app.zip
+crush-zhanggui-latest.tar.gz
+dist.tar.gz
+

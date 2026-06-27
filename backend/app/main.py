@@ -36,6 +36,8 @@ from app.api.v1.ai import router as ai_router
 from app.api.v1.ratings import router as ratings_router
 from app.api.v1.leaves import router as leaves_router
 from app.api.v1.store import router as store_router
+from app.api.v1.hq import router as hq_router
+from app.api.v1.hq_ai import router as hq_ai_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.butler import router as butler_router
 from app.api.v1.sign_tasks import router as sign_tasks_router
@@ -43,6 +45,7 @@ from app.api.v1.penalties import router as penalties_router
 from app.api.v1.printers import router as printers_router
 from app.api.v1.disputes import router as disputes_router
 from app.api.v1.auto_payroll import router as auto_payroll_router
+from app.api.v1.tasks import router as tasks_router
 from app.api.v1.wework_payments import router as wework_payments_router
 from app.api.v1.wework_callback import router as wework_callback_router
 from app.api.v1.wework_workbench import router as wework_workbench_router
@@ -79,24 +82,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("生产环境：跳过 create_all/seed，schema 由 alembic 迁移管理")
 
-    # 生产+开发都执行：安全补齐 sys_printers 缺失列（IF NOT EXISTS 不报错）
-    try:
-        async with engine.begin() as conn:
-            alter_sqls = [
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS printer_type VARCHAR(20) DEFAULT 'order'",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS api_user VARCHAR(100)",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS api_secret TEXT",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS paper_width INTEGER DEFAULT 80",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS online_status BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMPTZ",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS extra_config JSONB DEFAULT '{}'::jsonb",
-                "ALTER TABLE sys_printers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()",
-            ]
-            for sql in alter_sqls:
-                await conn.execute(text(sql))
-            logger.info("sys_printers 表结构检查完成")
-    except Exception as e:
-        logger.warning(f"sys_printers 补列跳过: {e}")
+    # sys_printers 表结构补齐已迁移到 alembic:
+    # alembic/versions/fix_sys_printers_columns.sql 和 20260623_printer_routing.sql
+    # 不再在 lifespan 中执行 ALTER TABLE，避免每次启动都跑 DDL。
 
     await init_redis()
     await init_scheduler()
@@ -366,6 +354,8 @@ app.include_router(ranking_router, prefix="/api/v1/rankings", tags=["员工排�
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["数据看板"])
 app.include_router(ai_router, prefix="/api/v1/ai", tags=["小C AI助手"])
 app.include_router(store_router, prefix="/api/v1/stores", tags=["门店配置"])
+app.include_router(hq_router, prefix="/api/v1/hq", tags=["总店后台"])
+app.include_router(hq_ai_router, prefix="/api/v1/hq", tags=["总店-全局AI配置"])
 app.include_router(leaves_router, prefix="/api/v1", tags=["假期余额"])
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["操作日志"])
 app.include_router(butler_router, prefix="/api/v1/butler", tags=["开闭店管理"])
@@ -373,8 +363,12 @@ app.include_router(sign_tasks_router, prefix="/api/v1/sign-tasks", tags=["签收
 app.include_router(penalties_router, prefix="/api/v1/penalties", tags=["处罚通知"])
 app.include_router(printers_router, prefix="/api/v1/printers", tags=["打印机管理"])
 app.include_router(disputes_router, prefix="/api/v1/disputes", tags=["工资申诉"])
+app.include_router(tasks_router, prefix="/api/v1/tasks", tags=["OA任务管理"])
 
 # 静态文件服务（上传的图片等）
+# 已知限制：当前 StaticFiles 未做认证，任何拿到 URL 的人都能下载文件。
+# 完整修复需配合前端改造（img 标签改用签名 URL），属较大改动，暂保留现状。
+# 生产环境建议通过 nginx 配置 Referer 校验或 IP 白名单作为兜底防护。
 import os as _os
 from fastapi.staticfiles import StaticFiles as _StaticFiles
 _uploads_root = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "uploads")

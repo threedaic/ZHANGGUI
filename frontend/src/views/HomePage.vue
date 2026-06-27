@@ -1,16 +1,45 @@
 <template>
   <div class="daily-page">
-    <div class="xiao-c-entry" @click="showChat = true">
-      <img src="/laoc-avatar.png" class="xiao-c-avatar" alt="老C" />
-      <div class="xiao-c-text">
-        <span class="xiao-c-title">老C</span>
-        <Transition name="hint-fade" mode="out-in">
-          <span class="xiao-c-hint" :key="hintIndex">{{ hints[hintIndex] }}</span>
-        </Transition>
+    <!-- 老C + 任务中心：左右各一半 -->
+    <div class="top-row">
+      <div class="xiao-c-entry" @click="showChat = true">
+        <img src="/laoc-avatar.png" class="xiao-c-avatar" alt="老C" />
+        <div class="xiao-c-text">
+          <span class="xiao-c-title">老C</span>
+          <Transition name="hint-fade" mode="out-in">
+            <span class="xiao-c-hint" :key="hintIndex">{{ hints[hintIndex] }}</span>
+          </Transition>
+        </div>
+        <span class="xiao-c-arrow">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#7A7C80" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
       </div>
-      <span class="xiao-c-arrow">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#7A7C80" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </span>
+
+      <div
+        class="task-center"
+        :class="{ 'has-urgent': butlerPending || oaPendingCount > 0 }"
+        @click="goTaskList()"
+      >
+        <div class="tc-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l2 2 4-4"/><path d="M21 12c0 5-3.5 7.5-7.5 9.5C9.5 19.5 6 17 6 12V5l7.5-3L21 5v7z"/>
+          </svg>
+          <span v-if="butlerPending || oaPendingCount > 0" class="tc-badge"></span>
+        </div>
+        <div class="tc-body">
+          <span class="tc-title">任务中心</span>
+          <span v-if="butlerPending" class="tc-hint urgent">
+            {{ butlerPending.label }}未完成
+          </span>
+          <span v-else-if="oaPendingCount > 0" class="tc-hint urgent">
+            {{ oaPendingCount }}个任务待处理
+          </span>
+          <span v-else class="tc-hint">今日暂无待办</span>
+        </div>
+        <span class="tc-arrow">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#7A7C80" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+      </div>
     </div>
 
     <!-- 浓缩看板：2行x3列 粉白粉 -->
@@ -70,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ChatWidget from '@/components/ChatWidget.vue'
 import { dashboardAPI } from '@/api/dashboard'
@@ -78,12 +107,47 @@ import type { DashboardData } from '@/api/dashboard'
 import { signTaskAPI } from '@/api/sign-tasks'
 import { approvalAPI } from '@/api/approval'
 import { getMyPayrollPreview } from '@/api/payroll'
+import { getTodayStatus, type ButlerTodayStatus } from '@/api/butler'
+import { taskAPI } from '@/api/task'
 
 const router = useRouter()
 const showChat = ref(false)
 
 const dashboard = ref<DashboardData | null>(null)
 const myPayrollNet = ref<number>(0)
+const butlerStatus = ref<ButlerTodayStatus | null>(null)
+const oaPendingCount = ref(0)
+
+// 首页提醒条：取第一个待办项
+const butlerPending = computed(() => {
+  if (!butlerStatus.value || butlerStatus.value.pending.length === 0) return null
+  const p = butlerStatus.value.pending[0]
+  // 判断是否超时：闭店超过当晚23:30 / 开店超过当日11:30
+  const now = new Date()
+  const hour = now.getHours()
+  const min = now.getMinutes()
+  let is_overdue = false
+  if (p.type === 'closing' && (hour > 23 || (hour === 23 && min > 30))) is_overdue = true
+  if (p.type === 'opening' && (hour > 11 || (hour === 11 && min > 30))) is_overdue = true
+  return { ...p, is_overdue }
+})
+
+function goButler() {
+  router.push('/daily/butler')
+}
+
+function goTaskList() {
+  router.push('/daily/tasks')
+}
+
+async function loadButlerStatus() {
+  try {
+    const res = await getTodayStatus()
+    if (res.data.code === 0) {
+      butlerStatus.value = res.data.data
+    }
+  } catch { /* silent */ }
+}
 
 // 老C滚动提示
 const hints = [
@@ -130,8 +194,10 @@ function fmtMoney(n: number | undefined) {
 onMounted(() => {
   loadDashboard()
   loadMyPayroll()
+  loadButlerStatus()
   loadInboxCount()
   loadApprovalCount()
+  loadOaPendingCount()
   startHintRotation()
 })
 
@@ -160,6 +226,15 @@ async function loadApprovalCount() {
       if (approvalCard) approvalCard.badge = count
     }
   } catch (e) { console.error('[HomePage] loadApprovalCount failed:', e) }
+}
+
+async function loadOaPendingCount() {
+  try {
+    const res = await taskAPI.myTasks({ status: 'pending', page: 1, page_size: 1 })
+    if (res.data.code === 0) {
+      oaPendingCount.value = res.data.data.total || 0
+    }
+  } catch { /* silent */ }
 }
 
 interface FuncCard {
@@ -229,57 +304,57 @@ const cards: FuncCard[] = [
   padding: 16px;
 }
 
-.xiao-c-entry {
+/* ========== 老C + 任务中心 ========== */
+.top-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-  border: 1px solid #333333;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.xiao-c-entry:hover {
-  border-color: #FB0079;
-  box-shadow: 0 4px 16px rgba(251, 0, 121, 0.15);
-  transform: translateY(-1px);
+.xiao-c-entry {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .xiao-c-entry:active {
-  transform: scale(0.98) translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transform: scale(0.97);
+  background: rgba(251, 0, 121, 0.05);
 }
 
 .xiao-c-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  object-fit: cover;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 12px rgba(251, 0, 121, 0.3);
+  box-shadow: 0 0 0 2px rgba(251, 0, 121, 0.4), 0 0 16px rgba(251, 0, 121, 0.35), 0 0 32px rgba(251, 0, 121, 0.15), 0 0 48px rgba(251, 0, 121, 0.05);
 }
 
 .xiao-c-text {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .xiao-c-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #fff;
 }
 
 .xiao-c-hint {
-  font-size: 12px;
-  color: #7A7C80;
+  font-size: 11px;
+  color: #666;
   display: inline-block;
 }
 
@@ -304,127 +379,117 @@ const cards: FuncCard[] = [
   align-items: center;
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* 任务中心 */
+.task-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.func-card {
+.task-center.has-urgent {
+  background: linear-gradient(135deg, rgba(251, 0, 121, 0.1) 0%, rgba(251, 0, 121, 0.02) 100%);
+  border-color: rgba(251, 0, 121, 0.25);
+}
+
+.task-center:active {
+  transform: scale(0.97);
+}
+
+.tc-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(251, 0, 121, 0.06);
+  color: rgba(251, 0, 121, 0.5);
+  position: relative;
+  transition: all 0.2s;
+  box-shadow: 0 0 16px rgba(251, 0, 121, 0.15), 0 0 32px rgba(251, 0, 121, 0.08);
+}
+
+.has-urgent .tc-icon {
+  background: rgba(251, 0, 121, 0.12);
+  color: #FB0079;
+  box-shadow: 0 0 0 2px rgba(251, 0, 121, 0.25), 0 0 16px rgba(251, 0, 121, 0.35), 0 0 32px rgba(251, 0, 121, 0.15), 0 0 48px rgba(251, 0, 121, 0.05);
+}
+
+.tc-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FB0079;
+  box-shadow: 0 0 6px rgba(251, 0, 121, 0.8), 0 0 12px rgba(251, 0, 121, 0.4);
+  animation: tc-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.tc-body {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 24px 12px;
-  background: 
-    linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%),
-    linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: 
-    0 2px 8px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  gap: 2px;
 }
 
-.func-card:hover {
-  border-color: rgba(251, 0, 121, 0.4);
-  box-shadow: 
-    0 4px 16px rgba(251, 0, 121, 0.15),
-    0 0 0 1px rgba(251, 0, 121, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
-}
-
-.func-card:active {
-  transform: scale(0.96) translateY(0);
-  box-shadow: 
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  transition: transform 0.2s ease;
-}
-
-.func-card:hover .card-icon {
-  transform: scale(1.1);
-}
-
-.card-label {
-  font-family: "Source Han Sans SC", sans-serif;
+.tc-title {
   font-size: 13px;
-  font-weight: 400;
-  color: #C8C8C8;
+  font-weight: 600;
+  color: #fff;
 }
 
-.card-arrow {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
+.tc-hint {
+  font-size: 11px;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-badge {
-  position: absolute;
-  top: 8px;
-  right: 28px;
-  background: linear-gradient(135deg, #FB0079 0%, #ff3d9a 100%);
-  color: #FFFFFF;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-  line-height: 1.4;
-  box-shadow: 0 2px 8px rgba(251, 0, 121, 0.4);
-  animation: badge-pulse 2s ease-in-out infinite;
+.tc-hint.urgent {
+  color: #FB0079;
 }
 
-@keyframes badge-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+.tc-arrow {
+  flex-shrink: 0;
 }
 
-/* 浓缩看板 */
+/* ========== 数据看板 ========== */
 .compact-dashboard {
-  background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-  border: 1px solid #333333;
-  border-radius: 12px;
-  padding: 12px 16px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 14px;
   margin-bottom: 12px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.compact-dashboard:hover {
-  border-color: #444444;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
 .cd-row {
   display: flex;
   align-items: center;
-  gap: 0;
 }
 
 .cd-row + .cd-row {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #1a1a1a;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .cd-item {
@@ -432,34 +497,118 @@ const cards: FuncCard[] = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.cd-item:active {
+  transform: scale(0.92);
 }
 
 .cd-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: #FFFFFF;
-  font-family: 'Poppins', sans-serif;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
 }
 
 .cd-pink .cd-value {
-  color: #FB0079;
-  text-shadow: 0 0 8px rgba(251, 0, 121, 0.3);
-}
-
-.cd-white .cd-value {
-  color: #FFFFFF;
+  background: linear-gradient(135deg, #FB0079, #FF6BAA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 6px rgba(251, 0, 121, 0.15));
 }
 
 .cd-label {
-  font-size: 11px;
-  color: #7A7C80;
+  font-size: 10px;
+  color: #666;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 .cd-div {
   width: 1px;
-  height: 24px;
-  background: linear-gradient(to bottom, transparent 0%, #333333 50%, transparent 100%);
+  height: 30px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+/* ========== 功能卡片 ========== */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.func-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 12px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.func-card:active {
+  transform: scale(0.95);
+  background: rgba(251, 0, 121, 0.04);
+}
+
+.card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(251, 0, 121, 0.06);
+  transition: transform 0.2s ease;
+}
+
+.func-card:active .card-icon {
+  transform: scale(1.1);
+}
+
+.card-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #bbb;
+}
+
+.card-arrow {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0.3;
+}
+
+.card-badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: linear-gradient(135deg, #FB0079, #ff3d9a);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(251, 0, 121, 0.35);
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 </style>

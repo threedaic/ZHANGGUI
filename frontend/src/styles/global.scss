@@ -6,6 +6,16 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 触摸设备隐藏滚动条 */
+html {
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 html,
 body {
   margin: 0;
@@ -168,16 +178,14 @@ a {
 
 /* ==================== 路由过渡动画 ==================== */
 .page-fade-enter-active {
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: opacity 0.2s ease;
 }
 .page-fade-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 .page-fade-enter-from {
   opacity: 0;
-  transform: translateY(6px);
 }
 .page-fade-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
 }

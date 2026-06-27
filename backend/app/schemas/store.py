@@ -68,3 +68,12 @@ class EmployeeRoleUpdate(BaseModel):
         if v not in valid:
             raise ValueError(f"无效角色: {v}")
         return v
+
+
+class StoreCreate(BaseModel):
+    """POST /api/v1/hq/stores 请求体 — 总店后台新建门店"""
+    store_code: str = Field(..., min_length=2, max_length=32, description="门店编号，如 WX-001")
+    name: str = Field(..., min_length=2, max_length=64, description="门店名称，如 无锡店")
+    city: Optional[str] = Field(None, max_length=32, description="城市/区域")
+    address: Optional[str] = Field(None, description="详细地址")
+    wework_department_id: Optional[int] = Field(None, description="企微部门ID（通讯录同步用）")

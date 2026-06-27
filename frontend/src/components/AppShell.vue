@@ -73,7 +73,7 @@ function back() {
 
 // 判断是否是 Tab 首页（不需要返回箭头）
 function isTabPage(path: string) {
-  return ['/daily', '/management', '/settings', '/profile'].some(
+  return ['/hq', '/daily', '/management', '/settings', '/profile'].some(
     (p) => path === p || path === p + '/'
   )
 }
@@ -83,11 +83,6 @@ function isTabPage(path: string) {
   <div class="app-shell">
     <header class="shell-header">
       <div class="header-left">
-        <span v-if="showBack || !isTabPage(route.path)" class="back-btn" @click="back">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13 4l-6 6 6 6"/>
-          </svg>
-        </span>
       </div>
       <h1 class="shell-title">{{ title }}</h1>
       <div class="header-right">
@@ -144,9 +139,11 @@ function isTabPage(path: string) {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 10;
+  left: 0;
+  right: 0;
+  z-index: 100;
 }
 
 .header-left {
@@ -226,6 +223,7 @@ function isTabPage(path: string) {
 
 .shell-main {
   flex: 1;
+  padding-top: 68px;
   padding-bottom: 88px;
 }
 </style>

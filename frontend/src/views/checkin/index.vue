@@ -113,15 +113,47 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { showToast, showSuccessToast } from 'vant'
+import { useRouter } from 'vue-router'
+import { showToast, showSuccessToast, showConfirmDialog } from 'vant'
 import { attendanceAPI } from '@/api/attendance'
 import type { CheckinStatus, CheckinConfig } from '@/api/attendance'
+import { getTodayStatus } from '@/api/butler'
 
+const router = useRouter()
 const status = ref<CheckinStatus | null>(null)
 const config = ref<CheckinConfig | null>(null)
 const loading = ref(false)
 const photoInput = ref<HTMLInputElement | null>(null)
 const pendingPhotoBlob = ref<Blob | null>(null)
+// 开闭店检查待办（打卡拦截用）
+const butlerPendingLabel = ref<string | null>(null)
+
+async function checkButlerBeforeClockin(): Promise<boolean> {
+  try {
+    const res = await getTodayStatus()
+    if (res.data.code !== 0) return true
+    const pending = res.data.data.pending
+    if (pending.length === 0) return true
+    butlerPendingLabel.value = pending[0].label
+    return false
+  } catch {
+    return true
+  }
+}
+
+async function showButlerReminder() {
+  try {
+    await showConfirmDialog({
+      title: `${butlerPendingLabel.value || '检查单'}未完成`,
+      message: `你有一项${butlerPendingLabel.value || '检查单'}还没做，先做完再打卡？`,
+      confirmButtonText: '现在去做',
+      cancelButtonText: '稍后再说',
+    })
+    router.push('/daily/butler')
+  } catch {
+    // 用户选"稍后再说"，继续打卡
+  }
+}
 const lastPhotoUrl = ref<string | null>(null)
 const wifiConnected = ref(false)
 
@@ -201,6 +233,14 @@ function detectWifi() {
 async function handleCheckin() {
   if (loading.value || !status.value) return
   if (status.value.next_action === 'done') return
+
+  // 打卡前检查：开闭店检查单是否未完成
+  const ok = await checkButlerBeforeClockin()
+  if (!ok) {
+    await showButlerReminder()
+    // 用户如果选了"稍后再说"，继续打卡流程
+    // 用户如果选了"现在去做"，已经跳转走了，这里继续执行也无妨
+  }
 
   if (config.value?.require_photo) {
     pendingPhotoBlob.value = null

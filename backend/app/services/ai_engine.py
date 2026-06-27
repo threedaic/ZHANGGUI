@@ -36,48 +36,52 @@ DB_SCHEMA_PROMPT = """
 数据库表结构（PostgreSQL，所有查询必须加 WHERE store_id = :store_id）：
 
 -- 存酒表
-wine_storage(id, store_id, customer_name, phone, wine_name, bottle_label, date_stored TEXT, remaining_ml, cabinet_no, status, notes)
+wine_stored_bottles(id, store_id, customer_name, phone, wine_name, bottle_label, date_stored TEXT, remaining_ml, cabinet_no, status, notes)
   status: 'stored' / 'retrieved' / 'pending_retrieve' / 'expired'
 
 -- 排班表
-schedules(id, store_id, employee_id, date DATE, shift_type, note)
+att_schedules(id, store_id, employee_id, date DATE, shift_type, note)
   shift_type: '早班' / '晚班' / '全天' / '休息'
 
 -- 员工表
-employees(id, store_id, employee_code, name, phone, role, status, hire_date DATE)
+shared_employees(employee_id, store_id, employee_code, name, phone, role, status, hire_date DATE)
 
 -- 订桌表
-bookings(id, store_id, customer_name, phone, date TEXT, time_slot, guests_count, table_no, status, notes)
+pos_bookings(id, store_id, customer_name, phone, date TEXT, time_slot, guests_count, table_no, status, notes)
   status: 'confirmed' / 'completed' / 'cancelled'
 
 -- 桌位表
-tables(id, store_id, area, table_no, capacity, status)
+shared_tables(id, store_id, area, table_no, capacity, status)
 
 -- 开台表
-table_sessions(id, store_id, table_no, opened_by, opened_at, closed_at, guest_count, status, notes)
+pos_table_sessions(id, store_id, table_no, opened_by, opened_at, closed_at, guest_count, status, notes)
   status: 'open' / 'closed'
 
 -- 营收表
-daily_revenue(id, store_id, date DATE, total_amount, guest_count, order_count, avg_per_guest)
+fin_daily_revenue(id, store_id, date DATE, total_amount, guest_count, order_count, avg_per_guest)
 
 -- 考勤表
-attendance_records(id, store_id, employee_id, date DATE, check_in TEXT, check_out TEXT, status, is_late, is_early)
+att_records(id, store_id, employee_id, date DATE, check_in TEXT, check_out TEXT, status, is_late, is_early)
 
 -- KPI表
-kpi_scores(id, store_id, employee_id, period TEXT, dimension TEXT, score FLOAT)
-kpi_results(id, store_id, employee_id, period TEXT, total_score FLOAT, coefficient FLOAT, grade TEXT)
+hr_kpi_scores(id, store_id, employee_id, period TEXT, dimension TEXT, score FLOAT)
+hr_kpi_results(id, store_id, employee_id, period TEXT, total_score FLOAT, coefficient FLOAT, grade TEXT)
+
+-- 排行榜
+hr_rankings(id, store_id, employee_id, period TEXT, rank INT, score FLOAT)
 
 SQL 规则:
-1. 用户问"存酒/某人的酒"→ 查 wine_storage
-2. 用户问"排班/晚班/早班/谁上班"→ 查 schedules JOIN employees
-3. 用户问"桌/订桌/A1桌/有没有桌"→ 查 table_sessions(当前) + bookings(今日)
-4. 用户问"营收/营业额/卖了多少钱"→ 查 daily_revenue
-5. 用户问"考勤/迟到/打卡"→ 查 attendance_records JOIN employees
-6. 用户问"KPI/评分/考核"→ 查 kpi_results JOIN employees
+1. 用户问"存酒/某人的酒"→ 查 wine_stored_bottles
+2. 用户问"排班/晚班/早班/谁上班"→ 查 att_schedules JOIN shared_employees
+3. 用户问"桌/订桌/A1桌/有没有桌"→ 查 pos_table_sessions(当前) + pos_bookings(今日)
+4. 用户问"营收/营业额/卖了多少钱"→ 查 fin_daily_revenue
+5. 用户问"考勤/迟到/打卡"→ 查 att_records JOIN shared_employees
+6. 用户问"KPI/评分/考核"→ 查 hr_kpi_results JOIN shared_employees
 7. 名字模糊匹配用 LIKE '%关键词%'，手机号精确匹配
-8. 日期用 CURRENT_DATE，今日订单查 bookings.date = CURRENT_DATE::text
+8. 日期用 CURRENT_DATE，今日订单查 pos_bookings.date = CURRENT_DATE::text
 9. LIMIT 最多 20 条
 10. 只返回一条 SQL，不要注释
+11. 员工表主键是 employee_id，排班/考勤/KPI 表的 employee_id 关联 shared_employees.employee_id
 
 输出 JSON 格式:
 {"sql": "SELECT ...", "explanation": "一句话说明你要查什么"}
@@ -127,31 +131,59 @@ async def get_ai_config(
     db: AsyncSession,
     store_id: uuid.UUID,
 ) -> dict[str, Any]:
-    """获取门店的 AI 配置，解密 API Key。"""
+    """获取门店的 AI 配置。门店未配置时回退到全局配置。"""
+    # 先查门店配置
     stmt = select(StoreSettings).where(StoreSettings.store_id == store_id)
     result = await db.execute(stmt)
     settings = result.scalar_one_or_none()
 
-    if not settings:
+    store_url = None
+    store_key = None
+    store_model = None
+    store_temp = 0.7
+
+    if settings:
+        store_url = settings.ai_api_url
+        store_model = settings.ai_model
+        store_temp = settings.ai_temperature or 0.7
+        if settings.ai_api_key:
+            try:
+                store_key = decrypt_aes(settings.ai_api_key)
+            except Exception:
+                store_key = settings.ai_api_key
+
+    # 门店有完整配置 -> 用门店的
+    if store_url and store_key:
         return {
-            "ai_api_url": None,
-            "ai_api_key": None,
-            "ai_model": None,
-            "ai_temperature": 0.7,
+            "ai_api_url": store_url,
+            "ai_api_key": store_key,
+            "ai_model": store_model,
+            "ai_temperature": store_temp,
         }
 
-    api_key = None
-    if settings.ai_api_key:
-        try:
-            api_key = decrypt_aes(settings.ai_api_key)
-        except Exception:
-            api_key = settings.ai_api_key  # fallback: may be plaintext
+    # 门店没配 -> 回退到全局配置
+    try:
+        from app.api.v1.hq_ai import get_global_ai_config_decrypted
+        global_cfg = await get_global_ai_config_decrypted(db)
+        # 全局配置里聊天模型用 chat_* 字段
+        g_url = global_cfg.get("chat_api_url")
+        g_key = global_cfg.get("chat_api_key")
+        if g_url and g_key:
+            return {
+                "ai_api_url": g_url,
+                "ai_api_key": g_key,
+                "ai_model": global_cfg.get("chat_model"),
+                "ai_temperature": global_cfg.get("chat_temperature", 0.7),
+            }
+    except Exception as e:
+        logger.opt(exception=True).warning(f"加载全局AI配置失败: {e}")
 
+    # 都没有
     return {
-        "ai_api_url": settings.ai_api_url,
-        "ai_api_key": api_key,
-        "ai_model": settings.ai_model,
-        "ai_temperature": settings.ai_temperature or 0.7,
+        "ai_api_url": store_url,
+        "ai_api_key": store_key,
+        "ai_model": store_model,
+        "ai_temperature": store_temp,
     }
 
 
@@ -244,6 +276,37 @@ async def _call_llm(
     return choices[0]["message"]["content"]
 
 
+# ==================== SQL 安全：表白名单 ====================
+# LLM 生成的 SQL 只允许查询以下表，防止越权读取用户/工资/审计等敏感数据。
+# 新增业务表需同步更新此处；不在名单内的表一律拒绝。
+# 注意：表名必须与数据库实际表名一致（含前缀 shared_/att_/pos_/fin_/hr_/wine_）
+ALLOWED_TABLES = {
+    "wine_stored_bottles",  # 存酒
+    "att_schedules",        # 排班
+    "shared_employees",     # 员工（不含密码、企微ID 等字段由 schema 控制）
+    "pos_bookings",         # 订桌
+    "shared_tables",        # 桌位
+    "pos_table_sessions",   # 开台
+    "fin_daily_revenue",    # 营收
+    "att_records",          # 考勤
+    "hr_kpi_scores",        # KPI 明细
+    "hr_kpi_results",       # KPI 结果
+    "hr_rankings",          # 排行榜
+}
+
+# 敏感表（即使被 LLM 误生成也坚决拒绝）
+SENSITIVE_TABLES = {
+    "sys_users", "sys_stores", "shared_store_settings",
+    "sys_audit_logs", "sys_printers", "sys_global_settings",
+    "sys_notifications", "sys_notification_settings", "sys_configs",
+    "wage_records", "wage_record_items", "wage_contracts",
+    "wage_disputes", "wage_salary_matrix", "wage_salary_rules",
+    "wage_periods", "wage_items_config", "wage_wework_payments",
+    "oa_tasks", "oa_task_templates", "oa_task_attachments",
+    "sig_tasks",
+}
+
+
 async def _execute_sql(
     db: AsyncSession,
     store_id: uuid.UUID,
@@ -253,9 +316,10 @@ async def _execute_sql(
 
     安全措施:
     1. 关键字检测（忽略大小写、检测注释注入符号 -- 和 /**/）
-    2. 参数化绑定 store_id（防 SQL 注入）
-    3. 结果集限制（后端强制 LIMIT 100）
-    4. 只读事务（PG 层面兜底）
+    2. 表白名单校验（防止读取敏感表）
+    3. 参数化绑定 store_id（防 SQL 注入）
+    4. 结果集限制（后端强制 LIMIT 100）
+    5. 只读事务（PG 层面兜底）
     """
     import re
 
@@ -271,11 +335,46 @@ async def _execute_sql(
         if sql_upper.startswith(keyword) or f" {keyword} " in f" {sql_upper} ":
             raise AppError(code=40004, message="不允许执行写操作 SQL")
 
+    # --- 1.5 表白名单校验（防越权读取敏感数据）---
+    # 提取 SQL 中所有 FROM/JOIN 后的表名
+    table_pattern = re.compile(
+        r"(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+        re.IGNORECASE,
+    )
+    referenced_tables = {t.lower() for t in table_pattern.findall(sql_no_comments)}
+    # 敏感表一律拒绝
+    blocked = referenced_tables & SENSITIVE_TABLES
+    if blocked:
+        logger.warning(f"AI SQL blocked sensitive tables: {blocked}, SQL: {sql}")
+        raise AppError(
+            code=40004,
+            message=f"出于安全考虑，无法查询这些数据",
+        )
+    # 不在白名单内的表拒绝（防止读其他未授权表）
+    unknown = referenced_tables - ALLOWED_TABLES
+    if unknown:
+        logger.warning(f"AI SQL blocked unknown tables: {unknown}, SQL: {sql}")
+        raise AppError(
+            code=40004,
+            message=f"查询的表不在允许范围内",
+        )
+
     # --- 2. 参数化绑定 store_id ---
+    # store_id 在数据库中是 UUID 类型，但 LLM 生成的 SQL 用 :store_id 占位符。
+    # 直接绑定字符串会报 "operator does not exist: uuid = character varying"。
+    # 解决：用 CAST(:store_id AS uuid) 显式类型转换（不能用 ::uuid，会被 SQLAlchemy 误识别为参数）。
+    sql_for_exec = sql
     if ":store_id" in sql:
-        sql_bound = text(sql).bindparams(store_id=store_id)
+        # 把 ":store_id" 替换为 "CAST(:store_id AS uuid)"，但要避免重复替换已转换的
+        import re as _re
+        sql_for_exec = _re.sub(
+            r"(?<!CAST\()(:store_id)(?!\s+AS uuid)",
+            r"CAST(\1 AS uuid)",
+            sql,
+        )
+        sql_bound = text(sql_for_exec).bindparams(store_id=store_id)
     else:
-        sql_bound = text(sql)
+        sql_bound = text(sql_for_exec)
 
     try:
         # --- 3. 只读事务 + 结果集限制 ---
@@ -283,10 +382,10 @@ async def _execute_sql(
         # Append LIMIT if not present, to prevent huge result sets
         sql_upper_limit = sql_no_comments.strip().upper()
         if "LIMIT" not in sql_upper_limit:
-            if ":store_id" in sql:
-                sql_bound = text(sql + " LIMIT 100").bindparams(store_id=store_id)
+            if ":store_id" in sql_for_exec:
+                sql_bound = text(sql_for_exec + " LIMIT 100").bindparams(store_id=store_id)
             else:
-                sql_bound = text(sql + " LIMIT 100")
+                sql_bound = text(sql_for_exec + " LIMIT 100")
 
         result = await db.execute(sql_bound)
         rows = result.fetchall()

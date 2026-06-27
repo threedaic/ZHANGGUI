@@ -8,6 +8,9 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const icons: Record<string, string> = {
+  hq: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 9l8-6 8 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M9 21V12h4v9"/>
+  </svg>`,
   daily: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="16" height="15" rx="2"/><line x1="3" y1="9" x2="19" y2="9"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="14" y1="2" x2="14" y2="5"/>
   </svg>`,
@@ -22,15 +25,16 @@ const icons: Record<string, string> = {
   </svg>`,
 }
 
-// SPEC 2.0 §5.4 角色权限：日常/我的=全员，管理=店长及以上，设置=boss/admin
-const ALL_ROLES = ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager', 'staff']
-const MANAGER_ROLES = ['admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager']
+// SPEC §0 四级权限体系：system_admin > boss > store_manager > staff
+const ALL_ROLES = ['system_admin', 'admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager', 'staff']
+const MANAGER_ROLES = ['system_admin', 'admin', 'boss', 'store_manager', 'accountant', 'bar_manager', 'service_manager', 'kitchen_manager']
 
 const tabs = computed(() => {
   const list = [
+    { key: 'hq', label: '总店', path: '/hq', roles: ['system_admin'] },
     { key: 'daily', label: '日常', path: '/daily', roles: ALL_ROLES },
     { key: 'management', label: '管理', path: '/management', roles: MANAGER_ROLES },
-    { key: 'settings', label: '设置', path: '/settings', roles: ['boss', 'admin'] },
+    { key: 'settings', label: '设置', path: '/settings', roles: ['system_admin', 'boss', 'admin'] },
     { key: 'profile', label: '我的', path: '/profile', roles: ALL_ROLES },
   ]
   return list.filter((t) => t.roles.includes(auth.role))
@@ -38,6 +42,7 @@ const tabs = computed(() => {
 
 const activeKey = computed(() => {
   const path = route.path
+  if (path.startsWith('/hq')) return 'hq'
   if (path.startsWith('/daily')) return 'daily'
   if (path.startsWith('/management')) return 'management'
   if (path.startsWith('/settings')) return 'settings'

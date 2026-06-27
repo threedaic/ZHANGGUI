@@ -148,6 +148,13 @@ const opsCards: FuncCard[] = [
     </svg>`,
   },
   {
+    label: '任务管理',
+    path: '/management/tasks',
+    icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
+      <path d="M9 11l2 2 4-4"/><path d="M21 14c0 5-3.5 7.5-7.5 9.5C9.5 21.5 6 19 6 14V7l7.5-3L21 7v7z"/>
+    </svg>`,
+  },
+  {
     label: '桌位管理',
     path: '/management/tables',
     icon: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">

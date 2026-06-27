@@ -161,3 +161,23 @@ export function resubmitPhoto(sessionId: string, resultId: string, file: File) {
 export function getDashboard() {
   return apiClient.get<ApiResponse<ButlerDashboardData>>('/butler/dashboard')
 }
+
+// ==================== 今日待办状态（首页提醒条用）====================
+
+export interface ButlerTodayStatus {
+  has_opening_template: boolean
+  has_closing_template: boolean
+  opening_done: boolean
+  closing_done: boolean
+  pending: {
+    type: 'opening' | 'closing'
+    label: string
+    session_id: string | null
+    completed: number
+    total: number
+  }[]
+}
+
+export function getTodayStatus() {
+  return apiClient.get<ApiResponse<ButlerTodayStatus>>('/butler/today-status')
+}

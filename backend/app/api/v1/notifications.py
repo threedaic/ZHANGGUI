@@ -237,7 +237,7 @@ async def test_webhook(
 ):
     """测试群机器人 Webhook 是否可用。仅老板可操作。"""
     require_role(request, ["boss"])
-    from app.services.wecom_notify import send_to_group
+    from app.services.notification_service import send_to_group
 
     ok = await send_to_group(
         body.webhook_url,

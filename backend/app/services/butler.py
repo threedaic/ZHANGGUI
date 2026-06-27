@@ -169,14 +169,36 @@ def set_ai_provider(provider: AIProvider) -> None:
 
 
 async def get_vision_provider(db: AsyncSession, store_id: uuid.UUID) -> VisionLLMProvider | DummyProvider:
-    """根据门店 AI 配置动态创建 Vision Provider"""
+    """根据门店/全局 AI 配置动态创建视觉 Provider。
+
+    优先级：门店视觉配置 > 门店通用AI配置 > 全局视觉配置 > 全局聊天配置
+    """
+    # 1. 先查门店配置（旧的通用 ai_* 字段）
     try:
         from app.services.ai_engine import get_ai_config
         config = await get_ai_config(db, store_id)
         if config.get("ai_api_url") and config.get("ai_api_key"):
+            # 门店有配置，但如果模型不是视觉模型，也得用
             return VisionLLMProvider(config)
     except Exception as e:
-        logger.opt(exception=True).warning(f"加载 AI 配置失败: {e}")
+        logger.opt(exception=True).warning(f"加载门店AI配置失败: {e}")
+
+    # 2. 回退到全局视觉模型配置
+    try:
+        from app.api.v1.hq_ai import get_global_ai_config_decrypted
+        global_cfg = await get_global_ai_config_decrypted(db)
+        v_url = global_cfg.get("vision_api_url")
+        v_key = global_cfg.get("vision_api_key")
+        if v_url and v_key:
+            return VisionLLMProvider({
+                "ai_api_url": v_url,
+                "ai_api_key": v_key,
+                "ai_model": global_cfg.get("vision_model"),
+                "ai_temperature": global_cfg.get("vision_temperature", 0.2),
+            })
+    except Exception as e:
+        logger.opt(exception=True).warning(f"加载全局视觉AI配置失败: {e}")
+
     return DummyProvider()
 
 
@@ -511,7 +533,7 @@ async def _notify_manual_review(
 
     push_to_group = bool(setting.push_to_group) if setting else False
 
-    review_url = f"https://zhanggui.crushserver.cloud/daily/butler/{session_id}?review={result_id}"
+    review_url = f"{get_settings().FRONTEND_BASE_URL}/daily/butler/{session_id}?review={result_id}"
     text = (
         f"【开闭店检查待审核】\n"
         f"检查项：{item_name}\n"

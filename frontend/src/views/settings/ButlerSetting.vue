@@ -1,65 +1,51 @@
 <template>
-  <div class="butler-setting-page">
-    <div class="page-header">
-      <h1 class="page-title">检查单配置</h1>
+  <div class="config-page">
+    <!-- 标题 -->
+    <div class="page-head">
+      <h1>检查单配置</h1>
+      <p>设置检查项，员工拍照后 AI 按标准自动判定</p>
     </div>
 
-    <!-- 新建模板按钮 -->
-    <button class="btn-new-template" @click="showNewTemplateForm = !showNewTemplateForm">
-      + 新建检查单
-    </button>
+    <!-- 闭店/开店 切换 -->
+    <div class="seg-bar">
+      <button :class="{ on: tab === 'closing' }" @click="tab = 'closing'">
+        闭店检查<span class="seg-num">{{ closingTemplates.length }}</span>
+      </button>
+      <button :class="{ on: tab === 'opening' }" @click="tab = 'opening'">
+        开店检查<span class="seg-num">{{ openingTemplates.length }}</span>
+      </button>
+    </div>
 
-    <!-- 新建模板表单 -->
-    <div v-if="showNewTemplateForm" class="new-template-form">
-      <input
-        v-model="newTemplate.name"
-        placeholder="检查单名称（如：店长闭店检查单）"
-        class="form-input"
-      />
-      <div class="form-row">
-        <label class="form-label">类型</label>
-        <div class="radio-group">
-          <label><input type="radio" v-model="newTemplate.session_type" value="opening" /> 开店</label>
-          <label><input type="radio" v-model="newTemplate.session_type" value="closing" /> 闭店</label>
-        </div>
-      </div>
-      <div class="form-row">
-        <label class="form-label">角色</label>
-        <select v-model="newTemplate.role_tag" class="form-select">
+    <!-- 新建 -->
+    <button v-if="!showNew" class="add-btn" @click="showNew = true">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>
+      新建检查单
+    </button>
+    <div v-else class="add-panel">
+      <input v-model="newTpl.name" placeholder="名称，如：吧台闭店检查单" class="add-input" />
+      <div class="add-meta">
+        <select v-model="newTpl.role_tag" class="add-sel">
           <option value="store_manager">店长</option>
           <option value="bartender">吧台长</option>
           <option value="server">服务员</option>
           <option value="all">所有人</option>
         </select>
+        <button class="btn-ok" :disabled="!newTpl.name.trim()" @click="createTpl">创建</button>
+        <button class="btn-no" @click="showNew = false">取消</button>
       </div>
-      <button class="btn-save" @click="createTemplate" :disabled="!newTemplate.name.trim()">创建</button>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <!-- 状态 -->
+    <div v-if="loading" class="center-hint">加载中...</div>
+    <div v-else-if="curList.length === 0" class="empty-box">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="#2a2a2a" stroke-width="1.5"><rect x="7" y="9" width="22" height="20" rx="3"/><path d="M12 9V5M24 9V5M7 16h22"/></svg>
+      <span>{{ tab === 'closing' ? '闭店' : '开店' }}检查单为空</span>
+      <small>点击上方按钮创建</small>
+    </div>
 
-    <!-- 闭店模板组 -->
-    <div v-else class="template-section">
-      <h3 class="section-title">闭店检查单</h3>
-      <div v-if="closingTemplates.length === 0" class="empty">暂无闭店检查单，点击上方"新建检查单"创建</div>
-      <div v-for="tpl in closingTemplates" :key="tpl.id" class="template-card">
-        <TemplateEditor
-          :template="tpl"
-          @save="saveItems"
-          @delete="deleteTemplate"
-          @update="updateTemplate"
-        />
-      </div>
-
-      <h3 class="section-title" style="margin-top: 24px;">开店检查单</h3>
-      <div v-if="openingTemplates.length === 0" class="empty">暂无开店检查单，点击上方"新建检查单"创建</div>
-      <div v-for="tpl in openingTemplates" :key="tpl.id" class="template-card">
-        <TemplateEditor
-          :template="tpl"
-          @save="saveItems"
-          @delete="deleteTemplate"
-          @update="updateTemplate"
-        />
-      </div>
+    <!-- 模板列表 -->
+    <div v-else class="tpl-stack">
+      <TemplateEditor v-for="tpl in curList" :key="tpl.id" :template="tpl" @save="saveItems" @delete="delTpl" @update="updTpl" />
     </div>
   </div>
 </template>
@@ -71,273 +57,238 @@ import TemplateEditor from './ButlerTemplateEditor.vue'
 import type { ChecklistTemplate } from '@/api/butler'
 
 const loading = ref(false)
-const showNewTemplateForm = ref(false)
+const showNew = ref(false)
+const tab = ref<'closing' | 'opening'>('closing')
 const templates = ref<ChecklistTemplate[]>([])
-
-const newTemplate = ref({
-  name: '',
-  session_type: 'closing' as 'opening' | 'closing',
-  role_tag: 'store_manager',
-})
+const newTpl = ref({ name: '', role_tag: 'store_manager' })
 
 const closingTemplates = computed(() => templates.value.filter(t => t.session_type === 'closing'))
 const openingTemplates = computed(() => templates.value.filter(t => t.session_type === 'opening'))
+const curList = computed(() => tab.value === 'closing' ? closingTemplates.value : openingTemplates.value)
 
-onMounted(() => {
-  loadTemplates()
-})
+onMounted(() => load())
 
-async function loadTemplates() {
+async function load() {
   loading.value = true
   try {
     const res: any = await listTemplates()
     templates.value = res.data?.data || res.data || []
-  } catch (e) {
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
+  } catch {} finally { loading.value = false }
 }
 
-async function createTemplate() {
-  if (!newTemplate.value.name.trim()) return
+async function createTpl() {
+  if (!newTpl.value.name.trim()) return
   try {
-    await createTemplateAPI({
-      name: newTemplate.value.name.trim(),
-      session_type: newTemplate.value.session_type,
-      role_tag: newTemplate.value.role_tag,
-    })
-    newTemplate.value = { name: '', session_type: 'closing', role_tag: 'store_manager' }
-    showNewTemplateForm.value = false
-    await loadTemplates()
-  } catch (e: any) {
-    alert(e?.response?.data?.message || '创建失败')
-  }
+    await createTemplateAPI({ name: newTpl.value.name.trim(), session_type: tab.value, role_tag: newTpl.value.role_tag })
+    newTpl.value = { name: '', role_tag: 'store_manager' }
+    showNew.value = false
+    await load()
+  } catch (e: any) { alert(e?.response?.data?.message || '创建失败') }
 }
 
-async function saveItems(templateId: string, items: { item_name: string; item_type: string; sort_order?: number; ai_prompt?: string | null }[]) {
+async function saveItems(id: string, items: { item_name: string; item_type: string; sort_order?: number; ai_prompt?: string | null }[]) {
   try {
-    await batchUpdateItems(templateId, items)
-    // 本地更新对应模板的 items，避免全量重载导致展开状态丢失
-    const tpl = templates.value.find(t => t.id === templateId)
-    if (tpl) {
-      tpl.items = items.map((i, idx) => ({
-        id: String(idx),
-        template_id: templateId,
-        item_name: i.item_name,
-        item_type: i.item_type as 'checkbox' | 'photo',
-        required_photo: i.item_type === 'photo',
-        sort_order: i.sort_order ?? idx,
-        ai_prompt: i.ai_prompt ?? null,
-      }))
-    }
-    alert('保存成功')
-  } catch (e: any) {
-    alert(e?.response?.data?.message || '保存失败')
-  }
-}
-
-async function deleteTemplate(id: string) {
-  if (!confirm('确定删除该检查单？')) return
-  try {
-    await deleteTemplateAPI(id)
-    templates.value = templates.value.filter(t => t.id !== id)
-  } catch (e: any) {
-    alert(e?.response?.data?.message || '删除失败')
-  }
-}
-
-async function updateTemplate(id: string, data: Record<string, any>) {
-  try {
-    await updateTemplateAPI(id, data)
-    // 本地更新对应模板，不触发全量重载（避免展开状态丢失和输入丢失）
+    await batchUpdateItems(id, items)
     const tpl = templates.value.find(t => t.id === id)
-    if (tpl) {
-      Object.assign(tpl, data)
-    }
-  } catch (e: any) {
-    alert(e?.response?.data?.message || '更新失败')
-  }
+    if (tpl) tpl.items = items.map((i, idx) => ({ id: String(idx), template_id: id, item_name: i.item_name, item_type: i.item_type as any, required_photo: i.item_type === 'photo', sort_order: i.sort_order ?? idx, ai_prompt: i.ai_prompt ?? null }))
+  } catch (e: any) { alert(e?.response?.data?.message || '保存失败') }
+}
+
+async function delTpl(id: string) {
+  if (!confirm('删除该检查单？')) return
+  try { await deleteTemplateAPI(id); templates.value = templates.value.filter(t => t.id !== id) }
+  catch (e: any) { alert(e?.response?.data?.message || '删除失败') }
+}
+
+async function updTpl(id: string, data: Record<string, any>) {
+  try { await updateTemplateAPI(id, data); const tpl = templates.value.find(t => t.id === id); if (tpl) Object.assign(tpl, data) }
+  catch (e: any) { alert(e?.response?.data?.message || '更新失败') }
 }
 </script>
 
 <style scoped>
-.butler-setting-page {
-  padding: 16px;
-  padding-bottom: calc(64px + 24px);
+.config-page {
   max-width: 640px;
   margin: 0 auto;
+  padding: 20px 16px calc(64px + 20px);
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 4px;
+/* 标题 */
+.page-head {
+  margin-bottom: 20px;
 }
-
-.page-title {
-  font-family: "Source Han Sans SC", sans-serif;
-  font-size: 20px;
+.page-head h1 {
+  font-size: 22px;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #fff;
+  margin: 0 0 4px;
+}
+.page-head p {
+  font-size: 13px;
+  color: #555;
   margin: 0;
 }
 
-.page-tip {
-  font-size: 12px;
-  color: #7A7C80;
-  margin: 0 0 20px;
-}
-
-/* 配置说明卡片 */
-.guide-card {
-  background: #111111;
-  border: 1px solid #333333;
-  border-radius: 12px;
-  padding: 14px 16px;
+/* 分段切换 */
+.seg-bar {
+  display: flex;
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 3px;
   margin-bottom: 16px;
 }
-
-.guide-title {
-  font-size: 13px;
+.seg-bar button {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #666;
+  font-size: 14px;
   font-weight: 600;
-  color: #FFFFFF;
-  margin-bottom: 12px;
-}
-
-.guide-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 6px 0;
-}
-
-.guide-item + .guide-item {
-  border-top: 1px solid #1a1a1a;
-  margin-top: 4px;
-  padding-top: 10px;
-}
-
-.guide-num {
+  cursor: pointer;
+  transition: all 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  background: rgba(251, 0, 121, 0.1);
-  color: #FB0079;
-  border-radius: 50%;
+  gap: 6px;
+}
+.seg-bar button.on {
+  background: #FB0079;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(251, 0, 121, 0.25);
+}
+.seg-num {
   font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-  margin-top: 2px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.seg-bar button.on .seg-num {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.guide-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #C8C8C8;
-  margin-bottom: 2px;
-}
-
-.guide-desc {
-  font-size: 11px;
-  color: #7A7C80;
-  line-height: 1.5;
-}
-
-.btn-new-template {
+/* 新建按钮 */
+.add-btn {
   width: 100%;
-  padding: 12px;
-  background: rgba(251, 0, 121, 0.08);
-  border: 1px dashed #FB0079;
-  color: #FB0079;
+  height: 44px;
+  border: 1px dashed #333;
   border-radius: 10px;
+  background: transparent;
+  color: #666;
   font-size: 14px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
-  margin-bottom: 12px;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+.add-btn:active {
+  border-color: #FB0079;
+  color: #FB0079;
 }
 
-.new-template-form {
-  background: #111111;
-  border: 1px solid #333333;
+/* 新建面板 */
+.add-panel {
+  background: #0f0f0f;
+  border: 1px solid #222;
   border-radius: 12px;
-  padding: 14px;
+  padding: 16px;
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.form-input, .form-select {
-  width: 100%;
-  padding: 10px 12px;
-  background: #1A1A1A;
-  border: 1px solid #333333;
-  border-radius: 8px;
-  color: #FFFFFF;
-  font-size: 14px;
-  font-family: inherit;
-  box-sizing: border-box;
-}
-
-.form-row {
-  display: flex;
-  align-items: center;
   gap: 12px;
 }
-
-.form-label {
-  font-size: 13px;
-  color: #7A7C80;
-  width: 40px;
-  flex-shrink: 0;
+.add-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  background: #000;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
 }
+.add-input:focus { border-color: #FB0079; }
+.add-input::placeholder { color: #444; }
 
-.radio-group {
+.add-meta {
   display: flex;
-  gap: 16px;
+  gap: 8px;
+  align-items: center;
+}
+.add-sel {
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  background: #000;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #ccc;
   font-size: 13px;
-  color: #C8C8C8;
+  outline: none;
 }
-
-.radio-group input, .form-row input[type="radio"] {
-  margin-right: 4px;
-}
-
-.btn-save {
-  padding: 10px 16px;
+.btn-ok {
+  height: 36px;
+  padding: 0 18px;
   background: #FB0079;
   border: none;
   border-radius: 8px;
-  color: #FFFFFF;
-  font-size: 14px;
+  color: #fff;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
-
-.btn-save:disabled {
-  background: #553344;
-  cursor: not-allowed;
-}
-
-.section-title {
-  font-size: 15px;
-  color: #C8C8C8;
-  margin: 16px 0 10px;
-  font-weight: 600;
-}
-
-.template-card {
-  margin-bottom: 12px;
-}
-
-.loading, .empty {
-  text-align: center;
-  padding: 24px;
-  color: #7A7C80;
+.btn-ok:disabled { opacity: 0.35; }
+.btn-no {
+  height: 36px;
+  padding: 0 14px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #666;
   font-size: 13px;
+  cursor: pointer;
+}
+
+/* 状态 */
+.center-hint {
+  text-align: center;
+  padding: 60px 0;
+  color: #444;
+  font-size: 14px;
+}
+
+.empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 56px 20px;
+  text-align: center;
+}
+.empty-box span {
+  font-size: 15px;
+  color: #888;
+  margin-top: 8px;
+}
+.empty-box small {
+  font-size: 12px;
+  color: #444;
+}
+
+/* 列表 */
+.tpl-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 </style>

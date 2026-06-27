@@ -9,31 +9,38 @@ from app.utils.audit_logger import set_audit_context
 # Paths that do NOT require JWT auth token (M-006 fix)
 # All API requests outside this whitelist will return 401 if no valid token.
 #
-# ⚠️ 维护规则：新增公开端点（无需登录的接口）时，必须同步在此添加路径。
+# 维护规则：新增公开端点（无需登录的接口）时，必须同步在此添加路径。
 #    忘记添加的后果：端点返回 401（安全失败，不会泄露数据）。
 #    路径变更时（如 /wines → /wine-storage）也必须同步更新此处。
-RLS_WHITELIST = {
+#
+# 两类条目：
+#   - 精确匹配（EXACT）：路径必须完全相等
+#   - 前缀匹配（PREFIX）：以该字符串开头（适合带路径参数的回调，需谨慎）
+RLS_WHITELIST_EXACT = {
     "/api/v1/auth/login",
     "/api/v1/auth/wework/login",    # WeCom OAuth callback (M-009 fix)
     "/api/v1/auth/wework/config",   # WeCom OAuth config for frontend redirect
     "/api/v1/auth/refresh",         # 使用 body 中的 refresh_token，不依赖 Authorization header
     "/api/v1/ratings",             # Guest QR code rating (POST submit, no auth)
-    "/api/v1/wine-storage/h5/",    # Guest wine status + retrieve via H5 (prefix match)
     "/api/v1/wine-storage/guest",  # Guest list wines by phone
-    "/api/v1/wework/callback",     # WeCom contact change callback (企微通讯录变更回调, prefix match)
     "/api/v1/health",
     "/docs", "/openapi.json",       # Swagger UI（生产环境已通过 docs_url=None 关闭）
     "/redoc",
 }
 
+# 前缀匹配（仅限确实需要带子路径的回调，新增需 review）
+RLS_WHITELIST_PREFIX = {
+    "/api/v1/wine-storage/h5/",    # Guest wine H5 (含子路径)
+    "/api/v1/wework/callback",     # WeCom contact change callback (企微回调,含子路径)
+}
+
 
 def _is_whitelisted(path: str) -> bool:
-    """Check if path is in the RLS whitelist (supports prefix matching)."""
-    for pattern in RLS_WHITELIST:
-        if path == pattern:
-            return True
-        # 前缀匹配: pattern 以 / 结尾，或 pattern 是 path 的某一段前缀
-        if path.startswith(pattern + "/") or (pattern.endswith("/") and path.startswith(pattern)):
+    """Check if path is in the RLS whitelist."""
+    if path in RLS_WHITELIST_EXACT:
+        return True
+    for pattern in RLS_WHITELIST_PREFIX:
+        if path == pattern or path.startswith(pattern + "/") or (pattern.endswith("/") and path.startswith(pattern)):
             return True
     return False
 

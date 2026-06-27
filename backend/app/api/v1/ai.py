@@ -27,9 +27,9 @@ router = APIRouter()
 
 
 def _ensure_admin(request: Request) -> None:
-    """仅 boss 角色可修改 AI 配置。"""
+    """仅管理员角色可修改 AI 配置。"""
     role = getattr(request.state, "role", None)
-    if role != "boss":
+    if role not in ("boss", "system_admin", "admin"):
         raise ForbiddenError("仅管理员可操作 AI 配置")
 
 

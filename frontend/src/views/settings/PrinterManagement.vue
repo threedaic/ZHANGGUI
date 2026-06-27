@@ -268,6 +268,10 @@
         </div>
         <!-- 易联云：client_id + client_secret -->
         <template v-if="printerForm.brand === 'yilianyun'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录易联云开放平台 <a href="https://dev.10ss.net/" target="_blank">dev.10ss.net</a> → 创建应用 → 获取 client_id 和 client_secret</div>
+          </div>
           <div class="form-group">
             <label class="form-label">应用ID (client_id)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="易联云开放平台获取" />
@@ -279,9 +283,13 @@
         </template>
         <!-- 飞鹅：user + ukey -->
         <template v-else-if="printerForm.brand === 'feie'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录飞鹅云后台 <a href="http://admin.feieyun.com" target="_blank">admin.feieyun.com</a> → 账号就是登录用户名 → UKEY在「开发者信息」里生成</div>
+          </div>
           <div class="form-group">
             <label class="form-label">账号 (user)</label>
-            <input v-model="printerForm.api_user" class="form-input" placeholder="飞鹅云后台注册的账号" />
+            <input v-model="printerForm.api_user" class="form-input" placeholder="飞鹅云后台注册的用户名（注意不要有空格）" />
           </div>
           <div class="form-group">
             <label class="form-label">密钥 (ukey)</label>
@@ -290,6 +298,10 @@
         </template>
         <!-- 芯烨：user + userKey -->
         <template v-else-if="printerForm.brand === 'xpyun'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录芯烨云开放平台 <a href="https://open.xpyun.net" target="_blank">open.xpyun.net</a> → 注册用户名就是 user → UserKEY在开发者中心获取</div>
+          </div>
           <div class="form-group">
             <label class="form-label">开发者ID (user)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="芯烨云平台注册用户名" />
@@ -301,6 +313,10 @@
         </template>
         <!-- 佳博：memberCode + apiKey -->
         <template v-else-if="printerForm.brand === 'gainscha'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录佳博云平台 <a href="https://www.poscom.cn" target="_blank">poscom.cn</a> → 商户编码在「账户信息」→ API密钥在「开发者设置」</div>
+          </div>
           <div class="form-group">
             <label class="form-label">商户编码 (memberCode)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="佳博云平台商户编码" />
@@ -312,6 +328,10 @@
         </template>
         <!-- 映美云：app_id + app_key -->
         <template v-else-if="printerForm.brand === 'jolimark'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录映美云开放平台 <a href="https://mcp.jolimark.com" target="_blank">mcp.jolimark.com</a> → 创建应用 → 获取 app_id 和 app_key</div>
+          </div>
           <div class="form-group">
             <label class="form-label">应用ID (app_id)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="映美云开放平台获取" />
@@ -323,6 +343,10 @@
         </template>
         <!-- 中午云：appid + appsecret + deviceid + devicesecret -->
         <template v-else-if="printerForm.brand === 'zhongwu'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录中午云开放平台 <a href="http://www.zhongwuyun.com" target="_blank">zhongwuyun.com</a> → 应用ID和密钥在「应用管理」→ 设备密钥在「设备管理」</div>
+          </div>
           <div class="form-group">
             <label class="form-label">应用ID (appid)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="中午云开放平台获取" />
@@ -342,6 +366,10 @@
         </template>
         <!-- 优声云：appId + appSecret + deviceid + devicesecret -->
         <template v-else-if="printerForm.brand === 'ushengyun'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录优声云开放平台 <a href="https://www.ushengyun.com" target="_blank">ushengyun.com</a> → 应用ID和密钥在「应用管理」→ 设备密钥在「设备管理」</div>
+          </div>
           <div class="form-group">
             <label class="form-label">应用ID (appId)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="优声云开放平台获取" />
@@ -361,6 +389,10 @@
         </template>
         <!-- 快递100：key + secret -->
         <template v-else-if="printerForm.brand === 'kuaidi100'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录快递100开放平台 <a href="https://api.kuaidi100.com" target="_blank">api.kuaidi100.com</a> → 应用管理 → 获取 Key 和 Secret</div>
+          </div>
           <div class="form-group">
             <label class="form-label">应用Key</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="快递100开放平台获取" />
@@ -372,6 +404,10 @@
         </template>
         <!-- 365智能云：deviceNo + key -->
         <template v-else-if="printerForm.brand === 'printcenter'">
+          <div class="brand-help">
+            <div class="brand-help-title">去哪里获取？</div>
+            <div class="brand-help-text">登录365智能云 <a href="http://www.printcenter.cn" target="_blank">printcenter.cn</a> → 打印机编号在设备列表 → 密钥在设备详情页</div>
+          </div>
           <div class="form-group">
             <label class="form-label">打印机编号 (deviceNo)</label>
             <input v-model="printerForm.api_user" class="form-input" placeholder="365智能云打印机编号" />
@@ -613,6 +649,13 @@ async function savePrinter() {
   if (!printerForm.name) {
     ElMessage.warning('请输入打印机名称')
     return
+  }
+
+  // 去除前后空格，防止签名错误
+  printerForm.device_sn = (printerForm.device_sn || '').trim()
+  printerForm.api_user = (printerForm.api_user || '').trim()
+  if (printerForm.api_secret) {
+    printerForm.api_secret = printerForm.api_secret.trim()
   }
 
   saving.value = true
@@ -1165,6 +1208,32 @@ onMounted(() => {
 
 .form-group {
   margin-bottom: 16px;
+}
+
+.brand-help {
+  background: #f0f7ff;
+  border: 1px solid #d6e8ff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.brand-help-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1677ff;
+  margin-bottom: 4px;
+}
+
+.brand-help-text {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.brand-help-text a {
+  color: #1677ff;
+  text-decoration: underline;
 }
 
 .form-label {

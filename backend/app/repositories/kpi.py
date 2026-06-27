@@ -187,14 +187,14 @@ class KPIRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def get_appeal_by_id(self, appeal_id: int) -> KPIAppeal | None:
+    async def get_appeal_by_id(self, appeal_id: uuid.UUID) -> KPIAppeal | None:
         stmt = select(KPIAppeal).where(
             and_(KPIAppeal.id == appeal_id, KPIAppeal.store_id == self.store_id)
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_appeal(self, appeal_id: int, **kwargs) -> KPIAppeal | None:
+    async def update_appeal(self, appeal_id: uuid.UUID, **kwargs) -> KPIAppeal | None:
         appeal = await self.get_appeal_by_id(appeal_id)
         if not appeal:
             return None

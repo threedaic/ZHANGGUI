@@ -6,6 +6,7 @@ from datetime import datetime
 from app.database import AsyncSessionLocal
 from app.services.wine_stocktake import generate_monthly_stocktake
 from app.services.notification_service import NotificationService
+from app.config import get_settings
 from loguru import logger
 
 
@@ -48,7 +49,7 @@ async def monthly_wine_stocktake_job() -> None:
                                 f"门店：{store.name}\n"
                                 f"盘点单号：#{stocktake_id}\n"
                                 f"请会计尽快扫码核对库存\n"
-                                f"链接：https://zhanggui.crushserver.cloud/management/wine-stocktake/{stocktake_id}"
+                                f"链接：{get_settings().FRONTEND_BASE_URL}/management/wine-stocktake/{stocktake_id}"
                             ),
                         )
                     else:

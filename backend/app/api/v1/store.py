@@ -64,9 +64,9 @@ async def list_all_stores(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """列出所有门店（仅 admin/boss 可用，用于切换门店下拉）。"""
+    """列出所有门店（仅 system_admin/admin/boss 可用，用于切换门店下拉）。"""
     role = getattr(request.state, "role", None)
-    if role not in ("admin", "boss"):
+    if role not in ("system_admin", "admin", "boss"):
         from app.utils.exceptions import ForbiddenError
         raise ForbiddenError("仅管理员可查看所有门店")
 
@@ -189,8 +189,8 @@ async def update_wework_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """更新企微配置字段。仅老板可操作。"""
-    require_role(request, ["boss"])
+    """更新企微配置字段。仅老板/系统管理员可操作。"""
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
 
     body_dict = body.model_dump(exclude_unset=True, exclude_none=True)
@@ -224,8 +224,8 @@ async def sync_wework_contacts(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """从企微通讯录同步员工到本地 employees 表。仅老板可操作。"""
-    require_role(request, ["boss"])
+    """从企微通讯录同步员工到本地 employees 表。仅老板/系统管理员可操作。"""
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
 
     from app.services.wework import sync_contacts
@@ -267,8 +267,8 @@ async def update_employee_role(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """更新员工角色。仅老板可操作。"""
-    require_role(request, ["boss"])
+    """更新员工角色。仅老板/系统管理员可操作。"""
+    require_role(request, ["system_admin", "boss"])
     store_id = get_store_id(request)
     new_role = body.role
 

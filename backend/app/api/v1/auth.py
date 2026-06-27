@@ -171,15 +171,15 @@ async def switch_store(
 ):
     """管理员切换当前门店（重新签发带新 store_id 的 token）。
 
-    仅 admin / boss 角色可用。其他角色调用返回 403。
+    仅 system_admin / admin / boss 角色可用。其他角色调用返回 403。
     请求体: {"store_id": "<uuid>"}
     """
     from app.utils.deps import get_user_id, require_role, make_response as _make
     import json as _json
 
-    # 鉴权：必须是 admin 或 boss
+    # 鉴权：必须是 system_admin / admin 或 boss
     role = getattr(request.state, "role", None)
-    if role not in ("admin", "boss"):
+    if role not in ("system_admin", "admin", "boss"):
         raise ForbiddenError("仅管理员可切换门店")
 
     user_id = get_user_id(request)

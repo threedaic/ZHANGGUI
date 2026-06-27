@@ -69,28 +69,30 @@ async def _push_to_user(token: str, userid: str, revenue: int, pending: bool) ->
 
         pending_str = "待打卡" if pending else "已打卡"
 
+        # 企微工作台关键数据型格式
+        # 文档: https://qiyeweixin.apifox.cn/api-10061347
         payload = {
             "agentid": int(AGENT_ID),
             "userid": userid,
-            "key": "today_data",
-            "data": {
+            "type": "keydata",
+            "keydata": {
                 "items": [
                     {
-                        "key": "revenue",
-                        "data": {"value": revenue_str},
+                        "key": "今日业绩",
+                        "data": revenue_str,
                         "jump_url": get_settings().FRONTEND_BASE_URL,
                         "pagepath": ""
                     },
                     {
-                        "key": "checkin",
-                        "data": {"value": pending_str},
+                        "key": "打卡状态",
+                        "data": pending_str,
                         "jump_url": get_settings().FRONTEND_BASE_URL,
                         "pagepath": ""
                     }
                 ]
             }
         }
-        resp = await http_client.post(url, json=payload)
+        resp = await http_client.post(url, json_body=payload)
         data = resp.json()
         if data.get("errcode") == 0:
             return True
@@ -163,7 +165,7 @@ async def set_workbench_template(db: AsyncSession, store_id) -> bool:
             },
             "replace_user_data": True
         }
-        resp = await http_client.post(url, json=payload)
+        resp = await http_client.post(url, json_body=payload)
         data = resp.json()
         if data.get("errcode") == 0:
             logger.info("工作台模板设置成功")

@@ -3,16 +3,28 @@ services:
     image: postgres:16-alpine
     container_name: crush-zhanggui-db
     environment:
-      POSTGRES_USER: crush_app
-      POSTGRES_PASSWORD: UXIe8QzwOLNjE3SWSImGhXbv6z_aCZhu
-      POSTGRES_DB: crush_zhanggui
+      POSTGRES_USER: ${POSTGRES_USER:-crush_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-crush_zhanggui}
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crush_app -d crush_zhanggui"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crush_app} -d ${POSTGRES_DB:-crush_zhanggui}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: crush-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,6 +38,8 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     deploy:
       resources:

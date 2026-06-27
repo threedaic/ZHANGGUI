@@ -73,21 +73,6 @@
         </span>
       </button>
 
-      <button class="func-card" @click="goAIConfig">
-        <span class="card-icon">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
-            <circle cx="14" cy="14" r="8"/>
-            <path d="M14 10v8"/>
-            <path d="M10 14h8"/>
-          </svg>
-        </span>
-        <span class="card-label">AI 视觉配置</span>
-        <span class="card-desc">配置图像识别模型</span>
-        <span class="card-arrow">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3l4 4-4 4" stroke="#7A7C80" stroke-width="1.2" stroke-linecap="round"/></svg>
-        </span>
-      </button>
-
       <button class="func-card" @click="goConfig">
         <span class="card-icon">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#FB0079" stroke-width="1.5" stroke-linecap="round">
@@ -240,7 +225,7 @@ function goDashboard() {
 }
 
 function goAIConfig() {
-  router.push('/settings/ai')
+  router.push('/settings/ai-config')
 }
 
 function goWecomBot() {

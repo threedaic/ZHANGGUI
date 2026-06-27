@@ -78,11 +78,21 @@ async def get_access_token(db: AsyncSession, store_id: uuid.UUID | None = None) 
 
 # ==================== 通讯录同步（部门+角色映射） ====================
 
-# 角色映射规则常量
-BOSS_DEPT_KEYWORD = "管理"  # 名称含此关键字的部门成员 → boss
-ROLE_BOSS = "boss"
-ROLE_STORE_MANAGER = "store_manager"
-ROLE_STAFF = "staff"
+# ============================================================
+# 角色映射规则常量 (连锁品牌四级权限体系, 参见 SPEC §0)
+# ============================================================
+# ⚠️ 重要不可遗忘：企微「Crush 管理」部门的所有成员 = system_admin
+#    系统管理员管全品牌全部门店，不绑定具体门店。
+#    管理群成员不是单店老板(boss)，是系统管理员(system_admin)！
+ADMIN_DEPT_KEYWORD = "管理"  # 名称含此关键字且 parentid=1 的部门 → 管理部门
+ROLE_SYSTEM_ADMIN = "system_admin"      # 系统管理员: 全品牌, 不绑门店 (管理群成员)
+ROLE_BOSS = "boss"                      # 单店老板: 绑一家门店
+ROLE_STORE_MANAGER = "store_manager"    # 店长: 管一家店日常运营
+ROLE_STAFF = "staff"                    # 员工: 只看自己的数据
+
+# 总部门店 ID：system_admin 不绑定具体门店，统一归到「总部」
+# RLS admin_all_access 策略对 system_admin 放开，让其可跨门店管理全品牌数据
+HQ_STORE_ID = "00000000-0000-0000-0000-000000000001"
 
 
 def _resolve_role(
@@ -91,33 +101,40 @@ def _resolve_role(
     is_leader: bool,
     admin_dept_ids: set[int],
     boss_userids: set[str],
+    system_admin_userids: set[str] | None = None,
 ) -> str:
-    """规则引擎：根据企微用户属性决定角色。
+    """规则引擎：根据企微用户属性决定角色（四级权限体系）。
 
     优先级（从高到低）：
-    1. BOSS_WEWORK_USERIDS 白名单 → boss（永不降级）
-    2. 属于「管理」部门 → boss
-    3. 是部门负责人 (is_leader_in_dept=1) → store_manager
-    4. 其他 → staff
+    1. SYSTEM_ADMIN_USERIDS 白名单 → system_admin（全品牌管理员，最高优先级）
+    2. 属于「管理」部门 → system_admin（管理群成员 = 系统管理员，不是boss!）
+    3. BOSS_WEWORK_USERIDS 白名单 → boss（单店老板）
+    4. 是部门负责人 (is_leader_in_dept=1) → store_manager
+    5. 其他 → staff
     """
-    # 1. 强制 boss 白名单
+    # 1. 系统管理员白名单（最高优先级，管理群成员）
+    if system_admin_userids and userid in system_admin_userids:
+        logger.debug(f"角色映射: {userid} → system_admin (白名单)")
+        return ROLE_SYSTEM_ADMIN
+
+    # 2. 管理部门成员 → system_admin（管理群 = 系统管理员！）
+    if admin_dept_ids:
+        member_admin = bool(set(dept_ids) & admin_dept_ids)
+        if member_admin:
+            logger.debug(f"角色映射: {userid} → system_admin (管理部)")
+            return ROLE_SYSTEM_ADMIN
+
+    # 3. 单店老板白名单
     if boss_userids and userid in boss_userids:
         logger.debug(f"角色映射: {userid} → boss (白名单)")
         return ROLE_BOSS
 
-    # 2. 管理部门成员 → boss
-    if admin_dept_ids:
-        member_admin = bool(set(dept_ids) & admin_dept_ids)
-        if member_admin:
-            logger.debug(f"角色映射: {userid} → boss (管理部)")
-            return ROLE_BOSS
-
-    # 3. 部门负责人 → store_manager
+    # 4. 部门负责人 → store_manager
     if is_leader:
         logger.debug(f"角色映射: {userid} → store_manager")
         return ROLE_STORE_MANAGER
 
-    # 4. 普通成员
+    # 5. 普通成员
     return ROLE_STAFF
 
 
@@ -198,11 +215,12 @@ async def _fetch_department_users(token: str, dept_id: int, fetch_child: bool = 
 async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
     """同步企微通讯录到本地 employees 表，自动映射角色。
 
-    角色映射规则（优先级从高到低）：
-    1. BOSS_WEWORK_USERIDS 白名单 → boss
-    2. 名称含「管理」的部门成员 → boss
-    3. 部门负责人 (is_leader_in_dept=1) → store_manager
-    4. 其余 → staff
+    角色映射规则（四级权限体系，优先级从高到低）：
+    1. SYSTEM_ADMIN_USERIDS 白名单 → system_admin（全品牌管理员）
+    2. 名称含「管理」的部门成员 → system_admin（管理群 = 系统管理员）
+    3. BOSS_WEWORK_USERIDS 白名单 → boss（单店老板）
+    4. 部门负责人 (is_leader_in_dept=1) → store_manager
+    5. 其余 → staff
 
     如果 store 配置了 wework_department_id，仅同步该部门及其子部门的成员。
     """
@@ -229,9 +247,9 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
         dept_children.setdefault(parentid, []).append(did)
         dept_id_by_name[name] = did
 
-        if BOSS_DEPT_KEYWORD in name and parentid == 1:
+        if ADMIN_DEPT_KEYWORD in name and parentid == 1:
             admin_dept_ids.add(did)
-            logger.info(f"识别管理部门: id={did} name={name}")
+            logger.info(f"识别管理部门(→system_admin): id={did} name={name}")
 
     # 自动识别门店部门（如果未手动配置 wework_department_id）
     if not root_dept_id and store:
@@ -262,12 +280,18 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
             f"可用部门={list(dept_id_by_name.keys())}"
         )
 
-    # Step 2: 获取 BOSS 白名单
+    # Step 2: 获取角色白名单
     settings = get_settings()
     boss_userids: set[str] = set()
     if settings.BOSS_WEWORK_USERIDS:
         boss_userids = {uid.strip() for uid in settings.BOSS_WEWORK_USERIDS.split(",") if uid.strip()}
         logger.info(f"BOSS 白名单: {boss_userids}")
+
+    # 系统管理员白名单（管理群成员 = 全品牌管理员）
+    system_admin_userids: set[str] = set()
+    if settings.SYSTEM_ADMIN_USERIDS:
+        system_admin_userids = {uid.strip() for uid in settings.SYSTEM_ADMIN_USERIDS.split(",") if uid.strip()}
+        logger.info(f"SYSTEM_ADMIN 白名单: {system_admin_userids}")
 
     # Step 3: 拉取指定部门成员
     wecom_users: list[dict] = []
@@ -309,6 +333,7 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
         "created": 0,
         "updated": 0,
         "role_changed": 0,
+        "system_admin_count": 0,
         "boss_from_env": 0,
         "boss_from_dept": 0,
         "manager_from_leader": 0,
@@ -328,7 +353,7 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
             # is_leader_in_dept 是数组，取该成员所在部门中的 leader 状态
             is_leader = bool(wu.get("is_leader_in_dept", [0])[0]) if wu.get("is_leader_in_dept") else False
 
-            role = _resolve_role(userid, dept_ids, is_leader, admin_dept_ids, boss_userids)
+            role = _resolve_role(userid, dept_ids, is_leader, admin_dept_ids, boss_userids, system_admin_userids)
 
             # 部门名称：取第一个同步范围内的部门名（员工可能属于多个部门）
             dept_name = ""
@@ -341,10 +366,12 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                 dept_name = dept_name_by_id.get(dept_ids[0], "")
 
             # 统计
-            if boss_userids and userid in boss_userids:
-                result["boss_from_env"] += 1
+            if system_admin_userids and userid in system_admin_userids:
+                result["system_admin_count"] += 1
             elif admin_dept_ids and (set(dept_ids) & admin_dept_ids):
-                result["boss_from_dept"] += 1
+                result["system_admin_count"] += 1
+            elif boss_userids and userid in boss_userids:
+                result["boss_from_env"] += 1
             elif is_leader:
                 result["manager_from_leader"] += 1
             else:
@@ -352,6 +379,9 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
 
             # 查本地记录
             emp = existing_map.get(userid)
+            # system_admin 不绑定具体门店，统一归到「总部」
+            # 其他角色：保持原 store_id（更新时）或用当前同步门店（新建时）
+            target_store_id = uuid.UUID(HQ_STORE_ID) if role == ROLE_SYSTEM_ADMIN else store_id
             if emp:
                 changed = False
                 if emp.name != name:
@@ -360,9 +390,11 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                 if emp.role != role:
                     old_role = emp.role
                     emp.role = role
+                    # 角色变更时同步 store_id（system_admin → 总部；其他 → 当前门店）
+                    emp.store_id = target_store_id
                     changed = True
                     result["role_changed"] += 1
-                    logger.info(f"角色变更: {userid} {old_role} → {role}")
+                    logger.info(f"角色变更: {userid} {old_role} → {role}  store_id → {target_store_id}")
                 if emp.department != dept_name:
                     emp.department = dept_name
                     changed = True
@@ -372,7 +404,7 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
                     result["synced"] += 1
             else:
                 new_emp = Employee(
-                    store_id=store_id,
+                    store_id=target_store_id,
                     employee_code=f"WX-{userid[:10]}",
                     name=name,
                     role=role,
@@ -401,7 +433,8 @@ async def sync_contacts(db: AsyncSession, store_id: uuid.UUID) -> dict:
     logger.info(
         f"通讯录同步完成: created={result['created']} updated={result['updated']} "
         f"synced={result['synced']} role_changed={result['role_changed']} "
-        f"boss=({result['boss_from_env']}+{result['boss_from_dept']}) "
+        f"system_admin={result['system_admin_count']} "
+        f"boss={result['boss_from_env']} "
         f"manager={result['manager_from_leader']} staff={result['staff_count']}"
     )
     return result

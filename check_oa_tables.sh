@@ -1,0 +1,11 @@
+#!/bin/bash
+echo "=== OA tables check ==="
+docker exec crush-zhanggui-db psql -U crush_app -d crush_zhanggui -tAc "SELECT tablename FROM pg_tables WHERE tablename LIKE 'oa\_%';"
+echo "=== Butler tables check ==="
+docker exec crush-zhanggui-db psql -U crush_app -d crush_zhanggui -tAc "SELECT tablename FROM pg_tables WHERE tablename LIKE 'butler\_%' LIMIT 5;"
+echo "=== Stores ==="
+docker exec crush-zhanggui-db psql -U crush_app -d crush_zhanggui -tAc "SELECT store_id, store_name FROM shared_stores;"
+echo "=== Employees ==="
+docker exec crush-zhanggui-db psql -U crush_app -d crush_zhanggui -tAc "SELECT employee_id, name, role FROM shared_employees LIMIT 5;"
+echo "=== Sys users ==="
+docker exec crush-zhanggui-db psql -U crush_app -d crush_zhanggui -tAc "SELECT user_id, username, role FROM sys_users;"

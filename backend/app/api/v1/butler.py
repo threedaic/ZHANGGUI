@@ -68,7 +68,7 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
 ):
     """创建清单模板（老板/店长）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "system_admin", "store_manager"])
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     user_id = get_user_id(request)
@@ -93,7 +93,7 @@ async def update_template(
     db: AsyncSession = Depends(get_db),
 ):
     """更新模板信息"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "system_admin", "store_manager"])
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     tpl = await repo.get_template(template_id)
@@ -113,7 +113,7 @@ async def delete_template(
     db: AsyncSession = Depends(get_db),
 ):
     """删除模板"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "system_admin", "store_manager"])
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     tpl = await repo.get_template(template_id)
@@ -132,7 +132,7 @@ async def batch_update_items(
     db: AsyncSession = Depends(get_db),
 ):
     """批量更新模板的清单项（全量替换）"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "system_admin", "store_manager"])
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     tpl = await repo.get_template(template_id)
@@ -277,7 +277,7 @@ async def item_review(
     db: AsyncSession = Depends(get_db),
 ):
     """店长/老板人工复核一个检查项"""
-    require_role(request, ["boss", "store_manager"])
+    require_role(request, ["boss", "system_admin", "store_manager"])
     store_id = get_store_id(request)
     user_id = get_user_id(request)
     data = await manual_review(db, store_id, session_id, result_id, user_id, body.action, body.comment)
@@ -303,6 +303,93 @@ async def item_resubmit(
     return make_response(request=request, data=data, message="已重新提交")
 
 
+# ==================== 今日待办状态（首页提醒条用）====================
+
+@router.get("/today-status")
+async def get_today_status(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    返回当前门店今日的开/闭店检查状态。
+    前端首页提醒条调用此接口，判断是否显示"闭店检查还没做"。
+
+    返回:
+      - has_opening_template: 是否配置了开店检查单
+      - has_closing_template: 是否配置了闭店检查单
+      - opening_done: 今日开店检查是否已完成
+      - closing_done: 今日闭店检查是否已完成
+      - opening_session: 今日开店会话信息（没有则 null）
+      - closing_session: 今日闭店会话信息（没有则 null）
+      - pending: 待办列表（用于首页提醒条展示）
+    """
+    store_id = get_store_id(request)
+    repo = ButlerRepository(db, store_id)
+
+    from datetime import date
+    today = date.today()
+
+    # 查模板
+    opening_tpls = await repo.list_templates(session_type="opening")
+    closing_tpls = await repo.list_templates(session_type="closing")
+    has_opening = len(opening_tpls) > 0
+    has_closing = len(closing_tpls) > 0
+
+    # 查今日会话
+    sessions, _ = await repo.list_sessions(page=1, page_size=50)
+    today_opening = None
+    today_closing = None
+    for s in sessions:
+        if s.started_at and s.started_at.date() == today:
+            info = {
+                "id": str(s.id),
+                "status": s.status,
+                "total_items": s.total_items,
+                "completed_items": s.completed_items,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+            }
+            if s.session_type == "opening":
+                today_opening = info
+            elif s.session_type == "closing":
+                today_closing = info
+
+    opening_done = today_opening and today_opening["status"] == "completed"
+    closing_done = today_closing and today_closing["status"] == "completed"
+
+    # 组装 pending 列表
+    from datetime import datetime as dt
+    now = dt.now()
+    current_hour = now.hour
+
+    pending = []
+    # 开店检查：只在上午显示（6:00-14:00）
+    if has_opening and not opening_done and 6 <= current_hour <= 14:
+        pending.append({
+            "type": "opening",
+            "label": "开店检查",
+            "session_id": today_opening["id"] if today_opening else None,
+            "completed": today_opening["completed_items"] if today_opening else 0,
+            "total": today_opening["total_items"] if today_opening else 0,
+        })
+    # 闭店检查：只在晚上显示（20:00-次日4:00）
+    if has_closing and not closing_done and (current_hour >= 20 or current_hour <= 4):
+        pending.append({
+            "type": "closing",
+            "label": "闭店检查",
+            "session_id": today_closing["id"] if today_closing else None,
+            "completed": today_closing["completed_items"] if today_closing else 0,
+            "total": today_closing["total_items"] if today_closing else 0,
+        })
+
+    return make_response(request=request, data={
+        "has_opening_template": has_opening,
+        "has_closing_template": has_closing,
+        "opening_done": opening_done,
+        "closing_done": closing_done,
+        "pending": pending,
+    })
+
+
 # ==================== 看板 ====================
 
 @router.get("/dashboard")
@@ -311,7 +398,7 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     """多店开闭店状态看板（仅老板）"""
-    require_role(request, ["boss"])
+    require_role(request, ["boss", "system_admin"])
     store_id = get_store_id(request)
     repo = ButlerRepository(db, store_id)
     data = await repo.get_all_stores_status()
