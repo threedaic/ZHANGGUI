@@ -326,19 +326,64 @@ await sign_service.send_to_inbox(
 | 后端源码 | `/opt/crush-zhanggui/backend/` |
 | 前端部署 | `/var/www/zhanggui-sub/` (Nginx 静态) |
 | 容器 | crush-zhanggui-api (8001), crush-zhanggui-db (5433), crush-redis (6379) |
+| 生产地址 | https://zhanggui.crushserver.cloud |
+| 本地前端 | http://localhost:5173/zhanggui/ (vite dev) |
+| 本地后端 | http://localhost:8001 (uvicorn) |
 
-### 部署命令
+### 部署铁律（不可违反）
+
+1. **禁止 `docker cp` 直接改容器内代码**（热修补）—— 容器重建后修复会丢失，且无法追踪
+2. **禁止在服务器上直接改代码** —— 服务器 git 仓库只做 pull，不做编辑
+3. **所有改动必须走 git 流程**：本地改 → `git commit` → `git push` → 服务器 `git pull` → `docker build`
+4. **紧急修复也走这个流程**，不允许跳过。宁可多花 2 分钟走流程，也不要用 docker cp 留隐患
+5. **部署后必须验证**：`git log -1` 确认 commit 一致 + 健康检查 `curl /api/v1/health`
+
+违反铁律的后果：容器内代码与 git 仓库脱节，排错困难，多人协作时互相覆盖。
+
+### 本地调试 vs 服务器调试
+
+- **日常开发调试：在本地**。浏览器输入 `http://localhost:5173/zhanggui/`
+  - 前端 vite dev 热更新，后端 uvicorn --reload 热更新
+  - 数据库连 docker postgres 容器（5433 端口），禁止连宿主机 postgres（5434）
+- **验证生产环境：在服务器**。浏览器输入 `https://zhanggui.crushserver.cloud`
+  - 只在本地验证通过后，才部署到服务器验证
+  - 不要直接在生产环境上调代码
+
+### 正规部署流程
+
 ```bash
-# 后端: 上传代码 + 重建容器
-cd crush-zhanggui/backend && tar czf - app/ | ssh root@49.233.181.87 \
-  "cd /opt/crush-zhanggui/backend && rm -rf app/ && tar xzf -"
-ssh root@49.233.181.87 "docker compose -f /opt/crush-zhanggui/docker-compose.yml up -d --build backend"
+# ========== 后端部署 ==========
+# 1. 本地提交并推送
+cd crush-zhanggui
+git add backend/
+git commit -m "fix: 描述本次修改"
+git push origin trae/generated-code
 
-# 前端: 本地构建 + 上传
-cd crush-zhanggui/frontend && npx vite build
-cd crush-zhanggui/frontend && tar czf - dist/ | ssh root@49.233.181.87 \
+# 2. 服务器拉取并重建
+ssh -i Crush3dai.pem root@49.233.181.87
+cd /opt/crush-zhanggui
+git fetch origin
+git reset --hard origin/trae/generated-code   # 强制对齐远程，丢弃本地脏改
+cd backend && docker compose -f /opt/crush-zhanggui/docker-compose.yml up -d --build backend
+
+# 3. 验证
+curl http://localhost:8001/api/v1/health
+git log -1 --oneline   # 确认 commit 与本地一致
+
+# ========== 前端部署 ==========
+# 1. 本地构建
+cd crush-zhanggui/frontend
+npx vite build
+
+# 2. 上传到服务器（前端不走 git，直接传 dist）
+tar czf - dist/ | ssh -i Crush3dai.pem root@49.233.181.87 \
   "cd /var/www/zhanggui-sub && rm -rf assets/ && tar xzf - && mv dist/* . && rm -rf dist/"
+
+# 3. 验证
+curl -s https://zhanggui.crushserver.cloud/ | grep -o '<title>[^<]*</title>'
 ```
+
+> 前端不走 git 的原因：dist 是构建产物，体积大且每次变化，不适合纳入版本控制。前端源码在本地 git 仓库管理，部署时只传构建产物。
 
 ---
 
